@@ -1,0 +1,82 @@
+features-planned.txt
+12/02/2022
+
+Relay driver FETs
+  Timer driven (pwm)
+   Flyback diodes
+   4 pin keyed Molex
+   1a load or less
+- Contactor precharge relay
+- Cooling pump motor relay
+- Air compressor motor relay (probably one per winch)
+- AC/DC switch relay (probably one per winch)
+
+HV FETs (>80v Vds)
+  Timer driven (pwm)
+   Flyback diodes (optional)
+   4 pin keyed
+   1a load or less
+- Contactor #1 coil
+- Contactor #2 coil
+
+High current FETs
+  Timer driven (pwm)
+  Flyback diodes
+  10a or less
+  Spade lugs or PowerPole stub
+- DMOC FANs (4a) 
+- Heat exchanger FAN (6a)
+
+I/O pin (not FET) driven LEDs
+- LED Grn: program status
+- LED Red: program status
+- LED Red: BMS12v pwr on (?)
+
+Power status LEDs
+- PFET 12v BMS power
+- Polarity protected 12v power
+
+I/O inputs
+- Contactor #1 aux contact
+- Contactor #2 aux contact
+- WHAT ELSE?
+
+USART
+  DMA channel available
+- Monitor/debugging (TX/RX)
+- Rx isolated HV measurements
+- EMC/hub communication
+
+CAN
+- CAN1: BMS bus
+- CAN2: JIC, not 12v pwr switched
+
+ADC inputs
+- 12v after polarity PFET (onboard)
+(The following might better be done on the isolated contactor HV processor 
+  since the bmsmot main circuits are high current and some are pwm'ing.)
+- Hall-effect sensor (3 pin Molex keyed)
+
+(The resolution for the following is not high so they can be on the system
+ side pcb)
+- Coolant inlet temp thermistor (2 pin hdr)
+- Coolant outlet temp thermistor (2 pin hdr)
+- Ambient (coolant/heat exchanger) air temp (2 pin hdr)
+
+Isolated HV measurement
+- 'L431 processor
+- opto-isolator, uart tx via FET drive 
+- four HV adc divider inputs (0.1" header)
+- 5v dc-dc 
+- Hall effect sensor input (3 pin keyed)
+(dc-dc may need to be greater than 5v so that a linear regulator
+ feeds the 5v for the Hall effect sensor)
+
+
+Misc--
+- 12 power polarity protection PFET (BMS + DMOC fans + FETs = ~12a)
+- Pushbutton reset processor
+- Pushbutton Master Reset (?)
+- jumper to by-pass 12v BMS power PFET, or have BMS 12v constant on
+- opto-isolated Master reset
+- CR2032 coin cell (VBAT)

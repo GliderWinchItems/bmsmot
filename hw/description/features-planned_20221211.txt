@@ -1,0 +1,87 @@
+features-planned_20221211.txt
+12/11/2022
+
+A. FET with 4 pin keyed JST connector
+- Pins: (gnd, signal, +5, +12)
+- NFET switches signal line
+- 20v, 1a or 2a SOT23
+- Flyback diode option
+- Timers (TIM1:1234, TIM2:34, TIM12:12, TIM8:1234)
+1.  Cooling pump motor (2)
+2.  Heat exchanger FAN (2)
+3.  Cooling power supply enable(?) (3)
+4.  DMOC FANs (2) 
+5.  Contactor #1 coil (1)
+6.  Contactor #2 coil (1)
+7.  Air compressor motor (1)(4)
+8.  AC/DC select (1)(4)
+9.  AD&DC ON/OFF(1)(4)
+10. DMOC enable
+11. spare
+12. spare
+
+(1) - relay (flyback diode installed)
+(2) - to sub-board with isolated high current FET
+(3) - ON/OFF
+(4) - One per winch
+
+CAN
+- CAN1: BMS bus: 
+  Master Reset on/off fet drive
+  12v high current 
+  RJ45 jacks/DE9 connector pair for loop
+  RJ45 jacks in & out
+
+- CAN2: JIC
+  12v low current
+  in & out RJ45 jacks
+
+I/O pin (not FET) driven LEDs
+- LED Grn: program status
+- LED Red: program status
+
+Power status LED
+
+I/O inputs
+- Contactor #1 aux contact
+- Contactor #2 aux contact
+- WHAT ELSE?
+
+USART
+  DMA channel available
+- Monitor/debugging (TX/RX)
+- Rx isolated HV measurements
+- EMC/MMC hub communication option
+
+ADC inputs: 2 pin headers
+- pins: (gnd, signal w pullup)
+- 10K pullup to 3.3v Vdd
+1. thermistor: ambient air temp
+2. thermistor: coolant inlet temp
+3. thermistor: coolant outlet temp
+4. thermistor: DMOC heat sink temp
+
+ADC inputs: 3 pin headers
+- pins: (gnd, signal, +5v)
+- Divider: 5-to-3.3v signal level
+5. Hall-effect current sensor
+6. Pressure sensor
+
+ADC inputs: on-board
+7. 12v supply
+8. Internal temperature
+
+Isolated HV measurement
+- 'L431 processor
+- opto-isolator, uart tx via FET drive 
+- four HV adc divider inputs (0.1" header)
+- 5v dc-dc 
+- Hall effect sensor input (3 pin keyed)
+(dc-dc may need to be greater than 5v so that a linear regulator
+ feeds the 5v for the Hall effect sensor)
+
+Misc--
+- Pushbutton reset processor
+- Pushbutton Master Reset (?)
+- Master reset
+- CR2032 coin cell (VBAT)

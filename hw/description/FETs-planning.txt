@@ -1,0 +1,65 @@
+FETs-planning.txt
+12/02/2022
+
+1. PFET: SiSS63DN-T1-GE3
+  https://www.mouser.com/datasheet/2/427/siss63dn-1765617.pdf
+  $1.08 qty-1
+  Package: PowerPAK 1212-8S
+  Rds 2.2 mOhm @ -10v Vgs
+
+  (1) BMS 12v power switch (5.5a max load)
+  (2) Polarity protection (~18a max?)
+
+2. NFET: BUK6D22-30EX
+  https://www.mouser.com/datasheet/2/916/BUK6D22_30E-1588536.pdf
+  $0.43 qty-1
+  Rds 22 mOhm @ 4.5v Vgs
+
+  Alternative: IRFS3006-7 (1.2 mOhm, 60v 240a, 35 parts in-hand)
+
+
+  Gate driver: DMG2302WT-7
+  https://www.mouser.com/datasheet/2/115/DIOD_S_A0012884460_1-2543861.pdf
+  $0.80 qty-1
+
+  Flyback diode: SS14_R1_00001
+  https://www.mouser.com/datasheet/2/1057/SS12_SERIES-1877093.pdf
+  $0.27 qty-1
+
+  Connector: Spade lugs or PowerPole stub
+  (1) DMOC fans (4.5a)
+  (2) Heat exchanger FAN (6a direct) 
+
+3. NFET: DMP3007SCG-7
+  https://www.diodes.com/assets/Datasheets/DMG2302UK.pdf
+  $0.279 qty-10
+  Package: DFN3333
+
+  Gate driver(s): 74VHCT125PW (4 non-inverting. Use two for 8)
+  https://www.mouser.com/datasheet/2/916/74VHC_VHCT125-2937642.pdf
+  $0.26 qty-1
+
+  Flyback diode: SS14_R1_00001
+  Connector: 3 pin keyed Molex (+relay,-relay, gnd )
+  (1) Cooling pump motor relay
+  (2) Air compressor motor relay (probably one per winch)
+  (3) AC/DC switch relay (probably one per winch)
+  (4) Pre-charge relay (optional)
+
+  No flyback diode, no driver, no connector
+  (4) BMS Master-Reset on/off
+  (5) BMS power PFET on/off
+
+4. NFET: SI2324-ATP (100v 1a)
+  https://www.mouser.com/datasheet/2/258/SI2324A_SOT_23_-2510923.pdf
+  $0.43 qty-1
+  Package: SOT23-3
+
+  No flyback diode required
+ (1) Contactor #1 coil
+ (2) Contactor #2 coil
+
+ 5. Isolated FET sub-board
+
+ Gate driver: RLP141A
+ 
