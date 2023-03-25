@@ -1,0 +1,82 @@
+
+headers-is-assignments.txt
+03/24/2023
+
+Header
+
+FET Output (4 pin)--
+SUB1 - PB2 - T2C4
+
+SUB2 - PB10 - T2C3
+
+SUB3 - PB14 - T12C1,T1C2N,T8C2N
+
+SUB4 - PB15 - T1C2,T1CH3N,T8CH3N
+
+SUB5 - PC6 - T3C1,T8C1
+
+SUB6 - PC7 - T3C1,T8C1
+
+SUB7 - PC8 - T3C3,T8C3
+
+SUB8 - PC9 - T3C4,T8C4
+
+74VHCT125 Output (3 pin)
+xxSUB4 - PA8 - T1C1
+
+xxSUB5 - PA10 - T1C3
+
+xxSUB10 - PA9 - T1C2
+
+xxSUB11 - PA11 - T1C4
+
+JP20-SUB14 (2 pin) - PB3
+
+ADC (2 pin; 10K pullup)
+
+JP1 - PC0
+
+JP8 - PC1
+
+JP9 - PC2
+ 
+JP10 - PC3
+
+
+UART/USART
+
+USART2 Tx - PA2 (uart-uart)
+USART2 Rx - PA3 (uart-uart)
+
+USART3 - Rx - PC11 (FTDI monitor)
+USART3 - Tx - PC10 (FTDI monitor)
+
+UART5 - Rx - PD2 (isolated 'L431)
+
+
+CAN
+
+CAN1 Rx - PB8
+CAN1 Tx - PB9
+
+CAN2 Rx - PB5
+CAN2 Tx - PB6
+
+LED
+
+GRN LED1 - power +12v protected
+GRN LED2 - PB0
+RED LED3 - PB1
+
+NON-HEADER FEATURE ASSIGNMENTS
+
+Power wake-up FET1 PC13
+
+Master-reset FET5 PA5
+
+
+
+
+
+
+
