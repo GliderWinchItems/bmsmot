@@ -1,6 +1,6 @@
 EAGLE Version 4.13 Copyright (c) 1988-2004 CadSoft
 
-Electrical Rule Check for /mnt/home/deh/GliderWinchItems/bmsmot/hw/eagle/bmsmot/bmsmot.sch at  3/24/2023 16:06:36 
+Electrical Rule Check for /mnt/home/deh/GliderWinchItems/bmsmot/hw/eagle/bmsmot/bmsmot.sch at  3/26/2023 13:07:28 
 
 WARNING: Sheet 1/2: POWER Pin U2POWER VDD_1 connected to VCC
 WARNING: Sheet 1/2: POWER Pin U2POWER VDD_2 connected to VCC
@@ -10,7 +10,6 @@ WARNING: Sheet 1/2: POWER Pin U2POWER VSS_2 connected to VSS_3
 WARNING: Sheet 1/2: POWER Pin U2POWER VSS_3 connected to GND
 WARNING: Sheet 1/2: POWER Pin U2POWER VDD_4 connected to VCC
 WARNING: Sheet 1/2: POWER Pin U2POWER VSS_4 connected to GND
-WARNING: Sheet 1/2: POWER Pin U2AN_POWER VBAT connected to N$4
 WARNING: Sheet 1/2: POWER Pin U2AN_POWER VSSA connected to GND
 WARNING: Sheet 1/2: POWER Pin U2AN_POWER VDDA connected to VDDA1
 WARNING: Sheet 1/2: POWER Pin IC1 VSS connected to GND
@@ -29,8 +28,21 @@ WARNING: Sheet 1/2: POWER Pin STM32L431AN_POWER VDDA connected to N$20
 WARNING: Sheet 1/2: POWER Pin IC3 VSS connected to GND
 WARNING: Sheet 1/2: POWER Pin IC4 VSS connected to GND
 WARNING: Sheet 1/2: POWER Pin IC5P VCC connected to +5V
+WARNING: Sheet 1/2, Net GND: missing Junction at (10.9 4.9)
+WARNING: Sheet 1/2, Net GND: missing Junction at (11.325 4.9)
+WARNING: Sheet 1/2, Net VCC: missing Junction at (11 4.5)
+WARNING: Sheet 1/2, Net VCC: missing Junction at (11.425 4.5)
+WARNING: Sheet 1/2, Net PC13: missing Junction at (9.325 7.275)
+WARNING: Sheet 1/2, Net GND: close but unconnected wires at (10.9 4.9)
+WARNING: Sheet 1/2, Net GND: close but unconnected wires at (10.9 4.9)
+WARNING: Sheet 1/2, Net GND: close but unconnected wires at (11.325 4.9)
+WARNING: Sheet 1/2, Net GND: close but unconnected wires at (11.325 4.9)
+WARNING: Sheet 1/2, Net VCC: close but unconnected wires at (11 4.5)
+WARNING: Sheet 1/2, Net VCC: close but unconnected wires at (11 4.5)
+WARNING: Sheet 1/2, Net VCC: close but unconnected wires at (11.425 4.5)
+WARNING: Sheet 1/2, Net VCC: close but unconnected wires at (11.425 4.5)
 
 Board and schematic are consistent
 
     0 errors
-   27 warnings
+   39 warnings

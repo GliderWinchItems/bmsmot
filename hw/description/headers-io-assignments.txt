@@ -1,21 +1,22 @@
 
-headers-is-assignments.txt
+headers-io-assignments.txt
 03/24/2023
 
 Header
 
 FET Output (4 pin)--
+(T = TIM/timer, C = Channel)
 SUB1 - PB2 - T2C4
 
 SUB2 - PB10 - T2C3
 
 SUB3 - PB14 - T12C1,T1C2N,T8C2N
 
-SUB4 - PB15 - T1C2,T1CH3N,T8CH3N
+SUB4 - PB15 - T1C2,T1C3N,T8C3N
 
 SUB5 - PC6 - T3C1,T8C1
 
-SUB6 - PC7 - T3C1,T8C1
+SUB6 - PC7 - T3C3,T8C2
 
 SUB7 - PC8 - T3C3,T8C3
 
@@ -52,6 +53,7 @@ USART3 - Rx - PC11 (FTDI monitor)
 USART3 - Tx - PC10 (FTDI monitor)
 
 UART5 - Rx - PD2 (isolated 'L431)
+UART5 - Tx - PC12 (isolated'L431)
 
 
 CAN
@@ -74,9 +76,99 @@ Power wake-up FET1 PC13
 
 Master-reset FET5 PA5
 
+=== Isolated L431 headers ===
+
+JP15 (6 pin) FTDI UART-USB
+
+JP16 (3 pin) SWD
+
+JP17 (4 pin) HV dividers
+1 - gnd
+2 - divider 1 R22|R25
+3 - divider 2 R14|R21
+4 - divider 3 R10|R13
+
+JP13 (3 pin) Hall-effect sensor
+1 - GNDA ('L431 gnd isolated from 'F446 gnd)
+2 - signal input: R26|R27 5v->3.3V divider
+3 - +5V/3 linear regulated 5v
 
 
+================ Configuration EMC/MMC local ======================
 
+SUB1 - Contactor coil #1
+ NFET 100v 0.17a no diodes, no pullups
+ PB2 - Output i/o
 
+SUB2 - Contactor coil #2
+ NFET 100v 0.17a no diodes, no pullups
+ PB10 - Output i/o
 
+SUB3 - ELCON Charger input (AC|DC) ON/OFF relay
+ NFET 20V 0.9a, diode
+ PB14 - T12C1 PWM
 
+SUB4 - SCP & RCP supply ON/OFF relay
+ NFET 20V 0.9a, diode
+ PB15 - T1C2 PWM
+
+ SUB5 - ELCON Charger Output ON/OFF relay
+ NFET 20V 0.9a, diode
+ PC6 - T3C1 | T8C1 PWM
+
+ SUB6 - SCP supply output ON/OFF relay
+  PC7 - T3C2,T8C2 PWM
+
+xxSUB4 - Cooling pump +12v motor
+ External isolated power FET sub-board
+ PA8 - T1C1 PWM
+
+xxSUB5 - Heat exchanger _12v fan/blowr
+ External isolated power FET sub-board
+ PA10 - T1C3 PWM
+
+xxSUB10 - DMOC 12v fans
+ External isolated power FET sub-board
+ PA9 - T1C2 PWM
+
+xxSUB11 - spare
+
+'L431 JP13 - ADC
+1 Battery string gnd
+2 ? Contactor #1 voltage
+3 ? Contactor charging resistor voltage
+4 ? Contactor capacitor voltage
+
+JP1
+ PC0 - ADC Ambient air temp
+
+JP8
+ PC1 - ADC Coolant inlet temp
+
+JP9
+ PC2 - ADC Coolant outlet temp
+
+'L431 - ADC
+JP13 - Hall-effect sensor: string current
+
+================ Configuration PSC (Power Supply Control) =====================
+
+SUB1 - Air compressor relay  on/off
+ NFET 20V 0.9a, diode
+ PB2 - T2C4 PWM
+
+ SUB2 - Mains|Generator select relay
+ NFET 20V 0.9a, diode
+	PB10 - T2C3 PWM
+
+SUB3 - 12v battery on/off relay/contactor
+ NFET 20V 0.9a, diode
+ PB14 - T12C1 PWM
+
+SUB4 - 12v to BMSMOT local boards relay/contactor
+ NFET 20V 0.9a, diode
+ PB15 - T1C2 PWM
+
+'L431 JP13 - ADC
+1 - AC power neutral (main|generator)
+2 - AC power voltage (main|generator)
