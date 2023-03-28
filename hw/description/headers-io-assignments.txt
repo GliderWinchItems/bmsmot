@@ -46,8 +46,12 @@ JP10 - PC3
 
 UART/USART
 
-USART2 Tx - PA2 (uart-uart)
-USART2 Rx - PA3 (uart-uart)
+JP11 - UART-UART
+USART2 Tx - PA2
+USART2 Rx - PA3
+
+JP12 - TX/RX UART-UART Select
+
 
 USART3 - Rx - PC11 (FTDI monitor)
 USART3 - Tx - PC10 (FTDI monitor)
