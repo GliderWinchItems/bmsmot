@@ -1,0 +1,171 @@
+
+headers-io-assignments.txt
+04/09/2023
+
+Header
+
+FET Output (4 pin)--
+(T = TIM/timer, C = Channel)
+SUB1 - PB2 - T2C4
+
+SUB2 - PB10 - T2C3
+
+SUB3 - PB14 - T12C1,T1C2N,T8C2N
+
+SUB4 - PB15 - T1C2,T1C3N,T8C3N
+
+SUB5 - PC6 - T3C1,T8C1
+
+SUB6 - PC7 - T3C3,T8C2
+
+SUB7 - PC8 - T3C3,T8C3
+
+SUB8 - PC9 - T3C4,T8C4
+
+74VHCT125 Output (3 pin)
+xxSUB4 - PA8 - T1C1
+
+xxSUB5 - PA10 - T1C3
+
+xxSUB10 - PA9 - T1C2
+
+xxSUB11 - PA11 - T1C4
+
+JP20-SUB14 (2 pin) - PB3
+
+ADC (2 pin; 10K pullup)
+
+JP1 - PC0
+
+JP8 - PC1
+
+JP9 - PC2
+ 
+JP10 - PC3
+
+
+UART/USART
+
+JP11 - UART-UART
+USART2 Tx - PA2
+USART2 Rx - PA3
+
+JP12 - TX/RX UART-UART Select
+
+
+USART3 - Rx - PC11 (FTDI monitor)
+USART3 - Tx - PC10 (FTDI monitor)
+
+UART5 - Rx - PD2 (isolated 'L431)
+UART5 - Tx - PC12 (isolated'L431)
+
+
+CAN
+
+CAN1 Rx - PB8
+CAN1 Tx - PB9
+
+CAN2 Rx - PB5
+CAN2 Tx - PB6
+
+LED
+
+GRN LED1 - power +12v protected
+GRN LED2 - PB0
+RED LED3 - PB1
+
+NON-HEADER FEATURE ASSIGNMENTS
+
+Power wake-up FET1 PC13
+
+Master-reset FET5 PA5
+
+=== Isolated L431 headers ===
+
+JP15 (6 pin) FTDI UART-USB
+
+JP16 (3 pin) SWD
+
+JP17 (4 pin) HV dividers
+1 - gnd
+2 - PC1-IN2: divider 1 R22|R25
+3 - PC2-IN3: divider 2 R14|R21
+4 - PC3-IN4: divider 3 R10|R13 w offset R44
+5 - PA4-IN9: divider 4 R32|R31 w offset R45
+6 - Plus string: R39 Hi-resistance 
+
+JP13 (3 pin) Hall-effect sensor
+1 - GNDA ('L431 gnd isolated from 'F446 gnd)
+2 - PC0-IN1: signal input: R26|R27 5v->3.3V divider
+3 - +5V/3 linear regulated 5v
+
+
+================ Configuration EMC/MMC local ======================
+FET output header group
+All FETs 100v 2A, flyback diode to 12v unless noted
+SUB1 - Contactor coil #1 (no diode)
+SUB2 - Contactor coil #2 (no diode)
+SUB3 - ELCON Charger input (AC|DC) ON/OFF relay
+SUB4 - SCP & RCP supply ON/OFF relay
+SUB5 - ELCON Charger Output ON/OFF relay
+SUB6 - SCP supply output ON/OFF relay
+SUB7 - spare
+SUB8 - spare
+
+External sub-board FET control group
+xxSUB4 - Cooling pump +12v motor
+xxSUB5 - Heat exchanger _12v fan/blowr
+xxSUB10 - DMOC 12v fans
+xxSUB11 - spare
+
+'L431 JP13 - isolated ADC
+1 Battery string gnd
+2 ? Contactor #1 voltage
+3 ? Contactor charging resistor voltage
+4 ? Contactor capacitor voltage
+5 - not used
+6 - Battery string plus
+
+'F446 non-isolated ADC
+JP1  PC0 - ADC Ambient air temp
+JP8  PC1 - ADC Coolant inlet temp
+JP9  PC2 - ADC Coolant outlet temp
+JP10 PC3 - spare
+JP22 PC4 - spare
+JP24 PC5 - 5v input ADC not used
+
+JP19 - switched 12v PFET
+ 2 pin header jumpered (always on)
+
+'L431 - ADC
+JP13 - Hall-effect sensor: string current
+
+================ Configuration PSC (Power Supply Control) =====================
+
+SUB8 - Air compressor relay  on/off
+SUB7 - Mains|Generator select relay
+SUB6 - 12v battery on/off
+SUB5 - SCP output on/off
+SUB4 - SCP input on/off
+SUB3 - AC/DC select
+SUB2 - spare no diode on pcb
+SUB1 - spare no diode on pcb
+
+xxSUB4 - spare
+xxSUB5 - spare
+xxSUB10 - spare
+xxSUB11 - spare
+
+JP19 - switched 12v PFET
+ Control Panel key switch on/off
+
+JP24 - 5v ADC input
+ Air pressure sensor input
+
+'L431 JP13 - ADC
+1 - Not used
+2 - Not used
+3 - Not used
+4 - AC power neutral (main|generator)
+5 - AC power voltage (main|generator)
+6-  Not used
