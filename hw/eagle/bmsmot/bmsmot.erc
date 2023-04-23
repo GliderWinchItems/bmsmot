@@ -1,35 +1,35 @@
 EAGLE Version 4.13 Copyright (c) 1988-2004 CadSoft
 
-Electrical Rule Check for /mnt/home/deh/GliderWinchItems/bmsmot/hw/eagle/bmsmot/bmsmot.sch at  4/19/2023 16:52:41 
+Electrical Rule Check for /mnt/home/deh/GliderWinchItems/bmsmot/hw/eagle/bmsmot/bmsmot.sch at  4/22/2023 21:11:44 
 
-WARNING: Sheet 1/2: POWER Pin U2POWER VDD_1 connected to VCC
-WARNING: Sheet 1/2: POWER Pin U2POWER VDD_2 connected to VCC
-WARNING: Sheet 1/2: POWER Pin U2POWER VDD_3 connected to VCC
-WARNING: Sheet 1/2: POWER Pin U2POWER VSS_1 connected to VSS_1-VCAP_1
-WARNING: Sheet 1/2: POWER Pin U2POWER VSS_2 connected to VSS_3
-WARNING: Sheet 1/2: POWER Pin U2POWER VSS_3 connected to GND
-WARNING: Sheet 1/2: POWER Pin U2POWER VDD_4 connected to VCC
-WARNING: Sheet 1/2: POWER Pin U2POWER VSS_4 connected to GND
-WARNING: Sheet 1/2: POWER Pin U2AN_POWER VSSA connected to GND
-WARNING: Sheet 1/2: POWER Pin U2AN_POWER VDDA connected to VDDA1
+WARNING: Sheet 1/2: POWER Pin U1POWER VDD_1 connected to VCC
+WARNING: Sheet 1/2: POWER Pin U1POWER VDD_2 connected to VCC
+WARNING: Sheet 1/2: POWER Pin U1POWER VDD_3 connected to VCC
+WARNING: Sheet 1/2: POWER Pin U1POWER VSS_1 connected to VSS_1-VCAP_1
+WARNING: Sheet 1/2: POWER Pin U1POWER VSS_2 connected to VSS_3
+WARNING: Sheet 1/2: POWER Pin U1POWER VSS_3 connected to GND
+WARNING: Sheet 1/2: POWER Pin U1POWER VDD_4 connected to VCC
+WARNING: Sheet 1/2: POWER Pin U1POWER VSS_4 connected to GND
+WARNING: Sheet 1/2: POWER Pin U1AN_POWER VSSA connected to GND
+WARNING: Sheet 1/2: POWER Pin U1AN_POWER VDDA connected to VDDA1
+WARNING: Sheet 1/2: POWER Pin IC102 VSS connected to GND
 WARNING: Sheet 1/2: POWER Pin IC1 VSS connected to GND
-WARNING: Sheet 1/2: POWER Pin IC2 VSS connected to GND
-WARNING: Sheet 1/2: POWER Pin STM32L431POWER VDD_1 connected to V+
-WARNING: Sheet 1/2: POWER Pin STM32L431POWER VDD_2 connected to V+
-WARNING: Sheet 1/2: POWER Pin STM32L431POWER VDD_3 connected to V+
-WARNING: Sheet 1/2: POWER Pin STM32L431POWER VSS_1 connected to GNDA
-WARNING: Sheet 1/2: POWER Pin STM32L431POWER VSS_2 connected to GNDA
-WARNING: Sheet 1/2: POWER Pin STM32L431POWER VSS_3 connected to GNDA
-WARNING: Sheet 1/2: POWER Pin STM32L431POWER VDD_4 connected to V+
-WARNING: Sheet 1/2: POWER Pin STM32L431POWER VSS_4 connected to GNDA
-WARNING: Sheet 1/2: POWER Pin STM32L431AN_POWER VBAT connected to V+
-WARNING: Sheet 1/2: POWER Pin STM32L431AN_POWER VSSA connected to GNDA
-WARNING: Sheet 1/2: POWER Pin STM32L431AN_POWER VDDA connected to L431-VDDA
-WARNING: Sheet 1/2: POWER Pin IC3 VSS connected to GND
-WARNING: Sheet 1/2: POWER Pin IC4 VSS connected to GND
-WARNING: Sheet 1/2: POWER Pin IC5P VCC connected to +5V
-WARNING: Sheet 1/2: POWER Pin U$5G$3 VDD connected to VCC
-WARNING: Sheet 1/2: POWER Pin IC6P VCC connected to +5V
+WARNING: Sheet 1/2: POWER Pin STM32L1POWER VDD_1 connected to V+
+WARNING: Sheet 1/2: POWER Pin STM32L1POWER VDD_2 connected to V+
+WARNING: Sheet 1/2: POWER Pin STM32L1POWER VDD_3 connected to V+
+WARNING: Sheet 1/2: POWER Pin STM32L1POWER VSS_1 connected to GNDA
+WARNING: Sheet 1/2: POWER Pin STM32L1POWER VSS_2 connected to GNDA
+WARNING: Sheet 1/2: POWER Pin STM32L1POWER VSS_3 connected to GNDA
+WARNING: Sheet 1/2: POWER Pin STM32L1POWER VDD_4 connected to V+
+WARNING: Sheet 1/2: POWER Pin STM32L1POWER VSS_4 connected to GNDA
+WARNING: Sheet 1/2: POWER Pin STM32L1AN_POWER VBAT connected to V+
+WARNING: Sheet 1/2: POWER Pin STM32L1AN_POWER VSSA connected to GNDA
+WARNING: Sheet 1/2: POWER Pin STM32L1AN_POWER VDDA connected to L431-VDDA
+WARNING: Sheet 1/2: POWER Pin IC100 VSS connected to GND
+WARNING: Sheet 1/2: POWER Pin IC101 VSS connected to GND
+WARNING: Sheet 1/2: POWER Pin IC3P VCC connected to +5V
+WARNING: Sheet 1/2: POWER Pin U$4G$3 VDD connected to VCC
+WARNING: Sheet 1/2: POWER Pin IC2P VCC connected to +5V
 
 Board and schematic are consistent
 
