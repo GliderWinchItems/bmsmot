@@ -1,0 +1,184 @@
+
+headers-io-assignments.txt
+04/30/2023
+(Parts renumbered on eagle)
+
+============================================
+'F446' fixed headers & port assignments--
+===========================================
+
+JP20 -- SWD (Single Wire Debugger) (3 pin 0.1" header)
+ 1 - GND
+ 2 - PA14 - SWCLK
+ 3 - PA13 - SWDIO
+  
+JP18 UART monitor FTDI (six pin 0.1" header)--
+ 1 - GND
+ 2 - NC
+ 3 - NC
+ 4 - USART3 - Rx - PC11
+ 5 - USART3 - Tx - PC10
+ 6 - NC
+
+CAN
+ CAN1 Rx - PB8
+ CAN1 Tx - PB9
+
+ CAN2 Rx - PB5
+ CAN2 Tx - PB6
+
+LED--
+ GRN LED1 - power +12v protected
+ PB12-LED2-GREEN
+ PB13-LED3-RED
+
+Power wake-up FET1 PC13
+
+Master-reset FET5 PA5
+
+Isolated 'F446 <-> L431
+ 'F446 UART5 - Rx - PD2
+ 'F446 UART5 - Tx - PC12
+
+===========================================
+Power Pole or spade lug: 12v high current
+===========================================
+
+Input 12V: GND, +12V RAW
+
+Output: GND, +12SW
+  Polarity protected & switched 
+  Common with BMS loop power.
+
+===========================================
+'F446 FET Outputs --
+===========================================
+(T = TIM/timer, C = Channel)
+
+Group A with SOT-23 NFET (Vgs = 3.3v i/o pin):
+(JST 4 pin: gnd, signal, +5v, +12v)
+(Flyback diode to +5v or +12v option on 0.1" spacing)
+ HDR-OA2 - PB15 - T1C2,T1C3N,T8C3N
+ HDR-OA1 - PB10 - T2C3
+ HDR-OA3 - PB2  - T2C4
+ HDR-OA4 - PB14 - T12C1,T1C2N,T8C2N
+
+Group B with 74VHCT125->DFN2020 NFET (Vgs = 5v):
+(JST 4 pin: gnd, signal, +5v, +12v)
+(Flyback diode to +5v or +12v option on 0.1" spacing)
+ HDR-OB2 - PC8 - T3C3,T8C3
+ HDR-OB1 - PC7 - T3C3,T8C2
+ HDR-OB4 - PC9 - T3C4,T8C4
+ HDR-OB3 - PC6 - T3C1,T8C1
+
+Group C with 74VHCT125 Buffer output (JST 3 pin)
+(drive external sub-board)
+(JST 3 pin: gnd, signal, +5v)
+ HDR-OC1 - PA9  - T1C2
+ HDR-OC2 - PA11 - T1C4
+ HDR-OC3 - PA8  - T1C1
+ HDR-OC4 - PA10 - T1C3
+ 
+ Extra SOT-23 NFET (Vgs = 3.3v i/o pin):
+(0.1" header: 3 pin gnd, signal, +5v)
+(No flyback diode option)
+ JP21 PB3 - T2C2
+
+===========================================
+'F446 processor ADC
+===========================================
+ADC (0.1" header: 2 pin; GND, input with 10K pullup)
+(Note: Could be used as input, but no i/o pin protection)
+ JP9  - PC0-IN10
+ JP8  - PC1-IN11
+ JP10 - PC2-IN12
+ JP11 - PC3-IN13
+ JP17 - PC4-IN14 via R16|R18 10K|10K
+ JP24 - PC5-IN15
+   1. GND
+   2. PC5-IN15 via R100|R19 5.6K|10K
+   3. +5v
+ JP34 - PA6 - T2C1 via R111|R112|R110  56K|10K|10K
+   1. GND
+   2. 240->12v AC   
+
+===========================================
+'F446 misc
+===========================================   
+JP7 Encoder option
+ 1. GND
+ 2. PA0-T2C1
+ 3. PA1-T2C2
+ 4. +5V
+
+JP14 PA12-KEYSW-SENSE (2 pin) (pull to gnd turns on PFET 12v switch)
+
+JP16 PB4 (2-pin) via R20|R102 (or 0603 zener for R102) T3C1
+
+JP33 - opt-isolator AC detector: PA15 - T2C1
+   1. gnd
+   2. 120-240 AC
+
+===========================================
+'F446 COMMUNICATION
+===========================================
+
+JP11 - UART-UART (RJ45)
+(Note: middle pins allows using a 6 pin phone cable)
+(CAN interface drivers)
+ 1. NC
+ 2. GND
+ 3. CHANNEL 1 CAN-H
+ 4. CHANNEL 1 CAN-L
+ 5. CHANNEL 2 CAN-H
+ 6. CHANNEL 2 CAN-L
+ 7. +5v
+ 8. NC
+
+JP12 - TX/RX UART-UART Select (0.1" header: 2x3)
+(Jumpers connect USART Rx & Tx to CAN driver channel)
+ 1. CHANNEL 1 - Rx
+ 2. CHANNEL 1 - Tx
+ 3. USART2 Rx - PA3
+ 4. USART2 Tx - PA2
+ 5. CHANNEL 2 - Rx
+ 6. CHANNEL 2 - Tx
+
+===========================================
+=== Isolated L431 ===
+===========================================
+
+JP15 (6 pin) FTDI UART-USB
+ 1 - GND
+ 2 - NC
+ 3 - NC
+ 4 - USART1 - Rx - PA10
+ 5 - USART1 - Tx - PA9
+ 6 - NC
+
+JP16 (3 pin) SWD
+ 1 - GND
+ 2 - PA14 - SWCLK
+ 3 - PA13 - SWDIO
+
+JP17 (6 pin) HV dividers to ADC
+1 - GNDA
+2 - PC1-IN2: divider HV3 (R40 1W+R35)|R31: (1M + 110K)|10K
+3 - PC2-IN3: divider HV2 (R39 1W+R32)|R29: (1M + 110K)|10K
+4 - PC3-IN4: divider HV1 (R37 1W+R33)|R28: (1M + 110K)|10K
+5 - PA4-IN9: divider AC  (R38 1W+R34)|R30 w offset R26: (1M + 110K)|10K 10K
+6 - Plus string:   R41 1W 22M -> op-amp follower -> PB0-IN15
+HV GNDA-to-system GND: R7 22M -> op-amp follower -> PB1-IN16
+
+JP13 (3 pin) Hall-effect sensor--
+1 - GNDA ('L431 gnd isolated from 'F446 gnd)
+2 - PC0-IN1: R36|R101 5.6K|10K
+3 - +5V/3 linear regulated 5v
+
+Isolated 'F446 <-> L431--
+ 'L431-USART3-PC11-RX
+ 'L431-USART3-PC10-USART3-TX2
+ 
+LEDs--
+ 'L431-PB0-LED-GRN
+ 'L431-PB1-LED-RED
