@@ -171,6 +171,66 @@ JP12 - TX/RX UART-UART Select (0.1" header: 2x3)
  Jumper settings with EMC/MMC #2
   channel 1 - Rx
   channel 2 - Tx
+
+JP1 - CAN BMS
+ 1. NC
+ 2. +12V Polarity protected & switched (Vpp)
+ 3. +12V Polarity protected & switched (Vpp)
+ 4. CAN1-H Feedthru JP1<->JP4
+ 5. CAN1-L Feedthru JP1<->JP4
+ 6. System ground
+ 7. System ground
+ 8. Master reset: system or program
+
+JP2 - CAN BMS 
+ 1. NC
+ 2. +12V Polarity protected & switched (Vpp)
+ 3. +12V Polarity protected & switched (Vpp)
+ 4. CAN1-H Feedthru JP2<->JP5 CAN1_H interface
+ 5. CAN1-L Feedthru JP2<->JP5 CAN1_L interface
+ 6. System ground
+ 7. System ground
+ 8. Master reset: system or program
+
+JP4 - CAN 1
+ 1. NC
+ 2. +12V JP CAN2 (VCAN2)
+ 3. +12V JP CAN2 (VCAN2)
+ 4. CAN1-H Feedthru JP1<->JP4
+ 5. CAN1-L Feedthru JP1<->JP4
+ 6. System ground
+ 7. System ground
+ 8. Master reset: system
+
+JP5 - CAN 1
+ 1. NC
+ 2. +12V JP CAN2 (VCAN2)
+ 3. +12V JP CAN2 (VCAN2)
+ 4. CAN1-H Feedthru JP2<->JP5 interface
+ 5. CAN1-L Feedthru JP2<->JP5 interface
+ 6. System ground
+ 7. System ground
+ 8. Master reset: system
+
+JP3 - CAN 2
+ 1. NC
+ 2. +12V JP CAN2 (VCAN2)
+ 3. +12V JP CAN2 (VCAN2)
+ 4. CAN1-H CAN2_H interface
+ 5. CAN1-L CAN2_L interface
+ 6. System ground
+ 7. System ground
+ 8. Master reset: system
+
+JP6 - CAN 2
+ 1. NC
+ 2. +12V JP CAN2 (VCAN2)
+ 3. +12V JP CAN2 (VCAN2)
+ 4. CAN1-H CAN2_H interface
+ 5. CAN1-L CAN2_L interface
+ 6. System ground
+ 7. System ground
+ 8. Master reset: system  
 ===========================================
 === Isolated L431 ===
 ===========================================
