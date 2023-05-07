@@ -66,8 +66,8 @@ Group A with SOT-23 NFET (Vgs = 3.3v i/o pin):
 Group B with 74VHCT125->DFN2020 NFET (Vgs = 5v):
 (JST 4 pin: gnd, signal, +5v, +12v)
 (Flyback diode to +5v or +12v option on 0.1" spacing)
- HDR-OB2 - PC8 - T3C3,T8C3
  HDR-OB1 - PC7 - T3C3,T8C2
+ HDR-OB2 - PC8 - T3C3,T8C3
  HDR-OB4 - PC9 - T3C4,T8C4
  HDR-OB3 - PC6 - T3C1,T8C1
 
@@ -221,7 +221,7 @@ JP16 (3 pin) SWD
  2 - PA14 - SWCLK
  3 - PA13 - SWDIO
 
-JP17 (6 pin) HV dividers to ADC
+JP23 (6 pin) HV dividers to ADC
 1 - GNDA
 2 - PC1-IN2: divider HV3 (R40 1W+R35)|R31: (1M + 110K)|10K
 3 - PC2-IN3: divider HV2 (R39 1W+R32)|R29: (1M + 110K)|10K
@@ -230,7 +230,7 @@ JP17 (6 pin) HV dividers to ADC
 6 - Plus string:   R41 1W 22M -> op-amp follower -> PB0-IN15
 HV GNDA-to-system GND: R7 22M -> op-amp follower -> PB1-IN16
 
-JP13 (3 pin) Hall-effect sensor--
+JP22 (3 pin) Hall-effect sensor--
 1 - GNDA ('L431 gnd isolated from 'F446 gnd)
 2 - PC0-IN1: R36|R101 5.6K|10K
 3 - +5V/3 linear regulated 5v

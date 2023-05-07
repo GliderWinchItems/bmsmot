@@ -59,20 +59,20 @@ Group A with SOT-23 NFET (Vgs = 3.3v i/o pin):
 (JST 4 pin: gnd, signal, +5v, +12v)
 (Flyback diode to +5v or +12v option on 0.1" spacing)
  HDR-OA2 - PB15 - T1C2,T1C3N,T8C3N
- 	ELCON input on/off relay
+    Select AC source DPDT relay
  HDR-OA1 - PB10 - T2C3
- 	ELCON ouput on/off relay
+    RSP on/off DPST relay
  HDR-OA3 - PB2  - T2C4
-  	AC/DC select relay
+  	AC/DC select relay DPDT
  HDR-OA4 - PB14 - T12C1,T1C2N,T8C2N
-  	spare
+    Select DC source DPDT relay
 
 Group B with 74VHCT125->DFN2020 NFET (Vgs = 5v):
 (JST 4 pin: gnd, signal, +5v, +12v)
 (Flyback diode to +5v or +12v option on 0.1" spacing)
- HDR-OB2 - PC8 - T3C3,T8C3
- 	contactor coil #1
  HDR-OB1 - PC7 - T3C3,T8C2
+ 	contactor coil #1
+ HDR-OB2 - PC8 - T3C3,T8C3
  	contactor coil #2
  HDR-OB4 - PC9 - T3C4,T8C4
   	spare
@@ -83,11 +83,11 @@ Group C with 74VHCT125 Buffer output (JST 3 pin)
 (drive external sub-board)
 (JST 3 pin: gnd, signal, +5v)
  HDR-OC1 - PA9  - T1C2
- 	DMOC fans
+ 	DMOC Fans
  HDR-OC2 - PA11 - T1C4
- 	cooling pump motor
+ 	Cooling Pump motor
  HDR-OC3 - PA8  - T1C1
- 	heat exchanger blower
+ 	Heat Exchanger Fan
  HDR-OC4 - PA10 - T1C3
  	spare
  
@@ -248,7 +248,7 @@ JP16 (3 pin) SWD
  2 - PA14 - SWCLK
  3 - PA13 - SWDIO
 
-JP17 (6 pin) HV dividers to ADC
+JP23 (6 pin) HV dividers to ADC
  1 - GNDA
  2 - PC1-IN2: divider HV3 (R40 1W+R35)|R31: (1M + 110K)|10K
  3 - PC2-IN3: divider HV2 (R39 1W+R32)|R29: (1M + 110K)|10K
@@ -259,7 +259,7 @@ JP17 (6 pin) HV dividers to ADC
  HV GNDA-to-system GND: R7 22M -> op-amp follower -> PB1-IN16
  	Jumper present
 
-JP13 (3 pin) Hall-effect sensor--
+JP22 (3 pin) Hall-effect sensor--
 	Battery string current sensor
  1 - GNDA ('L431 gnd isolated from 'F446 gnd)
  2 - PC0-IN1: R36|R101 5.6K|10K
