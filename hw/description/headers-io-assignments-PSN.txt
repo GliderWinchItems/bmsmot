@@ -58,15 +58,15 @@ Output: GND, +12SW
 Group A with SOT-23 NFET (Vgs = 3.3v i/o pin):
 (JST 4 pin: gnd, signal, +5v, +12v)
 (Flyback diode to +5v or +12v option on 0.1" spacing)
- HDR-OA2 - PB15 - T1C2,T1C3N,T8C3N
- 	Air compressor relay
  HDR-OA1 - PB10 - T2C3
- 	SCP select AC/DC relay
+ 	AC-1, AC-2 ON/OFF (two DPST relays)
+ HDR-OA2 - PB15 - T1C2,T1C3N,T8C3N
+ 	Select Aux HV1|HV2 (DPDT)
  HDR-OA3 - PB2  - T2C4
- 	12v Battery on/off relay
+ 	Select AC-1|2 (DPDT)
  HDR-OA4 - PB14 - T12C1,T1C2N,T8C2N
- 	spare
-
+ 	Select AC|DC (DPDT)
+ 	
 Group B with 74VHCT125->DFN2020 NFET (Vgs = 5v):
 (JST 4 pin: gnd, signal, +5v, +12v)
 (Flyback diode to +5v or +12v option on 0.1" spacing)
@@ -81,6 +81,7 @@ Group C with 74VHCT125 Buffer output (JST 3 pin)
  HDR-OC1 - PA9  - T1C2
  HDR-OC2 - PA11 - T1C4
  HDR-OC3 - PA8  - T1C1
+ 	Air Compressor
  HDR-OC4 - PA10 - T1C3
  
  Extra SOT-23 NFET (Vgs = 3.3v i/o pin):
@@ -119,7 +120,7 @@ JP7 Encoder option
 JP14 PA12-KEYSW-SENSE (2 pin) (pull to gnd turns on PFET 12v switch)
 	Key switch 
 
-JP16 PB4 (2-pin) via R20|R102 (or 0603 zener for R102) T3C1
+JP14 PB4 (2-pin) via R20|R102 (or 0603 zener for R102) T3C1
 
 JP33 - opt-isolator AC detector: PA15 - T2C1
    1. gnd
@@ -214,7 +215,7 @@ JP6 - CAN 2
 === Isolated L431 ===
 ===========================================
 
-JP15 (6 pin) FTDI UART-USB
+JP13 (6 pin) FTDI UART-USB
  1 - GND
  2 - NC
  3 - NC
@@ -222,7 +223,7 @@ JP15 (6 pin) FTDI UART-USB
  5 - USART1 - Tx - PA9
  6 - NC
 
-JP16 (3 pin) SWD
+JP15 (3 pin) SWD
  1 - GND
  2 - PA14 - SWCLK
  3 - PA13 - SWDIO
@@ -248,6 +249,19 @@ JP22 (3 pin) Hall-effect sensor--
 2 - PC0-IN1: R36|R101 5.6K|10K
 3 - +5V/3 linear regulated 5v
 
+JP35 (5 pin) SPI1
+ 1 - GNDA 
+ 2 - PA5: SPI1-CLK  (buffer 5v out)
+ 3 - PA7: SPI1-MOSI (buffer 5v out)
+ 4 - PA6: SPI1-MISO (buffer 5v in)
+ 5 - +5V/4
+
+JP36 (4 pin) I2C2
+ 1 - GNDA 
+ 2 - PB13: I2C2-CLK (buffer 5v out)
+ 3 - PB14: I2C2-SDA (3.3K pullup to +5v)
+ 4 - +5V/4
+ 
 Isolated 'F446 <-> L431--
  'L431-USART3-PC11-RX
  'L431-USART3-PC10-USART3-TX2

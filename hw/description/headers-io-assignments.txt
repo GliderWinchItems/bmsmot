@@ -113,7 +113,7 @@ JP7 Encoder option
 
 JP14 PA12-KEYSW-SENSE (2 pin) (pull to gnd turns on PFET 12v switch)
 
-JP16 PB4 (2-pin) via R20|R102 (or 0603 zener for R102) T3C1
+JP19 PB4 (2-pin) via R20|R102 (or 0603 zener for R102) T3C1
 
 JP33 - opt-isolator AC detector: PA15 - T2C1
    1. gnd
@@ -208,7 +208,7 @@ JP6 - CAN 2
 === Isolated L431 ===
 ===========================================
 
-JP15 (6 pin) FTDI UART-USB
+JP13 (6 pin) FTDI UART-USB
  1 - GND
  2 - NC
  3 - NC
@@ -216,7 +216,7 @@ JP15 (6 pin) FTDI UART-USB
  5 - USART1 - Tx - PA9
  6 - NC
 
-JP16 (3 pin) SWD
+JP15 (3 pin) SWD
  1 - GND
  2 - PA14 - SWCLK
  3 - PA13 - SWDIO
@@ -234,6 +234,19 @@ JP22 (3 pin) Hall-effect sensor--
 1 - GNDA ('L431 gnd isolated from 'F446 gnd)
 2 - PC0-IN1: R36|R101 5.6K|10K
 3 - +5V/3 linear regulated 5v
+
+JP35 (5 pin) SPI1
+ 1 - GNDA 
+ 2 - PA5: SPI1-CLK  (buffer 5v out)
+ 3 - PA7: SPI1-MOSI (buffer 5v out)
+ 4 - PA6: SPI1-MISO (buffer 5v in)
+ 5 - +5V/4
+
+JP36 (4 pin) I2C2
+ 1 - GNDA 
+ 2 - PB13: I2C2-CLK (buffer 5v out)
+ 3 - PB14: I2C2-SDA (3.3K pullup to +5v)
+ 4 - +5V/4
 
 Isolated 'F446 <-> L431--
  'L431-USART3-PC11-RX
