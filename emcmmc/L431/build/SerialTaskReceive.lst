@@ -1,0 +1,1501 @@
+ARM GAS  /tmp/ccsbYjAz.s 			page 1
+
+
+   1              		.syntax unified
+   2              		.cpu cortex-m4
+   3              		.eabi_attribute 27, 1
+   4              		.eabi_attribute 28, 1
+   5              		.fpu fpv4-sp-d16
+   6              		.eabi_attribute 20, 1
+   7              		.eabi_attribute 21, 1
+   8              		.eabi_attribute 23, 3
+   9              		.eabi_attribute 24, 1
+  10              		.eabi_attribute 25, 1
+  11              		.eabi_attribute 26, 1
+  12              		.eabi_attribute 30, 1
+  13              		.eabi_attribute 34, 1
+  14              		.eabi_attribute 18, 4
+  15              		.thumb
+  16              		.syntax unified
+  17              		.file	"SerialTaskReceive.c"
+  18              		.text
+  19              	.Ltext0:
+  20              		.cfi_sections	.debug_frame
+  21              		.section	.text.advancebuf,"ax",%progbits
+  22              		.align	2
+  23              		.thumb
+  24              		.thumb_func
+  26              	advancebuf:
+  27              	.LFB296:
+  28              		.file 1 "Ourwares/SerialTaskReceive.c"
+   1:Ourwares/SerialTaskReceive.c **** /******************************************************************************
+   2:Ourwares/SerialTaskReceive.c **** * File Name          : SerialTaskReceive.c
+   3:Ourwares/SerialTaskReceive.c **** * Date First Issued  : 01/21/2019
+   4:Ourwares/SerialTaskReceive.c **** * Description        : Serial input using FreeRTOS/ST HAL
+   5:Ourwares/SerialTaskReceive.c **** *******************************************************************************/
+   6:Ourwares/SerialTaskReceive.c **** 
+   7:Ourwares/SerialTaskReceive.c **** #include "FreeRTOS.h"
+   8:Ourwares/SerialTaskReceive.c **** #include "task.h"
+   9:Ourwares/SerialTaskReceive.c **** #include "queue.h"
+  10:Ourwares/SerialTaskReceive.c **** #include "cmsis_os.h"
+  11:Ourwares/SerialTaskReceive.c **** #include "malloc.h"
+  12:Ourwares/SerialTaskReceive.c **** #include "SerialTaskReceive.h"
+  13:Ourwares/SerialTaskReceive.c **** #include "stm32l4xx_hal_usart.h"
+  14:Ourwares/SerialTaskReceive.c **** #include "stm32l4xx_hal_uart.h"
+  15:Ourwares/SerialTaskReceive.c **** #include "morse.h"
+  16:Ourwares/SerialTaskReceive.c **** 
+  17:Ourwares/SerialTaskReceive.c **** /* May not want all the gateway routines pulled in. */
+  18:Ourwares/SerialTaskReceive.c **** #ifdef USECANMODEWITHGATEWAYROUTINES
+  19:Ourwares/SerialTaskReceive.c ****  #include "gateway_PCtoCAN.h"
+  20:Ourwares/SerialTaskReceive.c **** #endif
+  21:Ourwares/SerialTaskReceive.c **** 
+  22:Ourwares/SerialTaskReceive.c **** /*
+  23:Ourwares/SerialTaskReceive.c **** BaseType_t Rret; // Return value
+  24:Ourwares/SerialTaskReceive.c **** ...
+  25:Ourwares/SerialTaskReceive.c **** // Initialization before schedular start
+  26:Ourwares/SerialTaskReceive.c **** ...
+  27:Ourwares/SerialTaskReceive.c **** // uart handle, and dma flag
+  28:Ourwares/SerialTaskReceive.c **** Rret = xSerialTaskReceiveAdd(&huart6, 1);
+  29:Ourwares/SerialTaskReceive.c **** if (Rret != 0) while(1==1); // Hang
+  30:Ourwares/SerialTaskReceive.c **** ...
+ARM GAS  /tmp/ccsbYjAz.s 			page 2
+
+
+  31:Ourwares/SerialTaskReceive.c **** // Task initialization, before endless loop
+  32:Ourwares/SerialTaskReceive.c **** ...
+  33:Ourwares/SerialTaskReceive.c **** // uart handle, number line buffers, size of line buffers (not including \0)
+  34:Ourwares/SerialTaskReceive.c **** #define NOTEBIT 0x1;	// Unique bit in this task for this buffer notification
+  35:Ourwares/SerialTaskReceive.c **** uint32_t noteval = 0;	// OS copies its notification word upon a "notify"
+  36:Ourwares/SerialTaskReceive.c **** // uart handle, dma flag, buffer notify bit, number line buffers, size of line buffers);
+  37:Ourwares/SerialTaskReceive.c **** struct SERIALTASKRCVBCB* pinbuf1 = getserialinbuf(&huart6,1, NOTEBIT,&noteval,10,32); 
+  38:Ourwares/SerialTaskReceive.c **** ...other getserialinbuf(...) if more than one...
+  39:Ourwares/SerialTaskReceive.c **** 
+  40:Ourwares/SerialTaskReceive.c **** ...
+  41:Ourwares/SerialTaskReceive.c **** for ( ;; )
+  42:Ourwares/SerialTaskReceive.c **** {
+  43:Ourwares/SerialTaskReceive.c **** ...
+  44:Ourwares/SerialTaskReceive.c **** yscanf(pinbuf1," ...",...);
+  45:Ourwares/SerialTaskReceive.c **** ...
+  46:Ourwares/SerialTaskReceive.c **** }
+  47:Ourwares/SerialTaskReceive.c **** 
+  48:Ourwares/SerialTaskReceive.c **** */
+  49:Ourwares/SerialTaskReceive.c **** 
+  50:Ourwares/SerialTaskReceive.c **** static void unloaddma(struct SERIALRCVBCB* prbcb);
+  51:Ourwares/SerialTaskReceive.c **** 
+  52:Ourwares/SerialTaskReceive.c **** osThreadId SerialTaskReceiveHandle = NULL;
+  53:Ourwares/SerialTaskReceive.c **** 
+  54:Ourwares/SerialTaskReceive.c **** /* THE FOLLOWING COPIED FOR REFERENCE--
+  55:Ourwares/SerialTaskReceive.c **** // Line buffer control block for one uart 
+  56:Ourwares/SerialTaskReceive.c **** struct SERIALRCVBCB
+  57:Ourwares/SerialTaskReceive.c **** {
+  58:Ourwares/SerialTaskReceive.c **** 	struct SERIALRCVBCB* pnext;	// Link to next uart RBCB
+  59:Ourwares/SerialTaskReceive.c **** 	char* pbegin;// Ptr to first line buffer
+  60:Ourwares/SerialTaskReceive.c **** 	char* pend;  // Ptr to last+1 line buffer
+  61:Ourwares/SerialTaskReceive.c **** 	char* padd;  // Ptr to line buffer being filled
+  62:Ourwares/SerialTaskReceive.c **** 	char* ptake; // Ptr to line buffer to take
+  63:Ourwares/SerialTaskReceive.c **** 	char* pwork; // Ptr to next char to be added
+  64:Ourwares/SerialTaskReceive.c **** 	char* pworkend; // Ptr to end of current active line buffer
+  65:Ourwares/SerialTaskReceive.c **** 	UART_HandleTypeDef* phuart;// Pointer to 'MX uart handle
+  66:Ourwares/SerialTaskReceive.c **** 	osThreadId tskhandle;      // Task handle of originating task
+  67:Ourwares/SerialTaskReceive.c **** 	uint32_t  notebit;         // Unique notification bit (within task)
+  68:Ourwares/SerialTaskReceive.c **** 	uint32_t* pnoteval;        // Pointer to word receiving notification 
+  69:Ourwares/SerialTaskReceive.c **** 	char*  pbegindma;          // Pointer to beginning of dma buffer
+  70:Ourwares/SerialTaskReceive.c **** 	char*  penddma;            // Pointer to ebd + 1 of dma buffer
+  71:Ourwares/SerialTaskReceive.c **** 	char*  ptakedma;           // Pointer to last + 1 char taken from dma buffer
+  72:Ourwares/SerialTaskReceive.c **** 	uint32_t  numlinexsize;    // Number of lines * line size (chars)
+  73:Ourwares/SerialTaskReceive.c **** 	uint16_t  linesize;        // Number of chars in each line buffer (1)
+  74:Ourwares/SerialTaskReceive.c **** 	uint16_t  dmasize;         // Number of chars in total circular DMA buffer
+  75:Ourwares/SerialTaskReceive.c **** 	uint8_t   numline;         // Number of line (or CAN msg) buffers for this uart
+  76:Ourwares/SerialTaskReceive.c **** 	int8_t    dmaflag;         // dmaflag = 0 for char-by-char mode; 1 = dma mode (1)
+  77:Ourwares/SerialTaskReceive.c **** 	uint8_t   CANmode;         // 0 = ordinary lines; 1 = ascii/hex CAN
+  78:Ourwares/SerialTaskReceive.c **** 	struct GATEWAYPCTOCAN* pgptc; // Pointer to gateway_PCtoCAN control block
+  79:Ourwares/SerialTaskReceive.c **** 	uint32_t errorct;				// uart error callback counter
+  80:Ourwares/SerialTaskReceive.c **** };
+  81:Ourwares/SerialTaskReceive.c **** 
+  82:Ourwares/SerialTaskReceive.c **** */
+  83:Ourwares/SerialTaskReceive.c **** 
+  84:Ourwares/SerialTaskReceive.c **** /* Pointer to linked list of Receive Buffer Control Blocks */
+  85:Ourwares/SerialTaskReceive.c **** // Initial is NULL; pnext in last points to last
+  86:Ourwares/SerialTaskReceive.c **** static struct SERIALRCVBCB* prbhd = NULL;
+  87:Ourwares/SerialTaskReceive.c **** 
+ARM GAS  /tmp/ccsbYjAz.s 			page 3
+
+
+  88:Ourwares/SerialTaskReceive.c **** /* *************************************************************************
+  89:Ourwares/SerialTaskReceive.c ****  * struct SERIALRCVBCB* xSerialTaskRxAdduart(\
+  90:Ourwares/SerialTaskReceive.c **** 		UART_HandleTypeDef* phuart,\
+  91:Ourwares/SerialTaskReceive.c **** 		int8_t    dmaflag,\
+  92:Ourwares/SerialTaskReceive.c **** 		uint32_t  notebit,\
+  93:Ourwares/SerialTaskReceive.c **** 		uint32_t* pnoteval,\
+  94:Ourwares/SerialTaskReceive.c **** 		uint8_t   numline,\
+  95:Ourwares/SerialTaskReceive.c **** 		uint8_t   linesize,\
+  96:Ourwares/SerialTaskReceive.c **** 		char  dmasize,\
+  97:Ourwares/SerialTaskReceive.c **** 		uint8_t   CANmode);
+  98:Ourwares/SerialTaskReceive.c ****  *	@brief	: Setup circular line buffers this uart
+  99:Ourwares/SerialTaskReceive.c ****  * @param	: phuart = pointer to uart control block
+ 100:Ourwares/SerialTaskReceive.c ****  * @param	: dmaflag = 0 for char-by-char mode; 1 = dma mode
+ 101:Ourwares/SerialTaskReceive.c ****  * @param	: notebit = unique bit for notification for this task
+ 102:Ourwares/SerialTaskReceive.c ****  * @param	: pnoteval = pointer to word receiving notification word from OS
+ 103:Ourwares/SerialTaskReceive.c ****  * @param	: numline = number of line buffers in circular line buffer
+ 104:Ourwares/SerialTaskReceive.c ****  * @param	: linesize = number of chars in each line buffer
+ 105:Ourwares/SerialTaskReceive.c ****  * @param	: dmasize = number of chars in total circular DMA buffer
+ 106:Ourwares/SerialTaskReceive.c ****  * @param	: CANmode = 0 = straight ascii lines; 1 = convert ascii to CAN msgs
+ 107:Ourwares/SerialTaskReceive.c ****  * @return	: pointer = 'RCVBCB for this uart; NULL = failed
+ 108:Ourwares/SerialTaskReceive.c ****  * *************************************************************************/
+ 109:Ourwares/SerialTaskReceive.c **** struct SERIALRCVBCB* xSerialTaskRxAdduart(\
+ 110:Ourwares/SerialTaskReceive.c **** 		UART_HandleTypeDef* phuart,\
+ 111:Ourwares/SerialTaskReceive.c **** 		int8_t    dmaflag, \
+ 112:Ourwares/SerialTaskReceive.c **** 		uint32_t  notebit, \
+ 113:Ourwares/SerialTaskReceive.c **** 		uint32_t* pnoteval,\
+ 114:Ourwares/SerialTaskReceive.c **** 		uint8_t   numline, \
+ 115:Ourwares/SerialTaskReceive.c **** 		uint8_t   linesize,\
+ 116:Ourwares/SerialTaskReceive.c **** 		char      dmasize, \
+ 117:Ourwares/SerialTaskReceive.c **** 		uint8_t   CANmode  )
+ 118:Ourwares/SerialTaskReceive.c **** {
+ 119:Ourwares/SerialTaskReceive.c **** 	struct SERIALRCVBCB* ptmp1;
+ 120:Ourwares/SerialTaskReceive.c **** 	struct SERIALRCVBCB* ptmp2;
+ 121:Ourwares/SerialTaskReceive.c **** 	char* pbuf;
+ 122:Ourwares/SerialTaskReceive.c **** 
+ 123:Ourwares/SerialTaskReceive.c **** HAL_StatusTypeDef halret;
+ 124:Ourwares/SerialTaskReceive.c **** 
+ 125:Ourwares/SerialTaskReceive.c **** #ifdef USECANMODEWITHGATEWAYROUTINES
+ 126:Ourwares/SerialTaskReceive.c **** 	struct GATEWAYPCTOCAN* pgptc; // Pointer to Gateway Pc To Can
+ 127:Ourwares/SerialTaskReceive.c **** #endif
+ 128:Ourwares/SerialTaskReceive.c **** 
+ 129:Ourwares/SerialTaskReceive.c **** 	/* There can be a problem with Tasks not started if the calling task gets here first */
+ 130:Ourwares/SerialTaskReceive.c **** 	osDelay(10);
+ 131:Ourwares/SerialTaskReceive.c **** 
+ 132:Ourwares/SerialTaskReceive.c **** taskENTER_CRITICAL();
+ 133:Ourwares/SerialTaskReceive.c **** 	/* Add block with circular buffer pointers for this uart/usart to list */
+ 134:Ourwares/SerialTaskReceive.c **** 	ptmp1 = (struct SERIALRCVBCB*)calloc(1, sizeof(struct SERIALRCVBCB));
+ 135:Ourwares/SerialTaskReceive.c **** 	if (ptmp1  == NULL) {taskEXIT_CRITICAL();morse_trap(60);}
+ 136:Ourwares/SerialTaskReceive.c **** 	if (prbhd  == NULL) // Is this the first?
+ 137:Ourwares/SerialTaskReceive.c **** 	{ // Yes.  
+ 138:Ourwares/SerialTaskReceive.c **** 		prbhd = ptmp1;	// Point head to first on list
+ 139:Ourwares/SerialTaskReceive.c **** 		ptmp1->pnext = ptmp1; // Point first (and last) item on list to self
+ 140:Ourwares/SerialTaskReceive.c **** 	}
+ 141:Ourwares/SerialTaskReceive.c **** 	else
+ 142:Ourwares/SerialTaskReceive.c **** 	{ // No. One or more have been added
+ 143:Ourwares/SerialTaskReceive.c **** 		/* Find end of list */
+ 144:Ourwares/SerialTaskReceive.c **** 		ptmp2 = prbhd;	// Start at head
+ARM GAS  /tmp/ccsbYjAz.s 			page 4
+
+
+ 145:Ourwares/SerialTaskReceive.c **** 		while (ptmp2 != ptmp2->pnext) ptmp2 = ptmp2->pnext;
+ 146:Ourwares/SerialTaskReceive.c **** 		ptmp2->pnext = ptmp1; // Last block points to added block
+ 147:Ourwares/SerialTaskReceive.c **** 		ptmp1->pnext = ptmp1; // Added (and last) lock points to self
+ 148:Ourwares/SerialTaskReceive.c **** 	}
+ 149:Ourwares/SerialTaskReceive.c **** 
+ 150:Ourwares/SerialTaskReceive.c **** 	/* CAN msg conversion depends on line buffer size being large enough for CAN msg. */
+ 151:Ourwares/SerialTaskReceive.c **** 	if ((CANmode != 0) && (linesize < sizeof(struct CANRCVBUFPLUS))) 
+ 152:Ourwares/SerialTaskReceive.c **** 	     linesize = sizeof(struct CANRCVBUFPLUS);
+ 153:Ourwares/SerialTaskReceive.c **** 
+ 154:Ourwares/SerialTaskReceive.c **** 	/* Get memory for an array of line buffers for this uart */	
+ 155:Ourwares/SerialTaskReceive.c **** 	pbuf = (char*)calloc(numline*linesize, sizeof(char));
+ 156:Ourwares/SerialTaskReceive.c **** 	if ( pbuf == NULL) {taskEXIT_CRITICAL();morse_trap(61);}
+ 157:Ourwares/SerialTaskReceive.c **** 
+ 158:Ourwares/SerialTaskReceive.c **** 	/* Save parameters */
+ 159:Ourwares/SerialTaskReceive.c **** 	// ptmp1 points to last item on list
+ 160:Ourwares/SerialTaskReceive.c **** 	ptmp1->numlinexsize = numline*linesize;
+ 161:Ourwares/SerialTaskReceive.c **** 	ptmp1->linesize  = linesize;
+ 162:Ourwares/SerialTaskReceive.c **** 	ptmp1->numline   = numline;
+ 163:Ourwares/SerialTaskReceive.c **** 	ptmp1->dmaflag   = dmaflag;
+ 164:Ourwares/SerialTaskReceive.c **** 	ptmp1->pnoteval  = pnoteval;
+ 165:Ourwares/SerialTaskReceive.c **** 	ptmp1->notebit   = notebit;
+ 166:Ourwares/SerialTaskReceive.c **** 	ptmp1->phuart    = phuart;
+ 167:Ourwares/SerialTaskReceive.c **** 	ptmp1->tskhandle = xTaskGetCurrentTaskHandle();
+ 168:Ourwares/SerialTaskReceive.c **** 	ptmp1->errorct   = 0;
+ 169:Ourwares/SerialTaskReceive.c **** 
+ 170:Ourwares/SerialTaskReceive.c **** 	/* Initialize line buffer pointers */
+ 171:Ourwares/SerialTaskReceive.c **** 	ptmp1->pbegin = pbuf; // First line buffer beginning
+ 172:Ourwares/SerialTaskReceive.c **** 	ptmp1->padd   = pbuf; // Pointer to where next line will be added
+ 173:Ourwares/SerialTaskReceive.c **** 	ptmp1->ptake  = pbuf; // Pointer to where next line will be taken
+ 174:Ourwares/SerialTaskReceive.c **** 	ptmp1->pwork  = pbuf; // Pointer where next char in active line will be added
+ 175:Ourwares/SerialTaskReceive.c **** 	ptmp1->pworkend = pbuf + linesize - 2; // End of 1st LINE buffer (allow for zero terminator)
+ 176:Ourwares/SerialTaskReceive.c **** 	ptmp1->pend = pbuf + numline*linesize; // End of line buffers + 1 line
+ 177:Ourwares/SerialTaskReceive.c **** 	ptmp1->CANmode = CANmode;
+ 178:Ourwares/SerialTaskReceive.c **** 
+ 179:Ourwares/SerialTaskReceive.c **** 	if (dmaflag != 0)
+ 180:Ourwares/SerialTaskReceive.c **** 	{ // Circular DMA buffer 
+ 181:Ourwares/SerialTaskReceive.c **** 		pbuf = (char*)calloc((int)dmasize, sizeof(char));
+ 182:Ourwares/SerialTaskReceive.c **** 		if ( pbuf == NULL) morse_trap(62);
+ 183:Ourwares/SerialTaskReceive.c **** 		ptmp1->pbegindma = pbuf;   // Pointer to beginning of DMA circular buffer
+ 184:Ourwares/SerialTaskReceive.c **** 		ptmp1->penddma   = pbuf + dmasize; // Pointer to end + 1
+ 185:Ourwares/SerialTaskReceive.c **** 		ptmp1->ptakedma  = pbuf;   // "Take" Pointer into DMA buffer
+ 186:Ourwares/SerialTaskReceive.c **** 		ptmp1->dmasize   = dmasize; // Total number of chars in DMA buffer
+ 187:Ourwares/SerialTaskReceive.c **** 
+ 188:Ourwares/SerialTaskReceive.c **** #ifdef USECANMODEWITHGATEWAYROUTINES
+ 189:Ourwares/SerialTaskReceive.c **** 		/* When CANmode is requested, the conversion control block is used */
+ 190:Ourwares/SerialTaskReceive.c **** 		if (CANmode == 1)
+ 191:Ourwares/SerialTaskReceive.c **** 		{ // Initialize CAN conversion control block
+ 192:Ourwares/SerialTaskReceive.c **** 			pgptc = gateway_PCtoCAN_init(ptmp1);
+ 193:Ourwares/SerialTaskReceive.c **** 			if (pgptc == NULL)  {taskEXIT_CRITICAL();morse_trap(63);}
+ 194:Ourwares/SerialTaskReceive.c **** 			ptmp1->pgptc = pgptc; // Save pointer to CAN conversion control block
+ 195:Ourwares/SerialTaskReceive.c **** 		}
+ 196:Ourwares/SerialTaskReceive.c **** #endif
+ 197:Ourwares/SerialTaskReceive.c **** 
+ 198:Ourwares/SerialTaskReceive.c **** 		/* Start uart-dma circular mode.  Start once; run forever. */
+ 199:Ourwares/SerialTaskReceive.c **** 		halret = HAL_UART_Receive_DMA(ptmp1->phuart, (uint8_t*)ptmp1->pbegindma, ptmp1->dmasize);
+ 200:Ourwares/SerialTaskReceive.c **** 		if (halret == HAL_ERROR)
+ 201:Ourwares/SerialTaskReceive.c **** 		{
+ARM GAS  /tmp/ccsbYjAz.s 			page 5
+
+
+ 202:Ourwares/SerialTaskReceive.c **** 			taskEXIT_CRITICAL();
+ 203:Ourwares/SerialTaskReceive.c **** 			morse_trap(64);
+ 204:Ourwares/SerialTaskReceive.c **** //			return NULL;
+ 205:Ourwares/SerialTaskReceive.c **** 		}
+ 206:Ourwares/SerialTaskReceive.c **** 	}
+ 207:Ourwares/SerialTaskReceive.c **** 	else
+ 208:Ourwares/SerialTaskReceive.c **** 	{ // Start char-by-char mode. Restart upon each interrupt.
+ 209:Ourwares/SerialTaskReceive.c **** 		halret = HAL_UART_Receive_IT(ptmp1->phuart, (uint8_t*)ptmp1->pwork, 1);
+ 210:Ourwares/SerialTaskReceive.c **** 		if (halret == HAL_ERROR)
+ 211:Ourwares/SerialTaskReceive.c **** 		{
+ 212:Ourwares/SerialTaskReceive.c **** 			taskEXIT_CRITICAL();
+ 213:Ourwares/SerialTaskReceive.c **** 			morse_trap(65);
+ 214:Ourwares/SerialTaskReceive.c **** //			return NULL;
+ 215:Ourwares/SerialTaskReceive.c **** 		}
+ 216:Ourwares/SerialTaskReceive.c **** 	}
+ 217:Ourwares/SerialTaskReceive.c **** taskEXIT_CRITICAL();
+ 218:Ourwares/SerialTaskReceive.c **** 	return ptmp1;	// Success return pointer to this 'BCB
+ 219:Ourwares/SerialTaskReceive.c **** }
+ 220:Ourwares/SerialTaskReceive.c **** 
+ 221:Ourwares/SerialTaskReceive.c **** /* *************************************************************************
+ 222:Ourwares/SerialTaskReceive.c ****  * void StartSerialTaskReceive(void* argument);
+ 223:Ourwares/SerialTaskReceive.c ****  *	@brief	: Task startup
+ 224:Ourwares/SerialTaskReceive.c ****  * *************************************************************************/
+ 225:Ourwares/SerialTaskReceive.c **** void StartSerialTaskReceive(void* argument)
+ 226:Ourwares/SerialTaskReceive.c **** {
+ 227:Ourwares/SerialTaskReceive.c **** 	struct SERIALRCVBCB* prtmp = prbhd;
+ 228:Ourwares/SerialTaskReceive.c **** 	struct SERIALRCVBCB* prtmp2;
+ 229:Ourwares/SerialTaskReceive.c **** 	
+ 230:Ourwares/SerialTaskReceive.c **** 	/* Do nothing until at least one tasks calls 
+ 231:Ourwares/SerialTaskReceive.c ****       'xSerialTaskRxAdduart' and sets up the 
+ 232:Ourwares/SerialTaskReceive.c ****        uart and buffering. */
+ 233:Ourwares/SerialTaskReceive.c **** 
+ 234:Ourwares/SerialTaskReceive.c **** 	while (prtmp == NULL)
+ 235:Ourwares/SerialTaskReceive.c **** 	{
+ 236:Ourwares/SerialTaskReceive.c **** 		osDelay(10);
+ 237:Ourwares/SerialTaskReceive.c **** 		prtmp = prbhd;
+ 238:Ourwares/SerialTaskReceive.c **** 	}
+ 239:Ourwares/SerialTaskReceive.c **** 
+ 240:Ourwares/SerialTaskReceive.c ****   /* Infinite loop */
+ 241:Ourwares/SerialTaskReceive.c ****   for(;;)
+ 242:Ourwares/SerialTaskReceive.c ****   {
+ 243:Ourwares/SerialTaskReceive.c **** 		/* Wait for one tick or notification from a dma callback */
+ 244:Ourwares/SerialTaskReceive.c **** 		xTaskNotifyWait(0, 0, NULL, 2);
+ 245:Ourwares/SerialTaskReceive.c **** 
+ 246:Ourwares/SerialTaskReceive.c **** 		/* Go through list of receiving uarts and unload only dma uart buffers. */
+ 247:Ourwares/SerialTaskReceive.c **** 		prtmp = prbhd;
+ 248:Ourwares/SerialTaskReceive.c **** 		do
+ 249:Ourwares/SerialTaskReceive.c **** 		{
+ 250:Ourwares/SerialTaskReceive.c **** 			if (prtmp->dmaflag != 0)
+ 251:Ourwares/SerialTaskReceive.c **** 			{ // Here, dma mode
+ 252:Ourwares/SerialTaskReceive.c **** 				if (prtmp->CANmode == 1)
+ 253:Ourwares/SerialTaskReceive.c **** 				{ // Here, convert to CAN msg buffers
+ 254:Ourwares/SerialTaskReceive.c **** #ifdef USECANMODEWITHGATEWAYROUTINES
+ 255:Ourwares/SerialTaskReceive.c **** 					gateway_PCtoCAN_unloaddma(prtmp);
+ 256:Ourwares/SerialTaskReceive.c **** #endif
+ 257:Ourwares/SerialTaskReceive.c **** 				}
+ 258:Ourwares/SerialTaskReceive.c **** 				else
+ARM GAS  /tmp/ccsbYjAz.s 			page 6
+
+
+ 259:Ourwares/SerialTaskReceive.c **** 				{ // Here, straight ascii line buffers
+ 260:Ourwares/SerialTaskReceive.c **** 					unloaddma(prtmp);
+ 261:Ourwares/SerialTaskReceive.c **** 				}
+ 262:Ourwares/SerialTaskReceive.c **** 			}
+ 263:Ourwares/SerialTaskReceive.c **** 			prtmp2 = prtmp;
+ 264:Ourwares/SerialTaskReceive.c **** 			prtmp = prtmp2->pnext;
+ 265:Ourwares/SerialTaskReceive.c **** 		} while (prtmp2->pnext != prtmp2);
+ 266:Ourwares/SerialTaskReceive.c ****   }
+ 267:Ourwares/SerialTaskReceive.c **** }
+ 268:Ourwares/SerialTaskReceive.c **** /* *************************************************************************
+ 269:Ourwares/SerialTaskReceive.c ****  * osThreadId xSerialTaskReceiveCreate(uint32_t taskpriority);
+ 270:Ourwares/SerialTaskReceive.c ****  * @brief	: Create task; task handle created is global for all to enjoy!
+ 271:Ourwares/SerialTaskReceive.c ****  * @param	: taskpriority = Task priority (just as it says!)
+ 272:Ourwares/SerialTaskReceive.c ****  * @return	: SerialTaskReceiveHandle
+ 273:Ourwares/SerialTaskReceive.c ****  * *************************************************************************/
+ 274:Ourwares/SerialTaskReceive.c ****  osThreadId xSerialTaskReceiveCreate(uint32_t taskpriority)
+ 275:Ourwares/SerialTaskReceive.c **** {
+ 276:Ourwares/SerialTaskReceive.c **** /*
+ 277:Ourwares/SerialTaskReceive.c **** BaseType_t xTaskCreate( TaskFunction_t pvTaskCode,
+ 278:Ourwares/SerialTaskReceive.c **** const char * const pcName,
+ 279:Ourwares/SerialTaskReceive.c **** unsigned short usStackDepth,
+ 280:Ourwares/SerialTaskReceive.c **** void *pvParameters,
+ 281:Ourwares/SerialTaskReceive.c **** UBaseType_t uxPriority,
+ 282:Ourwares/SerialTaskReceive.c **** TaskHandle_t *pxCreatedTask );
+ 283:Ourwares/SerialTaskReceive.c **** */
+ 284:Ourwares/SerialTaskReceive.c **** 	BaseType_t ret = xTaskCreate(StartSerialTaskReceive, "StartSerialTaskReceive",\
+ 285:Ourwares/SerialTaskReceive.c ****         96, NULL, taskpriority, &SerialTaskReceiveHandle);
+ 286:Ourwares/SerialTaskReceive.c **** 	if (ret != pdPASS) return NULL;
+ 287:Ourwares/SerialTaskReceive.c **** 	return SerialTaskReceiveHandle;
+ 288:Ourwares/SerialTaskReceive.c **** }
+ 289:Ourwares/SerialTaskReceive.c **** /* *************************************************************************
+ 290:Ourwares/SerialTaskReceive.c ****  * char* xSerialTaskReceiveGetline(struct SERIALRCVBCB* pbcb);
+ 291:Ourwares/SerialTaskReceive.c ****  *	@brief	: Load buffer control block onto queue for sending
+ 292:Ourwares/SerialTaskReceive.c ****  * @param	: pbcb = Pointer to Buffer Control Block
+ 293:Ourwares/SerialTaskReceive.c ****  * @return	: Pointer to line buffer; NULL = no new lines
+ 294:Ourwares/SerialTaskReceive.c ****  * *************************************************************************/
+ 295:Ourwares/SerialTaskReceive.c **** char* xSerialTaskReceiveGetline(struct SERIALRCVBCB* pbcb)
+ 296:Ourwares/SerialTaskReceive.c **** {
+ 297:Ourwares/SerialTaskReceive.c **** 	char* p = NULL;
+ 298:Ourwares/SerialTaskReceive.c **** 
+ 299:Ourwares/SerialTaskReceive.c **** 	/* Check no new lines. */
+ 300:Ourwares/SerialTaskReceive.c **** 	if (pbcb->ptake == pbcb->padd) return p;
+ 301:Ourwares/SerialTaskReceive.c **** 	p = pbcb->ptake;
+ 302:Ourwares/SerialTaskReceive.c **** 
+ 303:Ourwares/SerialTaskReceive.c **** 	/* Advance 'take' pointer w wraparound check. */
+ 304:Ourwares/SerialTaskReceive.c **** 	pbcb->ptake += pbcb->linesize;
+ 305:Ourwares/SerialTaskReceive.c **** 	if (pbcb->ptake >= pbcb->pend) pbcb->ptake = pbcb->pbegin;
+ 306:Ourwares/SerialTaskReceive.c **** 
+ 307:Ourwares/SerialTaskReceive.c **** 	return p;
+ 308:Ourwares/SerialTaskReceive.c **** }
+ 309:Ourwares/SerialTaskReceive.c **** /* *************************************************************************
+ 310:Ourwares/SerialTaskReceive.c ****  * static void advancebuf(struct SERIALRCVBCB* prtmp);
+ 311:Ourwares/SerialTaskReceive.c ****  * @brief	: Advance to next line buffer
+ 312:Ourwares/SerialTaskReceive.c ****  * *************************************************************************/
+ 313:Ourwares/SerialTaskReceive.c **** static void advancebuf(struct SERIALRCVBCB* prtmp)
+ 314:Ourwares/SerialTaskReceive.c **** {		
+  29              		.loc 1 314 0
+ARM GAS  /tmp/ccsbYjAz.s 			page 7
+
+
+  30              		.cfi_startproc
+  31              		@ args = 0, pretend = 0, frame = 8
+  32              		@ frame_needed = 0, uses_anonymous_args = 0
+  33              	.LVL0:
+  34 0000 00B5     		push	{lr}
+  35              	.LCFI0:
+  36              		.cfi_def_cfa_offset 4
+  37              		.cfi_offset 14, -4
+  38 0002 85B0     		sub	sp, sp, #20
+  39              	.LCFI1:
+  40              		.cfi_def_cfa_offset 24
+  41 0004 0346     		mov	r3, r0
+ 315:Ourwares/SerialTaskReceive.c **** 	BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+  42              		.loc 1 315 0
+  43 0006 0022     		movs	r2, #0
+  44 0008 0392     		str	r2, [sp, #12]
+ 316:Ourwares/SerialTaskReceive.c **** 
+ 317:Ourwares/SerialTaskReceive.c **** 	/* Zero terminator addition. */
+ 318:Ourwares/SerialTaskReceive.c **** 	*prtmp->pwork = 0; // Add string terminator
+  45              		.loc 1 318 0
+  46 000a 4169     		ldr	r1, [r0, #20]
+  47 000c 0A70     		strb	r2, [r1]
+ 319:Ourwares/SerialTaskReceive.c **** 	
+ 320:Ourwares/SerialTaskReceive.c **** 	/* Advance to beginning of next line buffer */
+ 321:Ourwares/SerialTaskReceive.c **** 	prtmp->padd += prtmp->linesize;	// Step ahead one buffer length
+  48              		.loc 1 321 0
+  49 000e 828F     		ldrh	r2, [r0, #60]
+  50 0010 C168     		ldr	r1, [r0, #12]
+  51 0012 1144     		add	r1, r1, r2
+  52 0014 C160     		str	r1, [r0, #12]
+ 322:Ourwares/SerialTaskReceive.c **** 	if (prtmp->padd == prtmp->pend) prtmp->padd = prtmp->pbegin;
+  53              		.loc 1 322 0
+  54 0016 8068     		ldr	r0, [r0, #8]
+  55              	.LVL1:
+  56 0018 8142     		cmp	r1, r0
+  57 001a 01D1     		bne	.L2
+  58              		.loc 1 322 0 is_stmt 0 discriminator 1
+  59 001c 5968     		ldr	r1, [r3, #4]
+  60 001e D960     		str	r1, [r3, #12]
+  61              	.L2:
+ 323:Ourwares/SerialTaskReceive.c **** 
+ 324:Ourwares/SerialTaskReceive.c **** 	/* Initialize working char pointers */
+ 325:Ourwares/SerialTaskReceive.c **** 	prtmp->pwork = prtmp->padd;	// Begin
+  62              		.loc 1 325 0 is_stmt 1
+  63 0020 D968     		ldr	r1, [r3, #12]
+  64 0022 5961     		str	r1, [r3, #20]
+ 326:Ourwares/SerialTaskReceive.c **** 	prtmp->pworkend = prtmp->padd + prtmp->linesize - 2; // End
+  65              		.loc 1 326 0
+  66 0024 023A     		subs	r2, r2, #2
+  67 0026 0A44     		add	r2, r2, r1
+  68 0028 9A61     		str	r2, [r3, #24]
+ 327:Ourwares/SerialTaskReceive.c **** 
+ 328:Ourwares/SerialTaskReceive.c **** 	/* Notify originating task know a line is ready. */
+ 329:Ourwares/SerialTaskReceive.c **** 	xTaskNotifyFromISR(prtmp->tskhandle, 
+  69              		.loc 1 329 0
+  70 002a 186A     		ldr	r0, [r3, #32]
+  71 002c 596A     		ldr	r1, [r3, #36]
+ARM GAS  /tmp/ccsbYjAz.s 			page 8
+
+
+  72 002e 03AB     		add	r3, sp, #12
+  73              	.LVL2:
+  74 0030 0093     		str	r3, [sp]
+  75 0032 0023     		movs	r3, #0
+  76 0034 0122     		movs	r2, #1
+  77 0036 FFF7FEFF 		bl	xTaskGenericNotifyFromISR
+  78              	.LVL3:
+ 330:Ourwares/SerialTaskReceive.c **** 		prtmp->notebit,	/* 'or' bit assigned to buffer to notification value. */
+ 331:Ourwares/SerialTaskReceive.c **** 		eSetBits,      /* Set 'or' option */
+ 332:Ourwares/SerialTaskReceive.c **** 		&xHigherPriorityTaskWoken );
+ 333:Ourwares/SerialTaskReceive.c **** 
+ 334:Ourwares/SerialTaskReceive.c **** 	portYIELD_FROM_ISR( xHigherPriorityTaskWoken );
+  79              		.loc 1 334 0
+  80 003a 039B     		ldr	r3, [sp, #12]
+  81 003c 3BB1     		cbz	r3, .L1
+  82              		.loc 1 334 0 is_stmt 0 discriminator 1
+  83 003e 4FF08052 		mov	r2, #268435456
+  84 0042 044B     		ldr	r3, .L5
+  85 0044 1A60     		str	r2, [r3]
+  86              		.syntax unified
+  87              	@ 334 "Ourwares/SerialTaskReceive.c" 1
+  88 0046 BFF34F8F 		dsb
+  89              	@ 0 "" 2
+  90              	@ 334 "Ourwares/SerialTaskReceive.c" 1
+  91 004a BFF36F8F 		isb
+  92              	@ 0 "" 2
+  93              		.thumb
+  94              		.syntax unified
+  95              	.L1:
+ 335:Ourwares/SerialTaskReceive.c **** 	return;
+ 336:Ourwares/SerialTaskReceive.c **** }
+  96              		.loc 1 336 0 is_stmt 1
+  97 004e 05B0     		add	sp, sp, #20
+  98              	.LCFI2:
+  99              		.cfi_def_cfa_offset 4
+ 100              		@ sp needed
+ 101 0050 5DF804FB 		ldr	pc, [sp], #4
+ 102              	.L6:
+ 103              		.align	2
+ 104              	.L5:
+ 105 0054 04ED00E0 		.word	-536810236
+ 106              		.cfi_endproc
+ 107              	.LFE296:
+ 109              		.section	.text.advanceptr,"ax",%progbits
+ 110              		.align	2
+ 111              		.thumb
+ 112              		.thumb_func
+ 114              	advanceptr:
+ 115              	.LFB297:
+ 337:Ourwares/SerialTaskReceive.c **** /* *************************************************************************
+ 338:Ourwares/SerialTaskReceive.c ****  * static void advanceptr(struct SERIALRCVBCB* prtmp);
+ 339:Ourwares/SerialTaskReceive.c ****  * @brief	: Advance pointer within the active line buffer
+ 340:Ourwares/SerialTaskReceive.c ****  * *************************************************************************/
+ 341:Ourwares/SerialTaskReceive.c **** static void advanceptr(struct SERIALRCVBCB* prtmp, char c)
+ 342:Ourwares/SerialTaskReceive.c **** {
+ 116              		.loc 1 342 0
+ 117              		.cfi_startproc
+ARM GAS  /tmp/ccsbYjAz.s 			page 9
+
+
+ 118              		@ args = 0, pretend = 0, frame = 0
+ 119              		@ frame_needed = 0, uses_anonymous_args = 0
+ 120              	.LVL4:
+ 121 0000 08B5     		push	{r3, lr}
+ 122              	.LCFI3:
+ 123              		.cfi_def_cfa_offset 8
+ 124              		.cfi_offset 3, -8
+ 125              		.cfi_offset 14, -4
+ 343:Ourwares/SerialTaskReceive.c **** 	*prtmp->pwork++ = c;
+ 126              		.loc 1 343 0
+ 127 0002 4369     		ldr	r3, [r0, #20]
+ 128 0004 5A1C     		adds	r2, r3, #1
+ 129 0006 4261     		str	r2, [r0, #20]
+ 130 0008 1970     		strb	r1, [r3]
+ 344:Ourwares/SerialTaskReceive.c **** 	if (c == LINETERMINATOR) // || (c == 0XD))
+ 131              		.loc 1 344 0
+ 132 000a 0A29     		cmp	r1, #10
+ 133 000c 02D1     		bne	.L8
+ 345:Ourwares/SerialTaskReceive.c **** 	{ // Here End of Line
+ 346:Ourwares/SerialTaskReceive.c **** 		advancebuf(prtmp); // Advance to new line buffer and notify originator
+ 134              		.loc 1 346 0
+ 135 000e FFF7FEFF 		bl	advancebuf
+ 136              	.LVL5:
+ 347:Ourwares/SerialTaskReceive.c **** 		return;
+ 137              		.loc 1 347 0
+ 138 0012 08BD     		pop	{r3, pc}
+ 139              	.LVL6:
+ 140              	.L8:
+ 348:Ourwares/SerialTaskReceive.c **** 	}
+ 349:Ourwares/SerialTaskReceive.c **** 
+ 350:Ourwares/SerialTaskReceive.c **** 	/* Here, just an ordinary char stored. */
+ 351:Ourwares/SerialTaskReceive.c **** 	if (prtmp->pwork == prtmp->pworkend)
+ 141              		.loc 1 351 0
+ 142 0014 4269     		ldr	r2, [r0, #20]
+ 143 0016 8369     		ldr	r3, [r0, #24]
+ 144 0018 9A42     		cmp	r2, r3
+ 145 001a 01D1     		bne	.L7
+ 352:Ourwares/SerialTaskReceive.c **** 	{ // Here we are at end - 1 of line buffer
+ 353:Ourwares/SerialTaskReceive.c **** 		advancebuf(prtmp); // Advance to new line buffer and notify originator
+ 146              		.loc 1 353 0
+ 147 001c FFF7FEFF 		bl	advancebuf
+ 148              	.LVL7:
+ 149              	.L7:
+ 150 0020 08BD     		pop	{r3, pc}
+ 151              		.cfi_endproc
+ 152              	.LFE297:
+ 154 0022 00BF     		.section	.text.unloaddma,"ax",%progbits
+ 155              		.align	2
+ 156              		.thumb
+ 157              		.thumb_func
+ 159              	unloaddma:
+ 160              	.LFB298:
+ 354:Ourwares/SerialTaskReceive.c **** 	}	
+ 355:Ourwares/SerialTaskReceive.c **** 	return;
+ 356:Ourwares/SerialTaskReceive.c **** }
+ 357:Ourwares/SerialTaskReceive.c **** 
+ 358:Ourwares/SerialTaskReceive.c **** /* *************************************************************************
+ARM GAS  /tmp/ccsbYjAz.s 			page 10
+
+
+ 359:Ourwares/SerialTaskReceive.c ****  * static void unloaddma(struct SERIALRCVBCB* prbcb);
+ 360:Ourwares/SerialTaskReceive.c ****  * @brief	: DMA: Check for line terminator and store; enter from task poll
+ 361:Ourwares/SerialTaskReceive.c ****  * @param	: prbcb = pointer to buffer control block for uart causing callback
+ 362:Ourwares/SerialTaskReceive.c ****  * *************************************************************************/
+ 363:Ourwares/SerialTaskReceive.c **** static void unloaddma(struct SERIALRCVBCB* prbcb)
+ 364:Ourwares/SerialTaskReceive.c **** {
+ 161              		.loc 1 364 0
+ 162              		.cfi_startproc
+ 163              		@ args = 0, pretend = 0, frame = 0
+ 164              		@ frame_needed = 0, uses_anonymous_args = 0
+ 165              	.LVL8:
+ 166 0000 38B5     		push	{r3, r4, r5, lr}
+ 167              	.LCFI4:
+ 168              		.cfi_def_cfa_offset 16
+ 169              		.cfi_offset 3, -16
+ 170              		.cfi_offset 4, -12
+ 171              		.cfi_offset 5, -8
+ 172              		.cfi_offset 14, -4
+ 173 0002 0446     		mov	r4, r0
+ 365:Ourwares/SerialTaskReceive.c **** 	uint16_t dmandtr;	// Number of data items remaining in DMA NDTR register
+ 366:Ourwares/SerialTaskReceive.c **** 	int32_t diff;
+ 367:Ourwares/SerialTaskReceive.c **** 	char c;
+ 368:Ourwares/SerialTaskReceive.c **** 
+ 369:Ourwares/SerialTaskReceive.c **** // bsp_uart.c handling of dma
+ 370:Ourwares/SerialTaskReceive.c **** //		Diff = ( pctl->rxbuff_end - DMA_SNDTR(pctl->idma,pctl->rxdma_stream) - pctl->rxbuff_out );
+ 371:Ourwares/SerialTaskReceive.c **** //		if (Diff < 0)
+ 372:Ourwares/SerialTaskReceive.c **** //			Diff += pctl->rxbuff_size;  // Adjust for wrap
+ 373:Ourwares/SerialTaskReceive.c **** 
+ 374:Ourwares/SerialTaskReceive.c **** 		/* Get number of data item count in DMA buffer "now" from DMA NDTR register. */
+ 375:Ourwares/SerialTaskReceive.c **** 		dmandtr = __HAL_DMA_GET_COUNTER(prbcb->phuart->hdmarx); 
+ 174              		.loc 1 375 0
+ 175 0004 C369     		ldr	r3, [r0, #28]
+ 176 0006 1B6F     		ldr	r3, [r3, #112]
+ 177 0008 1B68     		ldr	r3, [r3]
+ 178 000a 5D68     		ldr	r5, [r3, #4]
+ 179              	.LVL9:
+ 376:Ourwares/SerialTaskReceive.c **** 
+ 377:Ourwares/SerialTaskReceive.c **** 		/* Difference between where we are taking out chars, and where DMA is or was storing. */
+ 378:Ourwares/SerialTaskReceive.c **** 		diff = prbcb->penddma - dmandtr - prbcb->ptakedma; 
+ 180              		.loc 1 378 0
+ 181 000c 026B     		ldr	r2, [r0, #48]
+ 182 000e ADB2     		uxth	r5, r5
+ 183 0010 531B     		subs	r3, r2, r5
+ 184 0012 456B     		ldr	r5, [r0, #52]
+ 185              	.LVL10:
+ 379:Ourwares/SerialTaskReceive.c **** 		if (diff < 0)
+ 186              		.loc 1 379 0
+ 187 0014 5D1B     		subs	r5, r3, r5
+ 188              	.LVL11:
+ 189 0016 0FD5     		bpl	.L13
+ 380:Ourwares/SerialTaskReceive.c **** 		{ // Wrap around
+ 381:Ourwares/SerialTaskReceive.c **** 			diff += prbcb->dmasize;
+ 190              		.loc 1 381 0
+ 191 0018 C38F     		ldrh	r3, [r0, #62]
+ 192 001a 1D44     		add	r5, r5, r3
+ 193              	.LVL12:
+ 194 001c 0CE0     		b	.L13
+ARM GAS  /tmp/ccsbYjAz.s 			page 11
+
+
+ 195              	.LVL13:
+ 196              	.L15:
+ 382:Ourwares/SerialTaskReceive.c **** 		}
+ 383:Ourwares/SerialTaskReceive.c **** 
+ 384:Ourwares/SerialTaskReceive.c **** 		/* Copy dma circular buffer into buffered lines */
+ 385:Ourwares/SerialTaskReceive.c **** 		while (diff > 0)
+ 386:Ourwares/SerialTaskReceive.c **** 		{
+ 387:Ourwares/SerialTaskReceive.c **** 			diff -= 1;
+ 197              		.loc 1 387 0
+ 198 001e 013D     		subs	r5, r5, #1
+ 199              	.LVL14:
+ 388:Ourwares/SerialTaskReceive.c **** 			c = *prbcb->ptakedma++; // Get char from dma buffer
+ 200              		.loc 1 388 0
+ 201 0020 626B     		ldr	r2, [r4, #52]
+ 202 0022 531C     		adds	r3, r2, #1
+ 203 0024 6363     		str	r3, [r4, #52]
+ 204 0026 1178     		ldrb	r1, [r2]	@ zero_extendqisi2
+ 205              	.LVL15:
+ 389:Ourwares/SerialTaskReceive.c **** 			if (prbcb->ptakedma == prbcb->penddma) prbcb->ptakedma = prbcb->pbegindma;
+ 206              		.loc 1 389 0
+ 207 0028 226B     		ldr	r2, [r4, #48]
+ 208 002a 9342     		cmp	r3, r2
+ 209 002c 01D1     		bne	.L14
+ 210              		.loc 1 389 0 is_stmt 0 discriminator 1
+ 211 002e E36A     		ldr	r3, [r4, #44]
+ 212 0030 6363     		str	r3, [r4, #52]
+ 213              	.L14:
+ 390:Ourwares/SerialTaskReceive.c **** 			
+ 391:Ourwares/SerialTaskReceive.c **** 			advanceptr(prbcb,c);
+ 214              		.loc 1 391 0 is_stmt 1
+ 215 0032 2046     		mov	r0, r4
+ 216 0034 FFF7FEFF 		bl	advanceptr
+ 217              	.LVL16:
+ 218              	.L13:
+ 385:Ourwares/SerialTaskReceive.c **** 		{
+ 219              		.loc 1 385 0
+ 220 0038 002D     		cmp	r5, #0
+ 221 003a F0DC     		bgt	.L15
+ 392:Ourwares/SerialTaskReceive.c **** 		}
+ 393:Ourwares/SerialTaskReceive.c **** 		return;
+ 394:Ourwares/SerialTaskReceive.c **** }
+ 222              		.loc 1 394 0
+ 223 003c 38BD     		pop	{r3, r4, r5, pc}
+ 224              		.cfi_endproc
+ 225              	.LFE298:
+ 227 003e 00BF     		.section	.text.StartSerialTaskReceive,"ax",%progbits
+ 228              		.align	2
+ 229              		.global	StartSerialTaskReceive
+ 230              		.thumb
+ 231              		.thumb_func
+ 233              	StartSerialTaskReceive:
+ 234              	.LFB293:
+ 226:Ourwares/SerialTaskReceive.c **** 	struct SERIALRCVBCB* prtmp = prbhd;
+ 235              		.loc 1 226 0
+ 236              		.cfi_startproc
+ 237              		@ args = 0, pretend = 0, frame = 0
+ 238              		@ frame_needed = 0, uses_anonymous_args = 0
+ARM GAS  /tmp/ccsbYjAz.s 			page 12
+
+
+ 239              	.LVL17:
+ 240 0000 10B5     		push	{r4, lr}
+ 241              	.LCFI5:
+ 242              		.cfi_def_cfa_offset 8
+ 243              		.cfi_offset 4, -8
+ 244              		.cfi_offset 14, -4
+ 227:Ourwares/SerialTaskReceive.c **** 	struct SERIALRCVBCB* prtmp2;
+ 245              		.loc 1 227 0
+ 246 0002 114B     		ldr	r3, .L25
+ 247 0004 1B68     		ldr	r3, [r3]
+ 248              	.LVL18:
+ 234:Ourwares/SerialTaskReceive.c **** 	{
+ 249              		.loc 1 234 0
+ 250 0006 04E0     		b	.L18
+ 251              	.LVL19:
+ 252              	.L19:
+ 236:Ourwares/SerialTaskReceive.c **** 		prtmp = prbhd;
+ 253              		.loc 1 236 0
+ 254 0008 0A20     		movs	r0, #10
+ 255 000a FFF7FEFF 		bl	osDelay
+ 256              	.LVL20:
+ 237:Ourwares/SerialTaskReceive.c **** 	}
+ 257              		.loc 1 237 0
+ 258 000e 0E4B     		ldr	r3, .L25
+ 259 0010 1B68     		ldr	r3, [r3]
+ 260              	.LVL21:
+ 261              	.L18:
+ 234:Ourwares/SerialTaskReceive.c **** 	{
+ 262              		.loc 1 234 0
+ 263 0012 002B     		cmp	r3, #0
+ 264 0014 F8D0     		beq	.L19
+ 265              	.L22:
+ 244:Ourwares/SerialTaskReceive.c **** 
+ 266              		.loc 1 244 0
+ 267 0016 0223     		movs	r3, #2
+ 268              	.LVL22:
+ 269 0018 0022     		movs	r2, #0
+ 270 001a 1146     		mov	r1, r2
+ 271 001c 1046     		mov	r0, r2
+ 272 001e FFF7FEFF 		bl	xTaskNotifyWait
+ 273              	.LVL23:
+ 247:Ourwares/SerialTaskReceive.c **** 		do
+ 274              		.loc 1 247 0
+ 275 0022 094B     		ldr	r3, .L25
+ 276 0024 1C68     		ldr	r4, [r3]
+ 277              	.LVL24:
+ 278 0026 00E0     		b	.L21
+ 279              	.LVL25:
+ 280              	.L23:
+ 264:Ourwares/SerialTaskReceive.c **** 		} while (prtmp2->pnext != prtmp2);
+ 281              		.loc 1 264 0
+ 282 0028 1C46     		mov	r4, r3
+ 283              	.LVL26:
+ 284              	.L21:
+ 250:Ourwares/SerialTaskReceive.c **** 			{ // Here, dma mode
+ 285              		.loc 1 250 0
+ 286 002a 94F94130 		ldrsb	r3, [r4, #65]
+ARM GAS  /tmp/ccsbYjAz.s 			page 13
+
+
+ 287 002e 33B1     		cbz	r3, .L20
+ 252:Ourwares/SerialTaskReceive.c **** 				{ // Here, convert to CAN msg buffers
+ 288              		.loc 1 252 0
+ 289 0030 94F84230 		ldrb	r3, [r4, #66]	@ zero_extendqisi2
+ 290 0034 012B     		cmp	r3, #1
+ 291 0036 02D0     		beq	.L20
+ 260:Ourwares/SerialTaskReceive.c **** 				}
+ 292              		.loc 1 260 0
+ 293 0038 2046     		mov	r0, r4
+ 294 003a FFF7FEFF 		bl	unloaddma
+ 295              	.LVL27:
+ 296              	.L20:
+ 264:Ourwares/SerialTaskReceive.c **** 		} while (prtmp2->pnext != prtmp2);
+ 297              		.loc 1 264 0
+ 298 003e 2368     		ldr	r3, [r4]
+ 299              	.LVL28:
+ 265:Ourwares/SerialTaskReceive.c ****   }
+ 300              		.loc 1 265 0
+ 301 0040 9C42     		cmp	r4, r3
+ 302 0042 F1D1     		bne	.L23
+ 303 0044 E7E7     		b	.L22
+ 304              	.L26:
+ 305 0046 00BF     		.align	2
+ 306              	.L25:
+ 307 0048 00000000 		.word	.LANCHOR0
+ 308              		.cfi_endproc
+ 309              	.LFE293:
+ 311              		.section	.text.xSerialTaskRxAdduart,"ax",%progbits
+ 312              		.align	2
+ 313              		.global	xSerialTaskRxAdduart
+ 314              		.thumb
+ 315              		.thumb_func
+ 317              	xSerialTaskRxAdduart:
+ 318              	.LFB292:
+ 118:Ourwares/SerialTaskReceive.c **** 	struct SERIALRCVBCB* ptmp1;
+ 319              		.loc 1 118 0
+ 320              		.cfi_startproc
+ 321              		@ args = 16, pretend = 0, frame = 16
+ 322              		@ frame_needed = 0, uses_anonymous_args = 0
+ 323              	.LVL29:
+ 324 0000 2DE9F04F 		push	{r4, r5, r6, r7, r8, r9, r10, fp, lr}
+ 325              	.LCFI6:
+ 326              		.cfi_def_cfa_offset 36
+ 327              		.cfi_offset 4, -36
+ 328              		.cfi_offset 5, -32
+ 329              		.cfi_offset 6, -28
+ 330              		.cfi_offset 7, -24
+ 331              		.cfi_offset 8, -20
+ 332              		.cfi_offset 9, -16
+ 333              		.cfi_offset 10, -12
+ 334              		.cfi_offset 11, -8
+ 335              		.cfi_offset 14, -4
+ 336 0004 85B0     		sub	sp, sp, #20
+ 337              	.LCFI7:
+ 338              		.cfi_def_cfa_offset 56
+ 339 0006 0190     		str	r0, [sp, #4]
+ 340 0008 8946     		mov	r9, r1
+ARM GAS  /tmp/ccsbYjAz.s 			page 14
+
+
+ 341 000a 0292     		str	r2, [sp, #8]
+ 342 000c 0393     		str	r3, [sp, #12]
+ 343 000e 9DF838B0 		ldrb	fp, [sp, #56]	@ zero_extendqisi2
+ 344 0012 9DF83C50 		ldrb	r5, [sp, #60]	@ zero_extendqisi2
+ 345 0016 9DF84080 		ldrb	r8, [sp, #64]	@ zero_extendqisi2
+ 346 001a 9DF844A0 		ldrb	r10, [sp, #68]	@ zero_extendqisi2
+ 130:Ourwares/SerialTaskReceive.c **** 
+ 347              		.loc 1 130 0
+ 348 001e 0A20     		movs	r0, #10
+ 349              	.LVL30:
+ 350 0020 FFF7FEFF 		bl	osDelay
+ 351              	.LVL31:
+ 132:Ourwares/SerialTaskReceive.c **** 	/* Add block with circular buffer pointers for this uart/usart to list */
+ 352              		.loc 1 132 0
+ 353 0024 FFF7FEFF 		bl	vPortEnterCritical
+ 354              	.LVL32:
+ 134:Ourwares/SerialTaskReceive.c **** 	if (ptmp1  == NULL) {taskEXIT_CRITICAL();morse_trap(60);}
+ 355              		.loc 1 134 0
+ 356 0028 4C21     		movs	r1, #76
+ 357 002a 0120     		movs	r0, #1
+ 358 002c FFF7FEFF 		bl	calloc
+ 359              	.LVL33:
+ 135:Ourwares/SerialTaskReceive.c **** 	if (prbhd  == NULL) // Is this the first?
+ 360              		.loc 1 135 0
+ 361 0030 0446     		mov	r4, r0
+ 362 0032 20B9     		cbnz	r0, .L28
+ 135:Ourwares/SerialTaskReceive.c **** 	if (prbhd  == NULL) // Is this the first?
+ 363              		.loc 1 135 0 is_stmt 0 discriminator 1
+ 364 0034 FFF7FEFF 		bl	vPortExitCritical
+ 365              	.LVL34:
+ 366 0038 3C20     		movs	r0, #60
+ 367 003a FFF7FEFF 		bl	morse_trap
+ 368              	.LVL35:
+ 369              	.L28:
+ 136:Ourwares/SerialTaskReceive.c **** 	{ // Yes.  
+ 370              		.loc 1 136 0 is_stmt 1
+ 371 003e 374B     		ldr	r3, .L39
+ 372 0040 1B68     		ldr	r3, [r3]
+ 373 0042 23B9     		cbnz	r3, .L29
+ 138:Ourwares/SerialTaskReceive.c **** 		ptmp1->pnext = ptmp1; // Point first (and last) item on list to self
+ 374              		.loc 1 138 0
+ 375 0044 354B     		ldr	r3, .L39
+ 376 0046 1C60     		str	r4, [r3]
+ 139:Ourwares/SerialTaskReceive.c **** 	}
+ 377              		.loc 1 139 0
+ 378 0048 2460     		str	r4, [r4]
+ 379 004a 05E0     		b	.L30
+ 380              	.LVL36:
+ 381              	.L36:
+ 145:Ourwares/SerialTaskReceive.c **** 		ptmp2->pnext = ptmp1; // Last block points to added block
+ 382              		.loc 1 145 0
+ 383 004c 1346     		mov	r3, r2
+ 384              	.LVL37:
+ 385              	.L29:
+ 145:Ourwares/SerialTaskReceive.c **** 		ptmp2->pnext = ptmp1; // Last block points to added block
+ 386              		.loc 1 145 0 is_stmt 0 discriminator 1
+ 387 004e 1A68     		ldr	r2, [r3]
+ARM GAS  /tmp/ccsbYjAz.s 			page 15
+
+
+ 388 0050 9342     		cmp	r3, r2
+ 389 0052 FBD1     		bne	.L36
+ 146:Ourwares/SerialTaskReceive.c **** 		ptmp1->pnext = ptmp1; // Added (and last) lock points to self
+ 390              		.loc 1 146 0 is_stmt 1
+ 391 0054 1C60     		str	r4, [r3]
+ 147:Ourwares/SerialTaskReceive.c **** 	}
+ 392              		.loc 1 147 0
+ 393 0056 2460     		str	r4, [r4]
+ 394              	.LVL38:
+ 395              	.L30:
+ 151:Ourwares/SerialTaskReceive.c **** 	     linesize = sizeof(struct CANRCVBUFPLUS);
+ 396              		.loc 1 151 0
+ 397 0058 BAF1000F 		cmp	r10, #0
+ 398 005c 02D0     		beq	.L31
+ 151:Ourwares/SerialTaskReceive.c **** 	     linesize = sizeof(struct CANRCVBUFPLUS);
+ 399              		.loc 1 151 0 is_stmt 0 discriminator 1
+ 400 005e 172D     		cmp	r5, #23
+ 401 0060 00D8     		bhi	.L31
+ 152:Ourwares/SerialTaskReceive.c **** 
+ 402              		.loc 1 152 0 is_stmt 1
+ 403 0062 1825     		movs	r5, #24
+ 404              	.L31:
+ 405              	.LVL39:
+ 155:Ourwares/SerialTaskReceive.c **** 	if ( pbuf == NULL) {taskEXIT_CRITICAL();morse_trap(61);}
+ 406              		.loc 1 155 0
+ 407 0064 05FB0BF7 		mul	r7, r5, fp
+ 408 0068 0121     		movs	r1, #1
+ 409 006a 3846     		mov	r0, r7
+ 410 006c FFF7FEFF 		bl	calloc
+ 411              	.LVL40:
+ 156:Ourwares/SerialTaskReceive.c **** 
+ 412              		.loc 1 156 0
+ 413 0070 0646     		mov	r6, r0
+ 414 0072 20B9     		cbnz	r0, .L32
+ 156:Ourwares/SerialTaskReceive.c **** 
+ 415              		.loc 1 156 0 is_stmt 0 discriminator 1
+ 416 0074 FFF7FEFF 		bl	vPortExitCritical
+ 417              	.LVL41:
+ 418 0078 3D20     		movs	r0, #61
+ 419 007a FFF7FEFF 		bl	morse_trap
+ 420              	.LVL42:
+ 421              	.L32:
+ 160:Ourwares/SerialTaskReceive.c **** 	ptmp1->linesize  = linesize;
+ 422              		.loc 1 160 0 is_stmt 1
+ 423 007e A763     		str	r7, [r4, #56]
+ 161:Ourwares/SerialTaskReceive.c **** 	ptmp1->numline   = numline;
+ 424              		.loc 1 161 0
+ 425 0080 A587     		strh	r5, [r4, #60]	@ movhi
+ 162:Ourwares/SerialTaskReceive.c **** 	ptmp1->dmaflag   = dmaflag;
+ 426              		.loc 1 162 0
+ 427 0082 84F840B0 		strb	fp, [r4, #64]
+ 163:Ourwares/SerialTaskReceive.c **** 	ptmp1->pnoteval  = pnoteval;
+ 428              		.loc 1 163 0
+ 429 0086 84F84190 		strb	r9, [r4, #65]
+ 164:Ourwares/SerialTaskReceive.c **** 	ptmp1->notebit   = notebit;
+ 430              		.loc 1 164 0
+ 431 008a 039B     		ldr	r3, [sp, #12]
+ARM GAS  /tmp/ccsbYjAz.s 			page 16
+
+
+ 432 008c A362     		str	r3, [r4, #40]
+ 165:Ourwares/SerialTaskReceive.c **** 	ptmp1->phuart    = phuart;
+ 433              		.loc 1 165 0
+ 434 008e 029B     		ldr	r3, [sp, #8]
+ 435 0090 6362     		str	r3, [r4, #36]
+ 166:Ourwares/SerialTaskReceive.c **** 	ptmp1->tskhandle = xTaskGetCurrentTaskHandle();
+ 436              		.loc 1 166 0
+ 437 0092 019B     		ldr	r3, [sp, #4]
+ 438 0094 E361     		str	r3, [r4, #28]
+ 167:Ourwares/SerialTaskReceive.c **** 	ptmp1->errorct   = 0;
+ 439              		.loc 1 167 0
+ 440 0096 FFF7FEFF 		bl	xTaskGetCurrentTaskHandle
+ 441              	.LVL43:
+ 442 009a 2062     		str	r0, [r4, #32]
+ 168:Ourwares/SerialTaskReceive.c **** 
+ 443              		.loc 1 168 0
+ 444 009c 0023     		movs	r3, #0
+ 445 009e A364     		str	r3, [r4, #72]
+ 171:Ourwares/SerialTaskReceive.c **** 	ptmp1->padd   = pbuf; // Pointer to where next line will be added
+ 446              		.loc 1 171 0
+ 447 00a0 6660     		str	r6, [r4, #4]
+ 172:Ourwares/SerialTaskReceive.c **** 	ptmp1->ptake  = pbuf; // Pointer to where next line will be taken
+ 448              		.loc 1 172 0
+ 449 00a2 E660     		str	r6, [r4, #12]
+ 173:Ourwares/SerialTaskReceive.c **** 	ptmp1->pwork  = pbuf; // Pointer where next char in active line will be added
+ 450              		.loc 1 173 0
+ 451 00a4 2661     		str	r6, [r4, #16]
+ 174:Ourwares/SerialTaskReceive.c **** 	ptmp1->pworkend = pbuf + linesize - 2; // End of 1st LINE buffer (allow for zero terminator)
+ 452              		.loc 1 174 0
+ 453 00a6 6661     		str	r6, [r4, #20]
+ 175:Ourwares/SerialTaskReceive.c **** 	ptmp1->pend = pbuf + numline*linesize; // End of line buffers + 1 line
+ 454              		.loc 1 175 0
+ 455 00a8 023D     		subs	r5, r5, #2
+ 456              	.LVL44:
+ 457 00aa 3544     		add	r5, r5, r6
+ 458 00ac A561     		str	r5, [r4, #24]
+ 176:Ourwares/SerialTaskReceive.c **** 	ptmp1->CANmode = CANmode;
+ 459              		.loc 1 176 0
+ 460 00ae 3744     		add	r7, r7, r6
+ 461 00b0 A760     		str	r7, [r4, #8]
+ 177:Ourwares/SerialTaskReceive.c **** 
+ 462              		.loc 1 177 0
+ 463 00b2 84F842A0 		strb	r10, [r4, #66]
+ 179:Ourwares/SerialTaskReceive.c **** 	{ // Circular DMA buffer 
+ 464              		.loc 1 179 0
+ 465 00b6 B9F1000F 		cmp	r9, #0
+ 466 00ba 1CD0     		beq	.L33
+ 181:Ourwares/SerialTaskReceive.c **** 		if ( pbuf == NULL) morse_trap(62);
+ 467              		.loc 1 181 0
+ 468 00bc 0121     		movs	r1, #1
+ 469 00be 4046     		mov	r0, r8
+ 470 00c0 FFF7FEFF 		bl	calloc
+ 471              	.LVL45:
+ 182:Ourwares/SerialTaskReceive.c **** 		ptmp1->pbegindma = pbuf;   // Pointer to beginning of DMA circular buffer
+ 472              		.loc 1 182 0
+ 473 00c4 0546     		mov	r5, r0
+ 474 00c6 10B9     		cbnz	r0, .L34
+ARM GAS  /tmp/ccsbYjAz.s 			page 17
+
+
+ 182:Ourwares/SerialTaskReceive.c **** 		ptmp1->pbegindma = pbuf;   // Pointer to beginning of DMA circular buffer
+ 475              		.loc 1 182 0 is_stmt 0 discriminator 1
+ 476 00c8 3E20     		movs	r0, #62
+ 477              	.LVL46:
+ 478 00ca FFF7FEFF 		bl	morse_trap
+ 479              	.LVL47:
+ 480              	.L34:
+ 183:Ourwares/SerialTaskReceive.c **** 		ptmp1->penddma   = pbuf + dmasize; // Pointer to end + 1
+ 481              		.loc 1 183 0 is_stmt 1
+ 482 00ce E562     		str	r5, [r4, #44]
+ 184:Ourwares/SerialTaskReceive.c **** 		ptmp1->ptakedma  = pbuf;   // "Take" Pointer into DMA buffer
+ 483              		.loc 1 184 0
+ 484 00d0 05EB0803 		add	r3, r5, r8
+ 485 00d4 2363     		str	r3, [r4, #48]
+ 185:Ourwares/SerialTaskReceive.c **** 		ptmp1->dmasize   = dmasize; // Total number of chars in DMA buffer
+ 486              		.loc 1 185 0
+ 487 00d6 6563     		str	r5, [r4, #52]
+ 186:Ourwares/SerialTaskReceive.c **** 
+ 488              		.loc 1 186 0
+ 489 00d8 1FFA88F2 		uxth	r2, r8
+ 490 00dc E287     		strh	r2, [r4, #62]	@ movhi
+ 199:Ourwares/SerialTaskReceive.c **** 		if (halret == HAL_ERROR)
+ 491              		.loc 1 199 0
+ 492 00de 2946     		mov	r1, r5
+ 493 00e0 E069     		ldr	r0, [r4, #28]
+ 494 00e2 FFF7FEFF 		bl	HAL_UART_Receive_DMA
+ 495              	.LVL48:
+ 200:Ourwares/SerialTaskReceive.c **** 		{
+ 496              		.loc 1 200 0
+ 497 00e6 0128     		cmp	r0, #1
+ 498 00e8 11D1     		bne	.L35
+ 202:Ourwares/SerialTaskReceive.c **** 			morse_trap(64);
+ 499              		.loc 1 202 0
+ 500 00ea FFF7FEFF 		bl	vPortExitCritical
+ 501              	.LVL49:
+ 203:Ourwares/SerialTaskReceive.c **** //			return NULL;
+ 502              		.loc 1 203 0
+ 503 00ee 4020     		movs	r0, #64
+ 504 00f0 FFF7FEFF 		bl	morse_trap
+ 505              	.LVL50:
+ 506 00f4 0BE0     		b	.L35
+ 507              	.LVL51:
+ 508              	.L33:
+ 209:Ourwares/SerialTaskReceive.c **** 		if (halret == HAL_ERROR)
+ 509              		.loc 1 209 0
+ 510 00f6 0122     		movs	r2, #1
+ 511 00f8 3146     		mov	r1, r6
+ 512 00fa E069     		ldr	r0, [r4, #28]
+ 513 00fc FFF7FEFF 		bl	HAL_UART_Receive_IT
+ 514              	.LVL52:
+ 210:Ourwares/SerialTaskReceive.c **** 		{
+ 515              		.loc 1 210 0
+ 516 0100 0128     		cmp	r0, #1
+ 517 0102 04D1     		bne	.L35
+ 212:Ourwares/SerialTaskReceive.c **** 			morse_trap(65);
+ 518              		.loc 1 212 0
+ 519 0104 FFF7FEFF 		bl	vPortExitCritical
+ARM GAS  /tmp/ccsbYjAz.s 			page 18
+
+
+ 520              	.LVL53:
+ 213:Ourwares/SerialTaskReceive.c **** //			return NULL;
+ 521              		.loc 1 213 0
+ 522 0108 4120     		movs	r0, #65
+ 523 010a FFF7FEFF 		bl	morse_trap
+ 524              	.LVL54:
+ 525              	.L35:
+ 217:Ourwares/SerialTaskReceive.c **** 	return ptmp1;	// Success return pointer to this 'BCB
+ 526              		.loc 1 217 0
+ 527 010e FFF7FEFF 		bl	vPortExitCritical
+ 528              	.LVL55:
+ 219:Ourwares/SerialTaskReceive.c **** 
+ 529              		.loc 1 219 0
+ 530 0112 2046     		mov	r0, r4
+ 531 0114 05B0     		add	sp, sp, #20
+ 532              	.LCFI8:
+ 533              		.cfi_def_cfa_offset 36
+ 534              		@ sp needed
+ 535 0116 BDE8F08F 		pop	{r4, r5, r6, r7, r8, r9, r10, fp, pc}
+ 536              	.LVL56:
+ 537              	.L40:
+ 538 011a 00BF     		.align	2
+ 539              	.L39:
+ 540 011c 00000000 		.word	.LANCHOR0
+ 541              		.cfi_endproc
+ 542              	.LFE292:
+ 544              		.section	.text.xSerialTaskReceiveCreate,"ax",%progbits
+ 545              		.align	2
+ 546              		.global	xSerialTaskReceiveCreate
+ 547              		.thumb
+ 548              		.thumb_func
+ 550              	xSerialTaskReceiveCreate:
+ 551              	.LFB294:
+ 275:Ourwares/SerialTaskReceive.c **** /*
+ 552              		.loc 1 275 0
+ 553              		.cfi_startproc
+ 554              		@ args = 0, pretend = 0, frame = 0
+ 555              		@ frame_needed = 0, uses_anonymous_args = 0
+ 556              	.LVL57:
+ 557 0000 00B5     		push	{lr}
+ 558              	.LCFI9:
+ 559              		.cfi_def_cfa_offset 4
+ 560              		.cfi_offset 14, -4
+ 561 0002 83B0     		sub	sp, sp, #12
+ 562              	.LCFI10:
+ 563              		.cfi_def_cfa_offset 16
+ 284:Ourwares/SerialTaskReceive.c ****         96, NULL, taskpriority, &SerialTaskReceiveHandle);
+ 564              		.loc 1 284 0
+ 565 0004 084B     		ldr	r3, .L45
+ 566 0006 0193     		str	r3, [sp, #4]
+ 567 0008 0090     		str	r0, [sp]
+ 568 000a 0023     		movs	r3, #0
+ 569 000c 6022     		movs	r2, #96
+ 570 000e 0749     		ldr	r1, .L45+4
+ 571 0010 0748     		ldr	r0, .L45+8
+ 572              	.LVL58:
+ 573 0012 FFF7FEFF 		bl	xTaskCreate
+ARM GAS  /tmp/ccsbYjAz.s 			page 19
+
+
+ 574              	.LVL59:
+ 286:Ourwares/SerialTaskReceive.c **** 	return SerialTaskReceiveHandle;
+ 575              		.loc 1 286 0
+ 576 0016 0128     		cmp	r0, #1
+ 577 0018 02D1     		bne	.L43
+ 287:Ourwares/SerialTaskReceive.c **** }
+ 578              		.loc 1 287 0
+ 579 001a 034B     		ldr	r3, .L45
+ 580 001c 1868     		ldr	r0, [r3]
+ 581              	.LVL60:
+ 582 001e 00E0     		b	.L42
+ 583              	.LVL61:
+ 584              	.L43:
+ 286:Ourwares/SerialTaskReceive.c **** 	return SerialTaskReceiveHandle;
+ 585              		.loc 1 286 0
+ 586 0020 0020     		movs	r0, #0
+ 587              	.LVL62:
+ 588              	.L42:
+ 288:Ourwares/SerialTaskReceive.c **** /* *************************************************************************
+ 589              		.loc 1 288 0
+ 590 0022 03B0     		add	sp, sp, #12
+ 591              	.LCFI11:
+ 592              		.cfi_def_cfa_offset 4
+ 593              		@ sp needed
+ 594 0024 5DF804FB 		ldr	pc, [sp], #4
+ 595              	.L46:
+ 596              		.align	2
+ 597              	.L45:
+ 598 0028 00000000 		.word	.LANCHOR1
+ 599 002c 00000000 		.word	.LC0
+ 600 0030 00000000 		.word	StartSerialTaskReceive
+ 601              		.cfi_endproc
+ 602              	.LFE294:
+ 604              		.section	.text.xSerialTaskReceiveGetline,"ax",%progbits
+ 605              		.align	2
+ 606              		.global	xSerialTaskReceiveGetline
+ 607              		.thumb
+ 608              		.thumb_func
+ 610              	xSerialTaskReceiveGetline:
+ 611              	.LFB295:
+ 296:Ourwares/SerialTaskReceive.c **** 	char* p = NULL;
+ 612              		.loc 1 296 0
+ 613              		.cfi_startproc
+ 614              		@ args = 0, pretend = 0, frame = 0
+ 615              		@ frame_needed = 0, uses_anonymous_args = 0
+ 616              		@ link register save eliminated.
+ 617              	.LVL63:
+ 618 0000 0346     		mov	r3, r0
+ 619              	.LVL64:
+ 300:Ourwares/SerialTaskReceive.c **** 	p = pbcb->ptake;
+ 620              		.loc 1 300 0
+ 621 0002 0069     		ldr	r0, [r0, #16]
+ 622              	.LVL65:
+ 623 0004 DA68     		ldr	r2, [r3, #12]
+ 624 0006 9042     		cmp	r0, r2
+ 625 0008 08D0     		beq	.L49
+ 626              	.LVL66:
+ARM GAS  /tmp/ccsbYjAz.s 			page 20
+
+
+ 304:Ourwares/SerialTaskReceive.c **** 	if (pbcb->ptake >= pbcb->pend) pbcb->ptake = pbcb->pbegin;
+ 627              		.loc 1 304 0
+ 628 000a 9A8F     		ldrh	r2, [r3, #60]
+ 629 000c 0244     		add	r2, r2, r0
+ 630 000e 1A61     		str	r2, [r3, #16]
+ 305:Ourwares/SerialTaskReceive.c **** 
+ 631              		.loc 1 305 0
+ 632 0010 9968     		ldr	r1, [r3, #8]
+ 633 0012 8A42     		cmp	r2, r1
+ 634 0014 03D3     		bcc	.L48
+ 305:Ourwares/SerialTaskReceive.c **** 
+ 635              		.loc 1 305 0 is_stmt 0 discriminator 1
+ 636 0016 5A68     		ldr	r2, [r3, #4]
+ 637 0018 1A61     		str	r2, [r3, #16]
+ 638 001a 7047     		bx	lr
+ 639              	.LVL67:
+ 640              	.L49:
+ 300:Ourwares/SerialTaskReceive.c **** 	p = pbcb->ptake;
+ 641              		.loc 1 300 0 is_stmt 1
+ 642 001c 0020     		movs	r0, #0
+ 643              	.LVL68:
+ 644              	.L48:
+ 308:Ourwares/SerialTaskReceive.c **** /* *************************************************************************
+ 645              		.loc 1 308 0
+ 646 001e 7047     		bx	lr
+ 647              		.cfi_endproc
+ 648              	.LFE295:
+ 650              		.section	.text.HAL_UART_RxCpltCallback,"ax",%progbits
+ 651              		.align	2
+ 652              		.global	HAL_UART_RxCpltCallback
+ 653              		.thumb
+ 654              		.thumb_func
+ 656              	HAL_UART_RxCpltCallback:
+ 657              	.LFB300:
+ 395:Ourwares/SerialTaskReceive.c **** 
+ 396:Ourwares/SerialTaskReceive.c **** /* #######################################################################
+ 397:Ourwares/SerialTaskReceive.c ****    UART interrupt callbacks
+ 398:Ourwares/SerialTaskReceive.c ****    ####################################################################### */
+ 399:Ourwares/SerialTaskReceive.c **** /* *************************************************************************
+ 400:Ourwares/SerialTaskReceive.c ****  * void HAL_UART_RxHalfCpltCallback(UART_HandleTypeDef *phuart);
+ 401:Ourwares/SerialTaskReceive.c ****  * @brief	: DMA callback at the halfway point in the circular buffer
+ 402:Ourwares/SerialTaskReceive.c ****  * *************************************************************************/
+ 403:Ourwares/SerialTaskReceive.c **** /* NOTE: under interrupt from callback. */
+ 404:Ourwares/SerialTaskReceive.c **** 
+ 405:Ourwares/SerialTaskReceive.c **** /* DMA Half buffer complete callback (dma only) */
+ 406:Ourwares/SerialTaskReceive.c **** void HAL_UART_RxHalfCpltCallback(UART_HandleTypeDef *phuart)
+ 407:Ourwares/SerialTaskReceive.c **** {
+ 408:Ourwares/SerialTaskReceive.c **** 	HAL_UART_RxCpltCallback(phuart);
+ 409:Ourwares/SerialTaskReceive.c **** }
+ 410:Ourwares/SerialTaskReceive.c **** /* *************************************************************************
+ 411:Ourwares/SerialTaskReceive.c ****  * void HAL_UART_RxHalfCpltCallback(UART_HandleTypeDef *phuart);
+ 412:Ourwares/SerialTaskReceive.c ****  * @brief	: DMA callback at the halfway point in the circular buffer
+ 413:Ourwares/SerialTaskReceive.c ****  *				: OR, char-by-char completion of sending
+ 414:Ourwares/SerialTaskReceive.c ****  * *************************************************************************/
+ 415:Ourwares/SerialTaskReceive.c **** /* DMA buffer complete, => OR <= char-by-char complete */
+ 416:Ourwares/SerialTaskReceive.c **** 
+ 417:Ourwares/SerialTaskReceive.c **** void HAL_UART_RxCpltCallback(UART_HandleTypeDef *phuart)
+ARM GAS  /tmp/ccsbYjAz.s 			page 21
+
+
+ 418:Ourwares/SerialTaskReceive.c **** {
+ 658              		.loc 1 418 0
+ 659              		.cfi_startproc
+ 660              		@ args = 0, pretend = 0, frame = 8
+ 661              		@ frame_needed = 0, uses_anonymous_args = 0
+ 662              	.LVL69:
+ 663 0000 30B5     		push	{r4, r5, lr}
+ 664              	.LCFI12:
+ 665              		.cfi_def_cfa_offset 12
+ 666              		.cfi_offset 4, -12
+ 667              		.cfi_offset 5, -8
+ 668              		.cfi_offset 14, -4
+ 669 0002 85B0     		sub	sp, sp, #20
+ 670              	.LCFI13:
+ 671              		.cfi_def_cfa_offset 32
+ 672 0004 0546     		mov	r5, r0
+ 419:Ourwares/SerialTaskReceive.c **** 	BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+ 673              		.loc 1 419 0
+ 674 0006 0023     		movs	r3, #0
+ 675 0008 0393     		str	r3, [sp, #12]
+ 420:Ourwares/SerialTaskReceive.c **** 
+ 421:Ourwares/SerialTaskReceive.c **** 	/* Look up buffer control block, given uart handle */
+ 422:Ourwares/SerialTaskReceive.c **** 	struct SERIALRCVBCB* prtmp = prbhd;
+ 676              		.loc 1 422 0
+ 677 000a 154B     		ldr	r3, .L56
+ 678 000c 1C68     		ldr	r4, [r3]
+ 679              	.LVL70:
+ 423:Ourwares/SerialTaskReceive.c **** 	while (prtmp->phuart != phuart) prtmp++;
+ 680              		.loc 1 423 0
+ 681 000e 00E0     		b	.L51
+ 682              	.L52:
+ 683              		.loc 1 423 0 is_stmt 0 discriminator 2
+ 684 0010 4C34     		adds	r4, r4, #76
+ 685              	.LVL71:
+ 686              	.L51:
+ 687              		.loc 1 423 0 discriminator 1
+ 688 0012 E369     		ldr	r3, [r4, #28]
+ 689 0014 AB42     		cmp	r3, r5
+ 690 0016 FBD1     		bne	.L52
+ 424:Ourwares/SerialTaskReceive.c **** 
+ 425:Ourwares/SerialTaskReceive.c **** 	/* Note char-by-char mode from dma mode. */
+ 426:Ourwares/SerialTaskReceive.c **** 	if (prtmp->dmaflag == 0)
+ 691              		.loc 1 426 0 is_stmt 1
+ 692 0018 94F94130 		ldrsb	r3, [r4, #65]
+ 693 001c 53B9     		cbnz	r3, .L53
+ 427:Ourwares/SerialTaskReceive.c **** 	{ // Here char-by-char interrupt mode
+ 428:Ourwares/SerialTaskReceive.c **** 
+ 429:Ourwares/SerialTaskReceive.c **** 		// Note: char-by-char stores directly to line buffer
+ 430:Ourwares/SerialTaskReceive.c **** 		advanceptr(prtmp,*prtmp->pwork); 
+ 694              		.loc 1 430 0
+ 695 001e 6369     		ldr	r3, [r4, #20]
+ 696 0020 1978     		ldrb	r1, [r3]	@ zero_extendqisi2
+ 697 0022 2046     		mov	r0, r4
+ 698              	.LVL72:
+ 699 0024 FFF7FEFF 		bl	advanceptr
+ 700              	.LVL73:
+ 431:Ourwares/SerialTaskReceive.c **** 
+ARM GAS  /tmp/ccsbYjAz.s 			page 22
+
+
+ 432:Ourwares/SerialTaskReceive.c **** 		/* Restart receiving one char. */
+ 433:Ourwares/SerialTaskReceive.c **** 		HAL_UART_Receive_IT(phuart, (uint8_t*)prtmp->pwork, 1); // Get next char		
+ 701              		.loc 1 433 0
+ 702 0028 0122     		movs	r2, #1
+ 703 002a 6169     		ldr	r1, [r4, #20]
+ 704 002c 2846     		mov	r0, r5
+ 705 002e FFF7FEFF 		bl	HAL_UART_Receive_IT
+ 706              	.LVL74:
+ 434:Ourwares/SerialTaskReceive.c **** 		return;
+ 707              		.loc 1 434 0
+ 708 0032 12E0     		b	.L50
+ 709              	.LVL75:
+ 710              	.L53:
+ 435:Ourwares/SerialTaskReceive.c **** 	}
+ 436:Ourwares/SerialTaskReceive.c **** 
+ 437:Ourwares/SerialTaskReceive.c **** 	/* Trigger Recieve Task to poll dma uarts */
+ 438:Ourwares/SerialTaskReceive.c **** 	xTaskNotifyFromISR(SerialTaskReceiveHandle, 
+ 711              		.loc 1 438 0
+ 712 0034 0B4B     		ldr	r3, .L56+4
+ 713 0036 1868     		ldr	r0, [r3]
+ 714              	.LVL76:
+ 715 0038 03AB     		add	r3, sp, #12
+ 716 003a 0093     		str	r3, [sp]
+ 717 003c 0023     		movs	r3, #0
+ 718 003e 0122     		movs	r2, #1
+ 719 0040 1946     		mov	r1, r3
+ 720 0042 FFF7FEFF 		bl	xTaskGenericNotifyFromISR
+ 721              	.LVL77:
+ 439:Ourwares/SerialTaskReceive.c **** 		0,	/* 'or' bit assigned to buffer to notification value. */
+ 440:Ourwares/SerialTaskReceive.c **** 		eSetBits,      /* Set 'or' option */
+ 441:Ourwares/SerialTaskReceive.c **** 		&xHigherPriorityTaskWoken ); 
+ 442:Ourwares/SerialTaskReceive.c **** 
+ 443:Ourwares/SerialTaskReceive.c **** 	portYIELD_FROM_ISR( xHigherPriorityTaskWoken );
+ 722              		.loc 1 443 0
+ 723 0046 039B     		ldr	r3, [sp, #12]
+ 724 0048 3BB1     		cbz	r3, .L50
+ 725              		.loc 1 443 0 is_stmt 0 discriminator 1
+ 726 004a 4FF08052 		mov	r2, #268435456
+ 727 004e 064B     		ldr	r3, .L56+8
+ 728 0050 1A60     		str	r2, [r3]
+ 729              		.syntax unified
+ 730              	@ 443 "Ourwares/SerialTaskReceive.c" 1
+ 731 0052 BFF34F8F 		dsb
+ 732              	@ 0 "" 2
+ 733              	@ 443 "Ourwares/SerialTaskReceive.c" 1
+ 734 0056 BFF36F8F 		isb
+ 735              	@ 0 "" 2
+ 736              		.thumb
+ 737              		.syntax unified
+ 738              	.L50:
+ 444:Ourwares/SerialTaskReceive.c **** 	return;
+ 445:Ourwares/SerialTaskReceive.c **** }
+ 739              		.loc 1 445 0 is_stmt 1
+ 740 005a 05B0     		add	sp, sp, #20
+ 741              	.LCFI14:
+ 742              		.cfi_def_cfa_offset 12
+ 743              		@ sp needed
+ARM GAS  /tmp/ccsbYjAz.s 			page 23
+
+
+ 744 005c 30BD     		pop	{r4, r5, pc}
+ 745              	.LVL78:
+ 746              	.L57:
+ 747 005e 00BF     		.align	2
+ 748              	.L56:
+ 749 0060 00000000 		.word	.LANCHOR0
+ 750 0064 00000000 		.word	.LANCHOR1
+ 751 0068 04ED00E0 		.word	-536810236
+ 752              		.cfi_endproc
+ 753              	.LFE300:
+ 755              		.section	.text.HAL_UART_RxHalfCpltCallback,"ax",%progbits
+ 756              		.align	2
+ 757              		.global	HAL_UART_RxHalfCpltCallback
+ 758              		.thumb
+ 759              		.thumb_func
+ 761              	HAL_UART_RxHalfCpltCallback:
+ 762              	.LFB299:
+ 407:Ourwares/SerialTaskReceive.c **** 	HAL_UART_RxCpltCallback(phuart);
+ 763              		.loc 1 407 0
+ 764              		.cfi_startproc
+ 765              		@ args = 0, pretend = 0, frame = 0
+ 766              		@ frame_needed = 0, uses_anonymous_args = 0
+ 767              	.LVL79:
+ 768 0000 08B5     		push	{r3, lr}
+ 769              	.LCFI15:
+ 770              		.cfi_def_cfa_offset 8
+ 771              		.cfi_offset 3, -8
+ 772              		.cfi_offset 14, -4
+ 408:Ourwares/SerialTaskReceive.c **** }
+ 773              		.loc 1 408 0
+ 774 0002 FFF7FEFF 		bl	HAL_UART_RxCpltCallback
+ 775              	.LVL80:
+ 776 0006 08BD     		pop	{r3, pc}
+ 777              		.cfi_endproc
+ 778              	.LFE299:
+ 780              		.section	.text.HAL_UART_ErrorCallback,"ax",%progbits
+ 781              		.align	2
+ 782              		.global	HAL_UART_ErrorCallback
+ 783              		.thumb
+ 784              		.thumb_func
+ 786              	HAL_UART_ErrorCallback:
+ 787              	.LFB301:
+ 446:Ourwares/SerialTaskReceive.c **** /* *************************************************************************
+ 447:Ourwares/SerialTaskReceive.c ****  * void HAL_UART_ErrorCallback(UART_HandleTypeDef *phuart);
+ 448:Ourwares/SerialTaskReceive.c ****  *	@brief	: Call back from receive errror, stm32f4xx_hal_uart
+ 449:Ourwares/SerialTaskReceive.c ****  * *************************************************************************/
+ 450:Ourwares/SerialTaskReceive.c **** void HAL_UART_ErrorCallback(UART_HandleTypeDef *phuart)
+ 451:Ourwares/SerialTaskReceive.c **** {
+ 788              		.loc 1 451 0
+ 789              		.cfi_startproc
+ 790              		@ args = 0, pretend = 0, frame = 0
+ 791              		@ frame_needed = 0, uses_anonymous_args = 0
+ 792              		@ link register save eliminated.
+ 793              	.LVL81:
+ 452:Ourwares/SerialTaskReceive.c **** 	/* Look up buffer control block, given uart handle */
+ 453:Ourwares/SerialTaskReceive.c **** 	/* Look up buffer control block, given uart handle */
+ 454:Ourwares/SerialTaskReceive.c **** 	struct SERIALRCVBCB* prtmp = prbhd;
+ARM GAS  /tmp/ccsbYjAz.s 			page 24
+
+
+ 794              		.loc 1 454 0
+ 795 0000 054B     		ldr	r3, .L63
+ 796 0002 1B68     		ldr	r3, [r3]
+ 797              	.LVL82:
+ 455:Ourwares/SerialTaskReceive.c **** 	while (prtmp->phuart != phuart) prtmp++;
+ 798              		.loc 1 455 0
+ 799 0004 00E0     		b	.L61
+ 800              	.L62:
+ 801              		.loc 1 455 0 is_stmt 0 discriminator 2
+ 802 0006 4C33     		adds	r3, r3, #76
+ 803              	.LVL83:
+ 804              	.L61:
+ 805              		.loc 1 455 0 discriminator 1
+ 806 0008 DA69     		ldr	r2, [r3, #28]
+ 807 000a 8242     		cmp	r2, r0
+ 808 000c FBD1     		bne	.L62
+ 456:Ourwares/SerialTaskReceive.c **** 	prtmp->errorct += 1;
+ 809              		.loc 1 456 0 is_stmt 1
+ 810 000e 9A6C     		ldr	r2, [r3, #72]
+ 811 0010 0132     		adds	r2, r2, #1
+ 812 0012 9A64     		str	r2, [r3, #72]
+ 813 0014 7047     		bx	lr
+ 814              	.L64:
+ 815 0016 00BF     		.align	2
+ 816              	.L63:
+ 817 0018 00000000 		.word	.LANCHOR0
+ 818              		.cfi_endproc
+ 819              	.LFE301:
+ 821              		.global	SerialTaskReceiveHandle
+ 822              		.section	.rodata.str1.4,"aMS",%progbits,1
+ 823              		.align	2
+ 824              	.LC0:
+ 825 0000 53746172 		.ascii	"StartSerialTaskReceive\000"
+ 825      74536572 
+ 825      69616C54 
+ 825      61736B52 
+ 825      65636569 
+ 826              		.section	.bss.prbhd,"aw",%nobits
+ 827              		.align	2
+ 828              		.set	.LANCHOR0,. + 0
+ 831              	prbhd:
+ 832 0000 00000000 		.space	4
+ 833              		.section	.bss.SerialTaskReceiveHandle,"aw",%nobits
+ 834              		.align	2
+ 835              		.set	.LANCHOR1,. + 0
+ 838              	SerialTaskReceiveHandle:
+ 839 0000 00000000 		.space	4
+ 840              		.text
+ 841              	.Letext0:
+ 842              		.file 2 "/home/deh/launchpad/gcc-arm-none-eabi-5_4-2016q3/arm-none-eabi/include/machine/_default_t
+ 843              		.file 3 "/home/deh/launchpad/gcc-arm-none-eabi-5_4-2016q3/arm-none-eabi/include/sys/_stdint.h"
+ 844              		.file 4 "Middlewares/Third_Party/FreeRTOS/Source/portable/GCC/ARM_CM4F/portmacro.h"
+ 845              		.file 5 "Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os2.h"
+ 846              		.file 6 "Drivers/CMSIS/Device/ST/STM32L4xx/Include/stm32l431xx.h"
+ 847              		.file 7 "Middlewares/Third_Party/FreeRTOS/Source/include/task.h"
+ 848              		.file 8 "Drivers/STM32L4xx_HAL_Driver/Inc/stm32l4xx_hal_def.h"
+ 849              		.file 9 "Drivers/STM32L4xx_HAL_Driver/Inc/stm32l4xx_hal_dma.h"
+ARM GAS  /tmp/ccsbYjAz.s 			page 25
+
+
+ 850              		.file 10 "Drivers/STM32L4xx_HAL_Driver/Inc/stm32l4xx_hal_uart.h"
+ 851              		.file 11 "Ourwares/common_misc.h"
+ 852              		.file 12 "Ourwares/common_can.h"
+ 853              		.file 13 "Ourwares/SerialTaskReceive.h"
+ 854              		.file 14 "Drivers/CMSIS/Include/cmsis_gcc.h"
+ 855              		.file 15 "Drivers/CMSIS/Include/core_cm4.h"
+ 856              		.file 16 "/home/deh/launchpad/gcc-arm-none-eabi-5_4-2016q3/arm-none-eabi/include/malloc.h"
+ 857              		.file 17 "Ourwares/morse.h"
+ARM GAS  /tmp/ccsbYjAz.s 			page 26
+
+
+DEFINED SYMBOLS
+                            *ABS*:00000000 SerialTaskReceive.c
+     /tmp/ccsbYjAz.s:22     .text.advancebuf:00000000 $t
+     /tmp/ccsbYjAz.s:26     .text.advancebuf:00000000 advancebuf
+     /tmp/ccsbYjAz.s:105    .text.advancebuf:00000054 $d
+     /tmp/ccsbYjAz.s:110    .text.advanceptr:00000000 $t
+     /tmp/ccsbYjAz.s:114    .text.advanceptr:00000000 advanceptr
+     /tmp/ccsbYjAz.s:155    .text.unloaddma:00000000 $t
+     /tmp/ccsbYjAz.s:159    .text.unloaddma:00000000 unloaddma
+     /tmp/ccsbYjAz.s:228    .text.StartSerialTaskReceive:00000000 $t
+     /tmp/ccsbYjAz.s:233    .text.StartSerialTaskReceive:00000000 StartSerialTaskReceive
+     /tmp/ccsbYjAz.s:307    .text.StartSerialTaskReceive:00000048 $d
+     /tmp/ccsbYjAz.s:312    .text.xSerialTaskRxAdduart:00000000 $t
+     /tmp/ccsbYjAz.s:317    .text.xSerialTaskRxAdduart:00000000 xSerialTaskRxAdduart
+     /tmp/ccsbYjAz.s:540    .text.xSerialTaskRxAdduart:0000011c $d
+     /tmp/ccsbYjAz.s:545    .text.xSerialTaskReceiveCreate:00000000 $t
+     /tmp/ccsbYjAz.s:550    .text.xSerialTaskReceiveCreate:00000000 xSerialTaskReceiveCreate
+     /tmp/ccsbYjAz.s:598    .text.xSerialTaskReceiveCreate:00000028 $d
+     /tmp/ccsbYjAz.s:605    .text.xSerialTaskReceiveGetline:00000000 $t
+     /tmp/ccsbYjAz.s:610    .text.xSerialTaskReceiveGetline:00000000 xSerialTaskReceiveGetline
+     /tmp/ccsbYjAz.s:651    .text.HAL_UART_RxCpltCallback:00000000 $t
+     /tmp/ccsbYjAz.s:656    .text.HAL_UART_RxCpltCallback:00000000 HAL_UART_RxCpltCallback
+     /tmp/ccsbYjAz.s:749    .text.HAL_UART_RxCpltCallback:00000060 $d
+     /tmp/ccsbYjAz.s:756    .text.HAL_UART_RxHalfCpltCallback:00000000 $t
+     /tmp/ccsbYjAz.s:761    .text.HAL_UART_RxHalfCpltCallback:00000000 HAL_UART_RxHalfCpltCallback
+     /tmp/ccsbYjAz.s:781    .text.HAL_UART_ErrorCallback:00000000 $t
+     /tmp/ccsbYjAz.s:786    .text.HAL_UART_ErrorCallback:00000000 HAL_UART_ErrorCallback
+     /tmp/ccsbYjAz.s:817    .text.HAL_UART_ErrorCallback:00000018 $d
+     /tmp/ccsbYjAz.s:838    .bss.SerialTaskReceiveHandle:00000000 SerialTaskReceiveHandle
+     /tmp/ccsbYjAz.s:823    .rodata.str1.4:00000000 $d
+     /tmp/ccsbYjAz.s:827    .bss.prbhd:00000000 $d
+     /tmp/ccsbYjAz.s:831    .bss.prbhd:00000000 prbhd
+     /tmp/ccsbYjAz.s:834    .bss.SerialTaskReceiveHandle:00000000 $d
+                     .debug_frame:00000010 $d
+
+UNDEFINED SYMBOLS
+xTaskGenericNotifyFromISR
+osDelay
+xTaskNotifyWait
+vPortEnterCritical
+calloc
+vPortExitCritical
+morse_trap
+xTaskGetCurrentTaskHandle
+HAL_UART_Receive_DMA
+HAL_UART_Receive_IT
+xTaskCreate

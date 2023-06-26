@@ -1,0 +1,200 @@
+ARM GAS  /tmp/ccLglP9i.s 			page 1
+
+
+   1              		.syntax unified
+   2              		.cpu cortex-m4
+   3              		.eabi_attribute 27, 1
+   4              		.eabi_attribute 28, 1
+   5              		.fpu fpv4-sp-d16
+   6              		.eabi_attribute 20, 1
+   7              		.eabi_attribute 21, 1
+   8              		.eabi_attribute 23, 3
+   9              		.eabi_attribute 24, 1
+  10              		.eabi_attribute 25, 1
+  11              		.eabi_attribute 26, 1
+  12              		.eabi_attribute 30, 1
+  13              		.eabi_attribute 34, 1
+  14              		.eabi_attribute 18, 4
+  15              		.thumb
+  16              		.syntax unified
+  17              		.file	"adcfastsum16.c"
+  18              		.text
+  19              	.Ltext0:
+  20              		.cfi_sections	.debug_frame
+  21              		.section	.text.adcfastsum16,"ax",%progbits
+  22              		.align	2
+  23              		.global	adcfastsum16
+  24              		.thumb
+  25              		.thumb_func
+  27              	adcfastsum16:
+  28              	.LFB0:
+  29              		.file 1 "Ourtasks/adcfastsum16.c"
+   1:Ourtasks/adcfastsum16.c **** /******************************************************************************
+   2:Ourtasks/adcfastsum16.c **** * File Name          : adcfastsum16.c
+   3:Ourtasks/adcfastsum16.c **** * Date First Issued  : 03/16/2019
+   4:Ourtasks/adcfastsum16.c **** * Description        : Fast sum: ADC DMA buffering--16 sequences, 'N' channels
+   5:Ourtasks/adcfastsum16.c **** *******************************************************************************/
+   6:Ourtasks/adcfastsum16.c **** 
+   7:Ourtasks/adcfastsum16.c **** #include "adcfastsum16.h"
+   8:Ourtasks/adcfastsum16.c **** 
+   9:Ourtasks/adcfastsum16.c **** /* *************************************************************************
+  10:Ourtasks/adcfastsum16.c ****  * void adcfastsum16(struct ADCCHANNEL* pchan, uint16_t* pdma);
+  11:Ourtasks/adcfastsum16.c ****  *	@brief	: Inline fast summation: ASSUMES 16 ADC sequences: channels: ADC1IDX_ADCSCANSIZE
+  12:Ourtasks/adcfastsum16.c ****  * @param	: pchan = pointer to stuct array for adc1 channels
+  13:Ourtasks/adcfastsum16.c ****  * @param	: pdma  = pointer to dma buffer
+  14:Ourtasks/adcfastsum16.c ****  * *************************************************************************/
+  15:Ourtasks/adcfastsum16.c **** void adcfastsum16(struct ADCCHANNEL* pchan, uint16_t* pdma)
+  16:Ourtasks/adcfastsum16.c **** {
+  30              		.loc 1 16 0
+  31              		.cfi_startproc
+  32              		@ args = 0, pretend = 0, frame = 24
+  33              		@ frame_needed = 0, uses_anonymous_args = 0
+  34              	.LVL0:
+  35 0000 2DE9F04F 		push	{r4, r5, r6, r7, r8, r9, r10, fp, lr}
+  36              	.LCFI0:
+  37              		.cfi_def_cfa_offset 36
+  38              		.cfi_offset 4, -36
+  39              		.cfi_offset 5, -32
+  40              		.cfi_offset 6, -28
+  41              		.cfi_offset 7, -24
+  42              		.cfi_offset 8, -20
+ARM GAS  /tmp/ccLglP9i.s 			page 2
+
+
+  43              		.cfi_offset 9, -16
+  44              		.cfi_offset 10, -12
+  45              		.cfi_offset 11, -8
+  46              		.cfi_offset 14, -4
+  47 0004 87B0     		sub	sp, sp, #28
+  48              	.LCFI1:
+  49              		.cfi_def_cfa_offset 64
+  50 0006 8646     		mov	lr, r0
+  51 0008 8C46     		mov	ip, r1
+  17:Ourtasks/adcfastsum16.c **** 	struct ADCCHANNEL* pend = pchan + ADC1IDX_ADCSCANSIZE;
+  52              		.loc 1 17 0
+  53 000a 00F5C073 		add	r3, r0, #384
+  54 000e 0593     		str	r3, [sp, #20]
+  55              	.LVL1:
+  56              	.L2:
+  18:Ourtasks/adcfastsum16.c **** 	do
+  19:Ourtasks/adcfastsum16.c **** 	{
+  20:Ourtasks/adcfastsum16.c **** 		pchan->sum = *pdma
+  57              		.loc 1 20 0 discriminator 1
+  58 0010 BCF800B0 		ldrh	fp, [ip]
+  21:Ourtasks/adcfastsum16.c **** 		 + *(pdma + ADC1IDX_ADCSCANSIZE * 1)
+  59              		.loc 1 21 0 discriminator 1
+  60 0014 BCF80C30 		ldrh	r3, [ip, #12]
+  22:Ourtasks/adcfastsum16.c **** 		 + *(pdma + ADC1IDX_ADCSCANSIZE * 2)
+  61              		.loc 1 22 0 discriminator 1
+  62 0018 BCF818A0 		ldrh	r10, [ip, #24]
+  23:Ourtasks/adcfastsum16.c **** 		 + *(pdma + ADC1IDX_ADCSCANSIZE * 3)
+  63              		.loc 1 23 0 discriminator 1
+  64 001c BCF82490 		ldrh	r9, [ip, #36]
+  24:Ourtasks/adcfastsum16.c **** 		 + *(pdma + ADC1IDX_ADCSCANSIZE * 4)
+  65              		.loc 1 24 0 discriminator 1
+  66 0020 BCF83080 		ldrh	r8, [ip, #48]
+  25:Ourtasks/adcfastsum16.c **** 		 + *(pdma + ADC1IDX_ADCSCANSIZE * 5)
+  67              		.loc 1 25 0 discriminator 1
+  68 0024 BCF83C70 		ldrh	r7, [ip, #60]
+  26:Ourtasks/adcfastsum16.c **** 		 + *(pdma + ADC1IDX_ADCSCANSIZE * 6)
+  69              		.loc 1 26 0 discriminator 1
+  70 0028 BCF84860 		ldrh	r6, [ip, #72]
+  27:Ourtasks/adcfastsum16.c **** 		 + *(pdma + ADC1IDX_ADCSCANSIZE * 7)
+  71              		.loc 1 27 0 discriminator 1
+  72 002c BCF85450 		ldrh	r5, [ip, #84]
+  28:Ourtasks/adcfastsum16.c **** 		 + *(pdma + ADC1IDX_ADCSCANSIZE * 8)
+  73              		.loc 1 28 0 discriminator 1
+  74 0030 BCF86020 		ldrh	r2, [ip, #96]
+  75 0034 0192     		str	r2, [sp, #4]
+  29:Ourtasks/adcfastsum16.c **** 		 + *(pdma + ADC1IDX_ADCSCANSIZE * 9)
+  76              		.loc 1 29 0 discriminator 1
+  77 0036 BCF86C10 		ldrh	r1, [ip, #108]
+  78 003a 0291     		str	r1, [sp, #8]
+  30:Ourtasks/adcfastsum16.c **** 		 + *(pdma + ADC1IDX_ADCSCANSIZE *10)
+  79              		.loc 1 30 0 discriminator 1
+  80 003c BCF87800 		ldrh	r0, [ip, #120]
+  81 0040 0390     		str	r0, [sp, #12]
+  31:Ourtasks/adcfastsum16.c **** 		 + *(pdma + ADC1IDX_ADCSCANSIZE *11)
+  82              		.loc 1 31 0 discriminator 1
+  83 0042 BCF88440 		ldrh	r4, [ip, #132]
+  84 0046 0494     		str	r4, [sp, #16]
+ARM GAS  /tmp/ccLglP9i.s 			page 3
+
+
+  32:Ourtasks/adcfastsum16.c **** 		 + *(pdma + ADC1IDX_ADCSCANSIZE *12)
+  85              		.loc 1 32 0 discriminator 1
+  86 0048 BCF89040 		ldrh	r4, [ip, #144]
+  33:Ourtasks/adcfastsum16.c **** 		 + *(pdma + ADC1IDX_ADCSCANSIZE *13)
+  87              		.loc 1 33 0 discriminator 1
+  88 004c BCF89C00 		ldrh	r0, [ip, #156]
+  34:Ourtasks/adcfastsum16.c **** 		 + *(pdma + ADC1IDX_ADCSCANSIZE *14)
+  89              		.loc 1 34 0 discriminator 1
+  90 0050 BCF8A810 		ldrh	r1, [ip, #168]
+  35:Ourtasks/adcfastsum16.c **** 		 + *(pdma + ADC1IDX_ADCSCANSIZE *15);
+  91              		.loc 1 35 0 discriminator 1
+  92 0054 BCF8B420 		ldrh	r2, [ip, #180]
+  20:Ourtasks/adcfastsum16.c **** 		 + *(pdma + ADC1IDX_ADCSCANSIZE * 1)
+  93              		.loc 1 20 0 discriminator 1
+  94 0058 5B44     		add	r3, r3, fp
+  95 005a 5344     		add	r3, r3, r10
+  96 005c 4B44     		add	r3, r3, r9
+  97 005e 4344     		add	r3, r3, r8
+  98 0060 3B44     		add	r3, r3, r7
+  99 0062 3344     		add	r3, r3, r6
+ 100 0064 2B44     		add	r3, r3, r5
+ 101 0066 019D     		ldr	r5, [sp, #4]
+ 102 0068 2B44     		add	r3, r3, r5
+ 103 006a 029D     		ldr	r5, [sp, #8]
+ 104 006c 2B44     		add	r3, r3, r5
+ 105 006e 039D     		ldr	r5, [sp, #12]
+ 106 0070 2B44     		add	r3, r3, r5
+ 107 0072 049D     		ldr	r5, [sp, #16]
+ 108 0074 2B44     		add	r3, r3, r5
+ 109 0076 1C44     		add	r4, r4, r3
+ 110 0078 2044     		add	r0, r0, r4
+ 111 007a 0144     		add	r1, r1, r0
+ 112 007c 0A44     		add	r2, r2, r1
+ 113 007e AEF82020 		strh	r2, [lr, #32]	@ movhi
+  36:Ourtasks/adcfastsum16.c **** 
+  37:Ourtasks/adcfastsum16.c **** 		pchan += 1;
+ 114              		.loc 1 37 0 discriminator 1
+ 115 0082 0EF1400E 		add	lr, lr, #64
+ 116              	.LVL2:
+  38:Ourtasks/adcfastsum16.c **** 		pdma  += 1;
+ 117              		.loc 1 38 0 discriminator 1
+ 118 0086 0CF1020C 		add	ip, ip, #2
+ 119              	.LVL3:
+  39:Ourtasks/adcfastsum16.c **** 	} while (pchan != pend);
+ 120              		.loc 1 39 0 discriminator 1
+ 121 008a 059B     		ldr	r3, [sp, #20]
+ 122 008c 7345     		cmp	r3, lr
+ 123 008e BFD1     		bne	.L2
+  40:Ourtasks/adcfastsum16.c **** 	return;
+  41:Ourtasks/adcfastsum16.c **** }
+ 124              		.loc 1 41 0
+ 125 0090 07B0     		add	sp, sp, #28
+ 126              	.LCFI2:
+ 127              		.cfi_def_cfa_offset 36
+ 128              		@ sp needed
+ 129 0092 BDE8F08F 		pop	{r4, r5, r6, r7, r8, r9, r10, fp, pc}
+ 130              		.cfi_endproc
+ARM GAS  /tmp/ccLglP9i.s 			page 4
+
+
+ 131              	.LFE0:
+ 133 0096 00BF     		.text
+ 134              	.Letext0:
+ 135              		.file 2 "/home/deh/launchpad/gcc-arm-none-eabi-5_4-2016q3/arm-none-eabi/include/machine/_default_t
+ 136              		.file 3 "/home/deh/launchpad/gcc-arm-none-eabi-5_4-2016q3/arm-none-eabi/include/sys/_stdint.h"
+ 137              		.file 4 "Ourtasks/iir_filter_lx.h"
+ 138              		.file 5 "Ourtasks/adcparams.h"
+ARM GAS  /tmp/ccLglP9i.s 			page 5
+
+
+DEFINED SYMBOLS
+                            *ABS*:00000000 adcfastsum16.c
+     /tmp/ccLglP9i.s:22     .text.adcfastsum16:00000000 $t
+     /tmp/ccLglP9i.s:27     .text.adcfastsum16:00000000 adcfastsum16
+                     .debug_frame:00000010 $d
+
+NO UNDEFINED SYMBOLS

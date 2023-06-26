@@ -3,6 +3,8 @@ headers-io-assignments-EMC_MMC.txt
 04/25/2023
 (Parts renumbered on eagle)
 
+[ ] = STM32CUBEMX configuration name assigned
+
 ============================================
 'F446' fixed headers & port assignments--
 ===========================================
@@ -12,13 +14,10 @@ JP20 -- SWD (Single Wire Debugger) (3 pin 0.1" header)
  2 - PA14 - SWCLK
  3 - PA13 - SWDIO
   
-JP18 UART monitor FTDI (six pin 0.1" header)--
+JP18 UART monitor FTDI (three pin 0.1" header)--
  1 - GND
- 2 - NC
- 3 - NC
- 4 - USART3 - Rx - PC11
- 5 - USART3 - Tx - PC10
- 6 - NC
+ 2 - USART3 - Rx - PC11 115200 DMA1 circular 
+ 3 - USART3 - Tx - PC10 115200 DMA1 normal 
 
 CAN
  CAN1 Rx - PB8
@@ -29,16 +28,16 @@ CAN
 
 LED--
  GRN LED1 - power +12v protected
- PB12-LED2-GREEN
- PB13-LED3-RED
+ PB12-LED5-GREEN [LED2-GRN]
+ PB13-LED6-RED   [LED3-RED]
 
-Power wake-up FET1 PC13
+Power wake-up FET1 PC13 [KEYSWFET]
 
-Master-reset FET5 PA5
+Master-reset FET5 PA5 [M-RESET]
 
 Isolated 'F446 <-> L431
- 'F446 UART5 - Rx - PD2
- 'F446 UART5 - Tx - PC12
+ 'F446 UART5 - Rx - PD2  DMA1 CIRC
+ 'F446 UART5 - Tx - PC12 (no dma available)
 
 ===========================================
 Power Pole or spade lug: 12v high current
@@ -58,43 +57,44 @@ Output: GND, +12SW
 Group A with SOT-23 NFET (Vgs = 3.3v i/o pin):
 (JST 4 pin: gnd, signal, +5v, +12v)
 (Flyback diode to +5v or +12v option on 0.1" spacing)
- HDR-OA2 - PB15 - T1C2,T1C3N,T8C3N
+ HDR-OA2 - PB15 - T12C2,T1C3N,T8C3N [T12C2: HDR-OA2]
     Select AC source DPDT relay
- HDR-OA1 - PB10 - T2C3
+ HDR-OA1 - PB10 - T2C3 [HDR-OA1]
     RSP on/off DPST relay
- HDR-OA3 - PB2  - T2C4
+ }
+ HDR-OA3 - PB2  - T2C4 [HDR-OA3]
   	AC/DC select relay DPDT
- HDR-OA4 - PB14 - T12C1,T1C2N,T8C2N
+ HDR-OA4 - PB14 - T12C1,T1C2N,T8C2N [T12C1: HDR-OA4]
     Select DC source DPDT relay
 
 Group B with 74VHCT125->DFN2020 NFET (Vgs = 5v):
 (JST 4 pin: gnd, signal, +5v, +12v)
 (Flyback diode to +5v or +12v option on 0.1" spacing)
- HDR-OB1 - PC7 - T3C3,T8C2
+ HDR-OB1 - PC7 - T3C2,T8C2 [HDR-OB1]
  	contactor coil #1
- HDR-OB2 - PC8 - T3C3,T8C3
+ HDR-OB2 - PC8 - T3C3,T8C3 [HDR-OB2]
  	contactor coil #2
- HDR-OB4 - PC9 - T3C4,T8C4
+ HDR-OB3 - PC6 - T3C1,T8C1 [HDR-OB3]
+    spare
+ HDR-OB4 - PC9 - T3C4,T8C4 [HDR-OB4]
   	spare
- HDR-OB3 - PC6 - T3C1,T8C1
-  	spare
-
+ 
 Group C with 74VHCT125 Buffer output (JST 3 pin)
 (drive external sub-board)
 (JST 3 pin: gnd, signal, +5v)
- HDR-OC1 - PA9  - T1C2
+ HDR-OC1 - PA9  - T1C2 [HDR-OC1]
  	DMOC Fans
- HDR-OC2 - PA11 - T1C4
+ HDR-OC2 - PA11 - T1C4 [HDR-OC2]
  	Cooling Pump motor
- HDR-OC3 - PA8  - T1C1
+ HDR-OC3 - PA8  - T1C1 [HDR-OC3]
  	Heat Exchanger Fan
- HDR-OC4 - PA10 - T1C3
+ HDR-OC4 - PA10 - T1C3 [HDR-OC4]
  	spare
  
  Extra SOT-23 NFET (Vgs = 3.3v i/o pin):
 (0.1" header: 3 pin gnd, signal, +5v)
 (No flyback diode option)
- JP21 PB3 - T2C2
+ JP21 PB3 - T2C2 [JP21FET] (Note: PA2 encoder conflict)
   	spare
 
 ===========================================
@@ -102,22 +102,22 @@ Group C with 74VHCT125 Buffer output (JST 3 pin)
 ===========================================
 ADC (0.1" header: 2 pin; GND, input with 10K pullup)
 (Note: Could be used as input, but no i/o pin protection)
- JP9  - PC0-IN10
+ JP9  - PC0-IN10 ADC3
   	coolant inlet thermistor
- JP8  - PC1-IN11
+ JP8  - PC1-IN11 ADC3
  	coolant outlet thermistor
- JP10 - PC2-IN12
+ JP10 - PC2-IN12 ADC3
  	ambient thermistor
- JP11 - PC3-IN13
+ JP11 - PC3-IN13 ADC3
  	spare
- JP17 - PC4-IN14 via R16|R18 10K|10K
+ JP17 - PC4-IN14 ADC1 via R16|R18 10K|10K
  	spare
- JP24 - PC5-IN15
+ JP24 - PC5-IN15 ADC1
    	spare
    1. GND
-   2. PC5-IN15 via R100|R19 5.6K|10K
+   2. PC5-IN15 ADC1 via R100|R19 5.6K|10K
    3. +5v
- JP34 - PA6 - T2C1 via R111|R112|R110  56K|10K|10K
+ JP34 - PA6-IN6 ADC1 - T2C1 via R111|R112|R110  56K|10K|10K
    1. GND
    2. 240->12v AC
 
@@ -127,16 +127,16 @@ ADC (0.1" header: 2 pin; GND, input with 10K pullup)
 ===========================================   
 JP7 Encoder option
  1. GND
- 2. PA0-T2C1
- 3. PA1-T2C2
+ 2. PA0-T2C1 (Note: conflict with PA15 T2C1)
+ 3. PA1-T2C2 (Note: conflict with PB3 T2C2)
  4. +5V
 
 JP14 PA12-KEYSW-SENSE (2 pin) (pull to gnd turns on PFET 12v switch)
-	Jumper present (always on)
+	Jumper present (always on) [KEYSWSENSE]
 
 JP14 PB4 (2-pin) via R20|R102 (or 0603 zener for R102) T3C1
 
-JP33 - opt-isolator AC detector: PA15 - T2C1
+JP33 - opt-isolator AC detector: PA15 - T2C1 (conflict with PA0 T2C1)
    1. gnd
    2. 120-240 AC
 
@@ -237,12 +237,9 @@ JP6 - CAN 2
 
 JP13 (6 pin) FTDI UART-USB
  1 - GND
- 2 - NC
- 3 - NC
- 4 - USART1 - Rx - PA10
- 5 - USART1 - Tx - PA9
- 6 - NC
-
+ 2 - USART1 - Rx - PA10
+ 3 - USART1 - Tx - PA9
+ 
 JP15 (3 pin) SWD
  1 - GND
  2 - PA14 - SWCLK
@@ -250,19 +247,19 @@ JP15 (3 pin) SWD
 
 JP23 (6 pin) HV dividers to ADC
  1 - GNDA
- 2 - PC1-IN2: divider HV3 (R40 1W+R35)|R31: (1M + 110K)|10K
- 3 - PC2-IN3: divider HV2 (R39 1W+R32)|R29: (1M + 110K)|10K
- 4 - PC3-IN4: divider HV1 (R37 1W+R33)|R28: (1M + 110K)|10K
- 5 - PA4-IN9: divider AC  (R38 1W+R34)|R30 w offset R26: (1M + 110K)|10K 10K
- 6 - Plus string:   R41 1W 22M -> op-amp follower -> PB0-IN15
+ 2 - PC1-IN2: divider HV3 (R40 1W+R35)|R31: (1M + 110K)|10K (fast)
+ 3 - PC2-IN3: divider HV2 (R39 1W+R32)|R29: (1M + 110K)|10K (fast)
+ 4 - PC3-IN4: divider HV1 (R37 1W+R33)|R28: (1M + 110K)|10K (fast)
+ 5 - PA4-IN9: divider AC  (R38 1W+R34)|R30 w offset R26: (1M + 110K)|10K 10K (slow)
+ 6 - Plus string:   R41 1W 22M -> op-amp follower -> F446:PB0-IN15 [STRING-PLUS]
  	Jumper present
- HV GNDA-to-system GND: R7 22M -> op-amp follower -> PB1-IN16
+ HV GNDA-to-system GND: R7 22M -> op-amp follower -> F446:PB1-IN16 [STRING-MINUS]
  	Jumper present
 
 JP22 (3 pin) Hall-effect sensor--
 	Battery string current sensor
  1 - GNDA ('L431 gnd isolated from 'F446 gnd)
- 2 - PC0-IN1: R36|R101 5.6K|10K
+ 2 - PC0-IN1: R36|R101 5.6K|10K (fast)
  3 - +5V/3 linear regulated 5v
 
 JP35 (5 pin) SPI1
@@ -274,8 +271,8 @@ JP35 (5 pin) SPI1
 
 JP36 (4 pin) I2C2
  1 - GNDA 
- 2 - PB13: I2C2-CLK (buffer 5v out)
- 3 - PB14: I2C2-SDA (3.3K pullup to +5v)
+ 2 - PB13: I2C2-CLK (buffer 5v out) {WARNING: PULLUP NEEDED}
+ 3 - PB14: I2C2-SDA (3.3K pullup to +5v){WARNING: PULLUP NEEDED, and R27=ZERO}
  4 - +5V/4
  
 Isolated 'F446 <-> L431--

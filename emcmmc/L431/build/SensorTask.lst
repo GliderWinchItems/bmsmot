@@ -1,0 +1,535 @@
+ARM GAS  /tmp/cctYLry6.s 			page 1
+
+
+   1              		.syntax unified
+   2              		.cpu cortex-m4
+   3              		.eabi_attribute 27, 1
+   4              		.eabi_attribute 28, 1
+   5              		.fpu fpv4-sp-d16
+   6              		.eabi_attribute 20, 1
+   7              		.eabi_attribute 21, 1
+   8              		.eabi_attribute 23, 3
+   9              		.eabi_attribute 24, 1
+  10              		.eabi_attribute 25, 1
+  11              		.eabi_attribute 26, 1
+  12              		.eabi_attribute 30, 1
+  13              		.eabi_attribute 34, 1
+  14              		.eabi_attribute 18, 4
+  15              		.thumb
+  16              		.syntax unified
+  17              		.file	"SensorTask.c"
+  18              		.text
+  19              	.Ltext0:
+  20              		.cfi_sections	.debug_frame
+  21              		.section	.text.hex,"ax",%progbits
+  22              		.align	2
+  23              		.thumb
+  24              		.thumb_func
+  26              	hex:
+  27              	.LFB294:
+  28              		.file 1 "Ourtasks/SensorTask.c"
+   1:Ourtasks/SensorTask.c **** /******************************************************************************
+   2:Ourtasks/SensorTask.c **** * File Name          : SensorTask.c
+   3:Ourtasks/SensorTask.c **** * Date First Issued  : 06/18/2019
+   4:Ourtasks/SensorTask.c **** * Description        : Contactor function w STM32CubeMX w FreeRTOS
+   5:Ourtasks/SensorTask.c **** *******************************************************************************/
+   6:Ourtasks/SensorTask.c **** 
+   7:Ourtasks/SensorTask.c **** #include "FreeRTOS.h"
+   8:Ourtasks/SensorTask.c **** #include "task.h"
+   9:Ourtasks/SensorTask.c **** #include "cmsis_os.h"
+  10:Ourtasks/SensorTask.c **** #include "malloc.h"
+  11:Ourtasks/SensorTask.c **** #include "ADCTask.h"
+  12:Ourtasks/SensorTask.c **** #include "adctask.h"
+  13:Ourtasks/SensorTask.c **** #include "morse.h"
+  14:Ourtasks/SensorTask.c **** #include "SerialTaskSend.h"
+  15:Ourtasks/SensorTask.c **** #include "getserialbuf.h"
+  16:Ourtasks/SensorTask.c **** #include "SensorTask.h"
+  17:Ourtasks/SensorTask.c **** #include "adcparamsinit.h"
+  18:Ourtasks/SensorTask.c **** #include "yprintf.h"
+  19:Ourtasks/SensorTask.c **** 
+  20:Ourtasks/SensorTask.c **** #include <string.h>
+  21:Ourtasks/SensorTask.c **** 
+  22:Ourtasks/SensorTask.c **** /* From 'main.c' */
+  23:Ourtasks/SensorTask.c **** extern UART_HandleTypeDef huart3;
+  24:Ourtasks/SensorTask.c **** 
+  25:Ourtasks/SensorTask.c **** static char* hex(char *p, u8 c);
+  26:Ourtasks/SensorTask.c **** 
+  27:Ourtasks/SensorTask.c **** osThreadId SensorTaskHandle;
+  28:Ourtasks/SensorTask.c **** 
+  29:Ourtasks/SensorTask.c **** static void adctoserial(char* p);
+  30:Ourtasks/SensorTask.c **** 
+ARM GAS  /tmp/cctYLry6.s 			page 2
+
+
+  31:Ourtasks/SensorTask.c **** 
+  32:Ourtasks/SensorTask.c **** /* *************************************************************************
+  33:Ourtasks/SensorTask.c ****  * osThreadId xSensorTaskCreate(uint32_t taskpriority);
+  34:Ourtasks/SensorTask.c ****  * @brief	: Create task; task handle created is global for all to enjoy!
+  35:Ourtasks/SensorTask.c ****  * @param	: taskpriority = Task priority (just as it says!)
+  36:Ourtasks/SensorTask.c ****  * @return	: SensorTaskHandle
+  37:Ourtasks/SensorTask.c ****  * *************************************************************************/
+  38:Ourtasks/SensorTask.c **** osThreadId xSensorTaskCreate(uint32_t taskpriority)
+  39:Ourtasks/SensorTask.c **** {
+  40:Ourtasks/SensorTask.c **** #if 0	
+  41:Ourtasks/SensorTask.c ****  	osThreadDef(SensorTask, StartSensorTask, osPriorityNormal, 0, 192);
+  42:Ourtasks/SensorTask.c **** 	SensorTaskHandle = osThreadCreate(osThread(SensorTask), NULL);
+  43:Ourtasks/SensorTask.c **** 	vTaskPrioritySet( SensorTaskHandle, taskpriority );
+  44:Ourtasks/SensorTask.c **** 	return SensorTaskHandle;
+  45:Ourtasks/SensorTask.c **** #endif
+  46:Ourtasks/SensorTask.c **** 
+  47:Ourtasks/SensorTask.c **** 	BaseType_t ret = xTaskCreate(StartSensorTask, "SensorTask",\
+  48:Ourtasks/SensorTask.c ****      (192), NULL, taskpriority, &SensorTaskHandle);
+  49:Ourtasks/SensorTask.c **** 	if (ret != pdPASS) return NULL;
+  50:Ourtasks/SensorTask.c **** 	return SensorTaskHandle;	
+  51:Ourtasks/SensorTask.c **** }
+  52:Ourtasks/SensorTask.c **** /* *************************************************************************
+  53:Ourtasks/SensorTask.c ****  * void StartSensorTask(void const * argument);
+  54:Ourtasks/SensorTask.c ****  *	@brief	: Task startup
+  55:Ourtasks/SensorTask.c ****  * *************************************************************************/
+  56:Ourtasks/SensorTask.c **** uint32_t dbgSS;
+  57:Ourtasks/SensorTask.c **** char dbgc[32];
+  58:Ourtasks/SensorTask.c **** 
+  59:Ourtasks/SensorTask.c **** void StartSensorTask(void const * argument)
+  60:Ourtasks/SensorTask.c **** {
+  61:Ourtasks/SensorTask.c **** 	/* A notification copies the internal notification word to this. */
+  62:Ourtasks/SensorTask.c **** 	uint32_t noteval = 0;    // Receives notification word upon an API notify
+  63:Ourtasks/SensorTask.c **** 
+  64:Ourtasks/SensorTask.c **** 	/* notification bits processed after a 'Wait. */
+  65:Ourtasks/SensorTask.c **** 	uint32_t noteused = 0;
+  66:Ourtasks/SensorTask.c **** 
+  67:Ourtasks/SensorTask.c **** 	/* Serial send buffer for sending readings. */
+  68:Ourtasks/SensorTask.c **** 	struct SERIALSENDTASKBCB* pbuf3 = getserialbuf(&huart3,48);
+  69:Ourtasks/SensorTask.c **** 	if (pbuf3 == NULL) morse_trap(31);
+  70:Ourtasks/SensorTask.c **** 
+  71:Ourtasks/SensorTask.c **** 	/* Initialize working struc for ADC. */
+  72:Ourtasks/SensorTask.c **** 	adcparams_init();
+  73:Ourtasks/SensorTask.c **** 
+  74:Ourtasks/SensorTask.c **** 	char c[32];
+  75:Ourtasks/SensorTask.c **** 
+  76:Ourtasks/SensorTask.c ****   /* Infinite loop */
+  77:Ourtasks/SensorTask.c ****   for(;;)
+  78:Ourtasks/SensorTask.c ****   {
+  79:Ourtasks/SensorTask.c **** 		/* Wait for notifications */
+  80:Ourtasks/SensorTask.c **** 		xTaskNotifyWait(noteused, 0, &noteval, portMAX_DELAY);
+  81:Ourtasks/SensorTask.c **** 		noteused = 0;	// Accumulate bits in 'noteval' processed.
+  82:Ourtasks/SensorTask.c **** 		if ((noteval & CNCTBIT00) != 0)
+  83:Ourtasks/SensorTask.c **** 		{ // ADC readings ready
+  84:Ourtasks/SensorTask.c **** 			noteused |= CNCTBIT00;  // We handled the bit
+  85:Ourtasks/SensorTask.c **** 			adctoserial(&c[0]);     // Construct the line
+  86:Ourtasks/SensorTask.c **** dbgSS += 1;
+  87:Ourtasks/SensorTask.c **** strncpy(dbgc,c,31);
+ARM GAS  /tmp/cctYLry6.s 			page 3
+
+
+  88:Ourtasks/SensorTask.c **** 			yputs(&pbuf3,&c[0]); // Queue for sending
+  89:Ourtasks/SensorTask.c **** 		}
+  90:Ourtasks/SensorTask.c **** 		if ((noteused & ~CNCTBIT00) != 0) // Debugging jic
+  91:Ourtasks/SensorTask.c **** 				morse_trap(32);
+  92:Ourtasks/SensorTask.c **** 	}
+  93:Ourtasks/SensorTask.c **** }
+  94:Ourtasks/SensorTask.c **** /* *************************************************************************
+  95:Ourtasks/SensorTask.c ****  * static void adctoserial(char* p);
+  96:Ourtasks/SensorTask.c ****  *	@brief	: Build serial line 
+  97:Ourtasks/SensorTask.c ****  * *************************************************************************/
+  98:Ourtasks/SensorTask.c **** /*
+  99:Ourtasks/SensorTask.c **** NOTE: This is where COBS coding would be done, but we start with ascii-hex
+ 100:Ourtasks/SensorTask.c **** */
+ 101:Ourtasks/SensorTask.c **** 
+ 102:Ourtasks/SensorTask.c **** /* bin to ascii lookup table */
+ 103:Ourtasks/SensorTask.c **** static const char h[16] = {'0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F'};
+ 104:Ourtasks/SensorTask.c **** static char* hex(char *p, u8 c)	// Convert 'c' to hex, placing in output *p.
+ 105:Ourtasks/SensorTask.c **** {
+  29              		.loc 1 105 0
+  30              		.cfi_startproc
+  31              		@ args = 0, pretend = 0, frame = 0
+  32              		@ frame_needed = 0, uses_anonymous_args = 0
+  33              		@ link register save eliminated.
+  34              	.LVL0:
+  35 0000 10B4     		push	{r4}
+  36              	.LCFI0:
+  37              		.cfi_def_cfa_offset 4
+  38              		.cfi_offset 4, -4
+  39              	.LVL1:
+ 106:Ourtasks/SensorTask.c **** 		*p++ = h[((c >> 4) & 0x0f)];	// Hi order nibble
+  40              		.loc 1 106 0
+  41 0002 0B09     		lsrs	r3, r1, #4
+  42 0004 064A     		ldr	r2, .L3
+  43 0006 D45C     		ldrb	r4, [r2, r3]	@ zero_extendqisi2
+  44 0008 0346     		mov	r3, r0
+  45 000a 03F8024B 		strb	r4, [r3], #2
+  46              	.LVL2:
+ 107:Ourtasks/SensorTask.c **** 		*p++ = h[(c & 0x0f)];		// Lo order nibble
+  47              		.loc 1 107 0
+  48 000e 01F00F01 		and	r1, r1, #15
+  49              	.LVL3:
+  50 0012 525C     		ldrb	r2, [r2, r1]	@ zero_extendqisi2
+  51 0014 4270     		strb	r2, [r0, #1]
+ 108:Ourtasks/SensorTask.c **** 		return p;			// Return new output pointer position
+ 109:Ourtasks/SensorTask.c **** }
+  52              		.loc 1 109 0
+  53 0016 1846     		mov	r0, r3
+  54 0018 5DF8044B 		ldr	r4, [sp], #4
+  55              	.LCFI1:
+  56              		.cfi_restore 4
+  57              		.cfi_def_cfa_offset 0
+  58 001c 7047     		bx	lr
+  59              	.L4:
+  60 001e 00BF     		.align	2
+  61              	.L3:
+  62 0020 00000000 		.word	.LANCHOR0
+  63              		.cfi_endproc
+ARM GAS  /tmp/cctYLry6.s 			page 4
+
+
+  64              	.LFE294:
+  66              		.section	.text.adctoserial,"ax",%progbits
+  67              		.align	2
+  68              		.thumb
+  69              		.thumb_func
+  71              	adctoserial:
+  72              	.LFB295:
+ 110:Ourtasks/SensorTask.c **** static void adctoserial(char* p)
+ 111:Ourtasks/SensorTask.c **** {
+  73              		.loc 1 111 0
+  74              		.cfi_startproc
+  75              		@ args = 0, pretend = 0, frame = 0
+  76              		@ frame_needed = 0, uses_anonymous_args = 0
+  77              	.LVL4:
+  78 0000 10B5     		push	{r4, lr}
+  79              	.LCFI2:
+  80              		.cfi_def_cfa_offset 8
+  81              		.cfi_offset 4, -8
+  82              		.cfi_offset 14, -4
+ 112:Ourtasks/SensorTask.c **** 	p = hex(p, adc1.chan[ADC1IDX_HIGHVOLT1].ival >> 0);
+  83              		.loc 1 112 0
+  84 0002 0F4C     		ldr	r4, .L7
+  85 0004 94F8FC10 		ldrb	r1, [r4, #252]	@ zero_extendqisi2
+  86 0008 FFF7FEFF 		bl	hex
+  87              	.LVL5:
+ 113:Ourtasks/SensorTask.c **** 	p = hex(p, adc1.chan[ADC1IDX_HIGHVOLT1].ival >> 8);
+  88              		.loc 1 113 0
+  89 000c 94F8FD10 		ldrb	r1, [r4, #253]	@ zero_extendqisi2
+  90 0010 FFF7FEFF 		bl	hex
+  91              	.LVL6:
+ 114:Ourtasks/SensorTask.c **** 
+ 115:Ourtasks/SensorTask.c **** 	p = hex(p, adc1.chan[ADC1IDX_HIGHVOLT2].ival >> 0);
+  92              		.loc 1 115 0
+  93 0014 94F83C11 		ldrb	r1, [r4, #316]	@ zero_extendqisi2
+  94 0018 FFF7FEFF 		bl	hex
+  95              	.LVL7:
+ 116:Ourtasks/SensorTask.c **** 	p = hex(p, adc1.chan[ADC1IDX_HIGHVOLT2].ival >> 8);
+  96              		.loc 1 116 0
+  97 001c 94F83D11 		ldrb	r1, [r4, #317]	@ zero_extendqisi2
+  98 0020 FFF7FEFF 		bl	hex
+  99              	.LVL8:
+ 117:Ourtasks/SensorTask.c **** 
+ 118:Ourtasks/SensorTask.c **** 	p = hex(p, adc1.chan[ADC1IDX_HIGHVOLT3].ival >> 0);
+ 100              		.loc 1 118 0
+ 101 0024 94F87C11 		ldrb	r1, [r4, #380]	@ zero_extendqisi2
+ 102 0028 FFF7FEFF 		bl	hex
+ 103              	.LVL9:
+ 119:Ourtasks/SensorTask.c **** 	p = hex(p, adc1.chan[ADC1IDX_HIGHVOLT3].ival >> 8);
+ 104              		.loc 1 119 0
+ 105 002c 94F87D11 		ldrb	r1, [r4, #381]	@ zero_extendqisi2
+ 106 0030 FFF7FEFF 		bl	hex
+ 107              	.LVL10:
+ 120:Ourtasks/SensorTask.c **** 
+ 121:Ourtasks/SensorTask.c **** 	*p++ = '\n'; *p = 0;
+ 108              		.loc 1 121 0
+ 109 0034 0A23     		movs	r3, #10
+ 110 0036 0370     		strb	r3, [r0]
+ARM GAS  /tmp/cctYLry6.s 			page 5
+
+
+ 111 0038 0023     		movs	r3, #0
+ 112 003a 4370     		strb	r3, [r0, #1]
+ 113 003c 10BD     		pop	{r4, pc}
+ 114              	.L8:
+ 115 003e 00BF     		.align	2
+ 116              	.L7:
+ 117 0040 00000000 		.word	adc1
+ 118              		.cfi_endproc
+ 119              	.LFE295:
+ 121              		.section	.text.StartSensorTask,"ax",%progbits
+ 122              		.align	2
+ 123              		.global	StartSensorTask
+ 124              		.thumb
+ 125              		.thumb_func
+ 127              	StartSensorTask:
+ 128              	.LFB293:
+  60:Ourtasks/SensorTask.c **** 	/* A notification copies the internal notification word to this. */
+ 129              		.loc 1 60 0
+ 130              		.cfi_startproc
+ 131              		@ args = 0, pretend = 0, frame = 40
+ 132              		@ frame_needed = 0, uses_anonymous_args = 0
+ 133              	.LVL11:
+ 134 0000 10B5     		push	{r4, lr}
+ 135              	.LCFI3:
+ 136              		.cfi_def_cfa_offset 8
+ 137              		.cfi_offset 4, -8
+ 138              		.cfi_offset 14, -4
+ 139 0002 8AB0     		sub	sp, sp, #40
+ 140              	.LCFI4:
+ 141              		.cfi_def_cfa_offset 48
+  62:Ourtasks/SensorTask.c **** 
+ 142              		.loc 1 62 0
+ 143 0004 0023     		movs	r3, #0
+ 144 0006 0993     		str	r3, [sp, #36]
+ 145              	.LVL12:
+  68:Ourtasks/SensorTask.c **** 	if (pbuf3 == NULL) morse_trap(31);
+ 146              		.loc 1 68 0
+ 147 0008 3021     		movs	r1, #48
+ 148 000a 1848     		ldr	r0, .L16
+ 149              	.LVL13:
+ 150 000c FFF7FEFF 		bl	getserialbuf
+ 151              	.LVL14:
+ 152 0010 0890     		str	r0, [sp, #32]
+  69:Ourtasks/SensorTask.c **** 
+ 153              		.loc 1 69 0
+ 154 0012 10B9     		cbnz	r0, .L10
+  69:Ourtasks/SensorTask.c **** 
+ 155              		.loc 1 69 0 is_stmt 0 discriminator 1
+ 156 0014 1F20     		movs	r0, #31
+ 157 0016 FFF7FEFF 		bl	morse_trap
+ 158              	.LVL15:
+ 159              	.L10:
+  72:Ourtasks/SensorTask.c **** 
+ 160              		.loc 1 72 0 is_stmt 1
+ 161 001a FFF7FEFF 		bl	adcparams_init
+ 162              	.LVL16:
+  65:Ourtasks/SensorTask.c **** 
+ARM GAS  /tmp/cctYLry6.s 			page 6
+
+
+ 163              		.loc 1 65 0
+ 164 001e 0024     		movs	r4, #0
+ 165              	.LVL17:
+ 166              	.L11:
+  80:Ourtasks/SensorTask.c **** 		noteused = 0;	// Accumulate bits in 'noteval' processed.
+ 167              		.loc 1 80 0
+ 168 0020 4FF0FF33 		mov	r3, #-1
+ 169 0024 09AA     		add	r2, sp, #36
+ 170 0026 0021     		movs	r1, #0
+ 171 0028 2046     		mov	r0, r4
+ 172 002a FFF7FEFF 		bl	xTaskNotifyWait
+ 173              	.LVL18:
+  82:Ourtasks/SensorTask.c **** 		{ // ADC readings ready
+ 174              		.loc 1 82 0
+ 175 002e 099B     		ldr	r3, [sp, #36]
+ 176 0030 13F0010F 		tst	r3, #1
+ 177 0034 11D0     		beq	.L14
+ 178              	.LVL19:
+  85:Ourtasks/SensorTask.c **** dbgSS += 1;
+ 179              		.loc 1 85 0
+ 180 0036 6846     		mov	r0, sp
+ 181 0038 FFF7FEFF 		bl	adctoserial
+ 182              	.LVL20:
+  86:Ourtasks/SensorTask.c **** strncpy(dbgc,c,31);
+ 183              		.loc 1 86 0
+ 184 003c 0C4A     		ldr	r2, .L16+4
+ 185 003e 1368     		ldr	r3, [r2]
+ 186 0040 0133     		adds	r3, r3, #1
+ 187 0042 1360     		str	r3, [r2]
+  87:Ourtasks/SensorTask.c **** 			yputs(&pbuf3,&c[0]); // Queue for sending
+ 188              		.loc 1 87 0
+ 189 0044 1F22     		movs	r2, #31
+ 190 0046 6946     		mov	r1, sp
+ 191 0048 0A48     		ldr	r0, .L16+8
+ 192 004a FFF7FEFF 		bl	strncpy
+ 193              	.LVL21:
+  88:Ourtasks/SensorTask.c **** 		}
+ 194              		.loc 1 88 0
+ 195 004e 6946     		mov	r1, sp
+ 196 0050 08A8     		add	r0, sp, #32
+ 197 0052 FFF7FEFF 		bl	yputs
+ 198              	.LVL22:
+  84:Ourtasks/SensorTask.c **** 			adctoserial(&c[0]);     // Construct the line
+ 199              		.loc 1 84 0
+ 200 0056 0124     		movs	r4, #1
+ 201 0058 00E0     		b	.L12
+ 202              	.LVL23:
+ 203              	.L14:
+  81:Ourtasks/SensorTask.c **** 		if ((noteval & CNCTBIT00) != 0)
+ 204              		.loc 1 81 0
+ 205 005a 0024     		movs	r4, #0
+ 206              	.LVL24:
+ 207              	.L12:
+  90:Ourtasks/SensorTask.c **** 				morse_trap(32);
+ 208              		.loc 1 90 0
+ 209 005c 34F00103 		bics	r3, r4, #1
+ 210 0060 DED0     		beq	.L11
+ARM GAS  /tmp/cctYLry6.s 			page 7
+
+
+  91:Ourtasks/SensorTask.c **** 	}
+ 211              		.loc 1 91 0
+ 212 0062 2020     		movs	r0, #32
+ 213 0064 FFF7FEFF 		bl	morse_trap
+ 214              	.LVL25:
+ 215 0068 DAE7     		b	.L11
+ 216              	.L17:
+ 217 006a 00BF     		.align	2
+ 218              	.L16:
+ 219 006c 00000000 		.word	huart3
+ 220 0070 00000000 		.word	dbgSS
+ 221 0074 00000000 		.word	dbgc
+ 222              		.cfi_endproc
+ 223              	.LFE293:
+ 225              		.section	.text.xSensorTaskCreate,"ax",%progbits
+ 226              		.align	2
+ 227              		.global	xSensorTaskCreate
+ 228              		.thumb
+ 229              		.thumb_func
+ 231              	xSensorTaskCreate:
+ 232              	.LFB292:
+  39:Ourtasks/SensorTask.c **** #if 0	
+ 233              		.loc 1 39 0
+ 234              		.cfi_startproc
+ 235              		@ args = 0, pretend = 0, frame = 0
+ 236              		@ frame_needed = 0, uses_anonymous_args = 0
+ 237              	.LVL26:
+ 238 0000 00B5     		push	{lr}
+ 239              	.LCFI5:
+ 240              		.cfi_def_cfa_offset 4
+ 241              		.cfi_offset 14, -4
+ 242 0002 83B0     		sub	sp, sp, #12
+ 243              	.LCFI6:
+ 244              		.cfi_def_cfa_offset 16
+  47:Ourtasks/SensorTask.c ****      (192), NULL, taskpriority, &SensorTaskHandle);
+ 245              		.loc 1 47 0
+ 246 0004 084B     		ldr	r3, .L22
+ 247 0006 0193     		str	r3, [sp, #4]
+ 248 0008 0090     		str	r0, [sp]
+ 249 000a 0023     		movs	r3, #0
+ 250 000c C022     		movs	r2, #192
+ 251 000e 0749     		ldr	r1, .L22+4
+ 252 0010 0748     		ldr	r0, .L22+8
+ 253              	.LVL27:
+ 254 0012 FFF7FEFF 		bl	xTaskCreate
+ 255              	.LVL28:
+  49:Ourtasks/SensorTask.c **** 	return SensorTaskHandle;	
+ 256              		.loc 1 49 0
+ 257 0016 0128     		cmp	r0, #1
+ 258 0018 02D1     		bne	.L20
+  50:Ourtasks/SensorTask.c **** }
+ 259              		.loc 1 50 0
+ 260 001a 034B     		ldr	r3, .L22
+ 261 001c 1868     		ldr	r0, [r3]
+ 262              	.LVL29:
+ 263 001e 00E0     		b	.L19
+ 264              	.LVL30:
+ARM GAS  /tmp/cctYLry6.s 			page 8
+
+
+ 265              	.L20:
+  49:Ourtasks/SensorTask.c **** 	return SensorTaskHandle;	
+ 266              		.loc 1 49 0
+ 267 0020 0020     		movs	r0, #0
+ 268              	.LVL31:
+ 269              	.L19:
+  51:Ourtasks/SensorTask.c **** /* *************************************************************************
+ 270              		.loc 1 51 0
+ 271 0022 03B0     		add	sp, sp, #12
+ 272              	.LCFI7:
+ 273              		.cfi_def_cfa_offset 4
+ 274              		@ sp needed
+ 275 0024 5DF804FB 		ldr	pc, [sp], #4
+ 276              	.L23:
+ 277              		.align	2
+ 278              	.L22:
+ 279 0028 00000000 		.word	SensorTaskHandle
+ 280 002c 00000000 		.word	.LC0
+ 281 0030 00000000 		.word	StartSensorTask
+ 282              		.cfi_endproc
+ 283              	.LFE292:
+ 285              		.comm	dbgc,32,4
+ 286              		.comm	dbgSS,4,4
+ 287              		.comm	SensorTaskHandle,4,4
+ 288              		.section	.rodata.str1.4,"aMS",%progbits,1
+ 289              		.align	2
+ 290              	.LC0:
+ 291 0000 53656E73 		.ascii	"SensorTask\000"
+ 291      6F725461 
+ 291      736B00
+ 292              		.section	.rodata.h,"a",%progbits
+ 293              		.align	2
+ 294              		.set	.LANCHOR0,. + 0
+ 297              	h:
+ 298 0000 30       		.byte	48
+ 299 0001 31       		.byte	49
+ 300 0002 32       		.byte	50
+ 301 0003 33       		.byte	51
+ 302 0004 34       		.byte	52
+ 303 0005 35       		.byte	53
+ 304 0006 36       		.byte	54
+ 305 0007 37       		.byte	55
+ 306 0008 38       		.byte	56
+ 307 0009 39       		.byte	57
+ 308 000a 41       		.byte	65
+ 309 000b 42       		.byte	66
+ 310 000c 43       		.byte	67
+ 311 000d 44       		.byte	68
+ 312 000e 45       		.byte	69
+ 313 000f 46       		.byte	70
+ 314              		.text
+ 315              	.Letext0:
+ 316              		.file 2 "/home/deh/launchpad/gcc-arm-none-eabi-5_4-2016q3/arm-none-eabi/include/machine/_default_t
+ 317              		.file 3 "/home/deh/launchpad/gcc-arm-none-eabi-5_4-2016q3/arm-none-eabi/include/sys/_stdint.h"
+ 318              		.file 4 "Middlewares/Third_Party/FreeRTOS/Source/portable/GCC/ARM_CM4F/portmacro.h"
+ 319              		.file 5 "Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os2.h"
+ 320              		.file 6 "Drivers/CMSIS/Device/ST/STM32L4xx/Include/stm32l431xx.h"
+ARM GAS  /tmp/cctYLry6.s 			page 9
+
+
+ 321              		.file 7 "Drivers/STM32L4xx_HAL_Driver/Inc/stm32l4xx_hal_def.h"
+ 322              		.file 8 "Drivers/STM32L4xx_HAL_Driver/Inc/stm32l4xx_hal_dma.h"
+ 323              		.file 9 "Drivers/STM32L4xx_HAL_Driver/Inc/stm32l4xx_hal_uart.h"
+ 324              		.file 10 "Middlewares/Third_Party/FreeRTOS/Source/include/queue.h"
+ 325              		.file 11 "Middlewares/Third_Party/FreeRTOS/Source/include/semphr.h"
+ 326              		.file 12 "Ourwares/SerialTaskSend.h"
+ 327              		.file 13 "Ourtasks/iir_filter_lx.h"
+ 328              		.file 14 "Ourtasks/adc_idx_v_struct.h"
+ 329              		.file 15 "Ourtasks/adcparams.h"
+ 330              		.file 16 "Drivers/CMSIS/Include/cmsis_gcc.h"
+ 331              		.file 17 "Drivers/CMSIS/Include/core_cm4.h"
+ 332              		.file 18 "Ourwares/getserialbuf.h"
+ 333              		.file 19 "Ourwares/morse.h"
+ 334              		.file 20 "Middlewares/Third_Party/FreeRTOS/Source/include/task.h"
+ 335              		.file 21 "/home/deh/launchpad/gcc-arm-none-eabi-5_4-2016q3/arm-none-eabi/include/string.h"
+ 336              		.file 22 "Ourwares/yprintf.h"
+ 337              		.file 23 "Ourwares/common_misc.h"
+ARM GAS  /tmp/cctYLry6.s 			page 10
+
+
+DEFINED SYMBOLS
+                            *ABS*:00000000 SensorTask.c
+     /tmp/cctYLry6.s:22     .text.hex:00000000 $t
+     /tmp/cctYLry6.s:26     .text.hex:00000000 hex
+     /tmp/cctYLry6.s:62     .text.hex:00000020 $d
+     /tmp/cctYLry6.s:67     .text.adctoserial:00000000 $t
+     /tmp/cctYLry6.s:71     .text.adctoserial:00000000 adctoserial
+     /tmp/cctYLry6.s:117    .text.adctoserial:00000040 $d
+     /tmp/cctYLry6.s:122    .text.StartSensorTask:00000000 $t
+     /tmp/cctYLry6.s:127    .text.StartSensorTask:00000000 StartSensorTask
+     /tmp/cctYLry6.s:219    .text.StartSensorTask:0000006c $d
+                            *COM*:00000004 dbgSS
+                            *COM*:00000020 dbgc
+     /tmp/cctYLry6.s:226    .text.xSensorTaskCreate:00000000 $t
+     /tmp/cctYLry6.s:231    .text.xSensorTaskCreate:00000000 xSensorTaskCreate
+     /tmp/cctYLry6.s:279    .text.xSensorTaskCreate:00000028 $d
+                            *COM*:00000004 SensorTaskHandle
+     /tmp/cctYLry6.s:289    .rodata.str1.4:00000000 $d
+     /tmp/cctYLry6.s:293    .rodata.h:00000000 $d
+     /tmp/cctYLry6.s:297    .rodata.h:00000000 h
+                     .debug_frame:00000010 $d
+
+UNDEFINED SYMBOLS
+adc1
+getserialbuf
+morse_trap
+adcparams_init
+xTaskNotifyWait
+strncpy
+yputs
+huart3
+xTaskCreate

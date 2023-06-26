@@ -1,0 +1,140 @@
+ARM GAS  /tmp/ccBEyJpd.s 			page 1
+
+
+   1              		.syntax unified
+   2              		.cpu cortex-m4
+   3              		.eabi_attribute 27, 1
+   4              		.eabi_attribute 28, 1
+   5              		.fpu fpv4-sp-d16
+   6              		.eabi_attribute 20, 1
+   7              		.eabi_attribute 21, 1
+   8              		.eabi_attribute 23, 3
+   9              		.eabi_attribute 24, 1
+  10              		.eabi_attribute 25, 1
+  11              		.eabi_attribute 26, 1
+  12              		.eabi_attribute 30, 1
+  13              		.eabi_attribute 34, 1
+  14              		.eabi_attribute 18, 4
+  15              		.thumb
+  16              		.syntax unified
+  17              		.file	"stackwatermark.c"
+  18              		.text
+  19              	.Ltext0:
+  20              		.cfi_sections	.debug_frame
+  21              		.section	.text.stackwatermark_show,"ax",%progbits
+  22              		.align	2
+  23              		.global	stackwatermark_show
+  24              		.thumb
+  25              		.thumb_func
+  27              	stackwatermark_show:
+  28              	.LFB292:
+  29              		.file 1 "Ourtasks/stackwatermark.c"
+   1:Ourtasks/stackwatermark.c **** /******************************************************************************
+   2:Ourtasks/stackwatermark.c **** * File Name          : stackwatermark.c
+   3:Ourtasks/stackwatermark.c **** * Date First Issued  : 01/22/2019
+   4:Ourtasks/stackwatermark.c **** * Description        : Output stack watermark
+   5:Ourtasks/stackwatermark.c **** *******************************************************************************/
+   6:Ourtasks/stackwatermark.c **** 
+   7:Ourtasks/stackwatermark.c **** #include "FreeRTOS.h"
+   8:Ourtasks/stackwatermark.c **** #include "task.h"
+   9:Ourtasks/stackwatermark.c **** #include "cmsis_os.h"
+  10:Ourtasks/stackwatermark.c **** #include "SerialTaskSend.h"
+  11:Ourtasks/stackwatermark.c **** 
+  12:Ourtasks/stackwatermark.c **** #include "stackwatermark.h"
+  13:Ourtasks/stackwatermark.c **** #include "yprintf.h"
+  14:Ourtasks/stackwatermark.c **** 
+  15:Ourtasks/stackwatermark.c **** extern osSemaphoreId sprintfSemaphoreHandle;
+  16:Ourtasks/stackwatermark.c **** 
+  17:Ourtasks/stackwatermark.c **** /* *************************************************************************
+  18:Ourtasks/stackwatermark.c ****  * void stackwatermark_show(osThreadId TaskHandle, struct SERIALSENDTASKBCB** ppbcb, char* pchar);
+  19:Ourtasks/stackwatermark.c ****  *	@brief	:
+  20:Ourtasks/stackwatermark.c ****  * @param	: TaskHandle = task handle for stackwatermark check  
+  21:Ourtasks/stackwatermark.c ****  * @param	: pycb = pointer to stuct to pointer with uart pointers and buffer parameters
+  22:Ourtasks/stackwatermark.c ****  * @param	: pchar = pointer to text string to precede stack value number
+  23:Ourtasks/stackwatermark.c ****  * *************************************************************************/
+  24:Ourtasks/stackwatermark.c **** void stackwatermark_show(osThreadId TaskHandle, struct SERIALSENDTASKBCB** ppbcb, char* pchar)
+  25:Ourtasks/stackwatermark.c **** {
+  30              		.loc 1 25 0
+  31              		.cfi_startproc
+  32              		@ args = 0, pretend = 0, frame = 0
+  33              		@ frame_needed = 0, uses_anonymous_args = 0
+ARM GAS  /tmp/ccBEyJpd.s 			page 2
+
+
+  34              	.LVL0:
+  35 0000 38B5     		push	{r3, r4, r5, lr}
+  36              	.LCFI0:
+  37              		.cfi_def_cfa_offset 16
+  38              		.cfi_offset 3, -16
+  39              		.cfi_offset 4, -12
+  40              		.cfi_offset 5, -8
+  41              		.cfi_offset 14, -4
+  42 0002 0C46     		mov	r4, r1
+  43 0004 1546     		mov	r5, r2
+  26:Ourtasks/stackwatermark.c **** 	UBaseType_t stackwatermark; // For unused task stack space
+  27:Ourtasks/stackwatermark.c **** 
+  28:Ourtasks/stackwatermark.c **** 		/* Get stack high water mark for tasks of interest. */
+  29:Ourtasks/stackwatermark.c **** 		stackwatermark = uxTaskGetStackHighWaterMark( TaskHandle );
+  44              		.loc 1 29 0
+  45 0006 FFF7FEFF 		bl	uxTaskGetStackHighWaterMark
+  46              	.LVL1:
+  30:Ourtasks/stackwatermark.c **** 
+  31:Ourtasks/stackwatermark.c **** 		yprintf(ppbcb, "\n\r#Stack: %s %3d",pchar, (int)stackwatermark);
+  47              		.loc 1 31 0
+  48 000a 0346     		mov	r3, r0
+  49 000c 2A46     		mov	r2, r5
+  50 000e 0249     		ldr	r1, .L3
+  51 0010 2046     		mov	r0, r4
+  52              	.LVL2:
+  53 0012 FFF7FEFF 		bl	yprintf
+  54              	.LVL3:
+  55 0016 38BD     		pop	{r3, r4, r5, pc}
+  56              	.LVL4:
+  57              	.L4:
+  58              		.align	2
+  59              	.L3:
+  60 0018 00000000 		.word	.LC0
+  61              		.cfi_endproc
+  62              	.LFE292:
+  64              		.section	.rodata.str1.4,"aMS",%progbits,1
+  65              		.align	2
+  66              	.LC0:
+  67 0000 0A0D2353 		.ascii	"\012\015#Stack: %s %3d\000"
+  67      7461636B 
+  67      3A202573 
+  67      20253364 
+  67      00
+  68              		.text
+  69              	.Letext0:
+  70              		.file 2 "/home/deh/launchpad/gcc-arm-none-eabi-5_4-2016q3/arm-none-eabi/include/machine/_default_t
+  71              		.file 3 "/home/deh/launchpad/gcc-arm-none-eabi-5_4-2016q3/arm-none-eabi/include/sys/_stdint.h"
+  72              		.file 4 "Middlewares/Third_Party/FreeRTOS/Source/portable/GCC/ARM_CM4F/portmacro.h"
+  73              		.file 5 "Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os2.h"
+  74              		.file 6 "Drivers/CMSIS/Device/ST/STM32L4xx/Include/stm32l431xx.h"
+  75              		.file 7 "Drivers/STM32L4xx_HAL_Driver/Inc/stm32l4xx_hal_def.h"
+  76              		.file 8 "Drivers/STM32L4xx_HAL_Driver/Inc/stm32l4xx_hal_dma.h"
+  77              		.file 9 "Drivers/STM32L4xx_HAL_Driver/Inc/stm32l4xx_hal_uart.h"
+  78              		.file 10 "Middlewares/Third_Party/FreeRTOS/Source/include/queue.h"
+  79              		.file 11 "Middlewares/Third_Party/FreeRTOS/Source/include/semphr.h"
+  80              		.file 12 "Ourwares/SerialTaskSend.h"
+  81              		.file 13 "Drivers/CMSIS/Include/cmsis_gcc.h"
+ARM GAS  /tmp/ccBEyJpd.s 			page 3
+
+
+  82              		.file 14 "Drivers/CMSIS/Include/core_cm4.h"
+  83              		.file 15 "Middlewares/Third_Party/FreeRTOS/Source/include/task.h"
+  84              		.file 16 "Ourwares/yprintf.h"
+ARM GAS  /tmp/ccBEyJpd.s 			page 4
+
+
+DEFINED SYMBOLS
+                            *ABS*:00000000 stackwatermark.c
+     /tmp/ccBEyJpd.s:22     .text.stackwatermark_show:00000000 $t
+     /tmp/ccBEyJpd.s:27     .text.stackwatermark_show:00000000 stackwatermark_show
+     /tmp/ccBEyJpd.s:60     .text.stackwatermark_show:00000018 $d
+     /tmp/ccBEyJpd.s:65     .rodata.str1.4:00000000 $d
+                     .debug_frame:00000010 $d
+
+UNDEFINED SYMBOLS
+uxTaskGetStackHighWaterMark
+yprintf

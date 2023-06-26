@@ -1,0 +1,490 @@
+ARM GAS  /tmp/cc20zgYn.s 			page 1
+
+
+   1              		.syntax unified
+   2              		.cpu cortex-m4
+   3              		.eabi_attribute 27, 1
+   4              		.eabi_attribute 28, 1
+   5              		.fpu fpv4-sp-d16
+   6              		.eabi_attribute 20, 1
+   7              		.eabi_attribute 21, 1
+   8              		.eabi_attribute 23, 3
+   9              		.eabi_attribute 24, 1
+  10              		.eabi_attribute 25, 1
+  11              		.eabi_attribute 26, 1
+  12              		.eabi_attribute 30, 1
+  13              		.eabi_attribute 34, 1
+  14              		.eabi_attribute 18, 4
+  15              		.thumb
+  16              		.syntax unified
+  17              		.file	"adcparamsinit.c"
+  18              		.text
+  19              	.Ltext0:
+  20              		.cfi_sections	.debug_frame
+  21              		.global	__aeabi_ui2d
+  22              		.global	__aeabi_ddiv
+  23              		.global	__aeabi_dmul
+  24              		.global	__aeabi_d2uiz
+  25              		.global	__aeabi_dcmplt
+  26              		.global	__aeabi_dcmpgt
+  27              		.section	.text.adcparamsinit_init,"ax",%progbits
+  28              		.align	2
+  29              		.global	adcparamsinit_init
+  30              		.thumb
+  31              		.thumb_func
+  33              	adcparamsinit_init:
+  34              	.LFB292:
+  35              		.file 1 "Ourtasks/adcparamsinit.c"
+   1:Ourtasks/adcparamsinit.c **** /******************************************************************************
+   2:Ourtasks/adcparamsinit.c **** * File Name          : adcparamsinit.c
+   3:Ourtasks/adcparamsinit.c **** * Date First Issued  : 03/09/2019
+   4:Ourtasks/adcparamsinit.c **** * Board              : DiscoveryF4
+   5:Ourtasks/adcparamsinit.c **** * Description        : Initialization of parameters for ADC app configuration
+   6:Ourtasks/adcparamsinit.c **** *******************************************************************************/
+   7:Ourtasks/adcparamsinit.c **** /* 
+   8:Ourtasks/adcparamsinit.c **** This is where hard-coded parameters for the ADC are entered.
+   9:Ourtasks/adcparamsinit.c **** 
+  10:Ourtasks/adcparamsinit.c **** Later, this may be replaced with a "copy" of the flat file in high flash, generated
+  11:Ourtasks/adcparamsinit.c **** by the java program from the sql database.
+  12:Ourtasks/adcparamsinit.c **** */
+  13:Ourtasks/adcparamsinit.c **** #include "adcparamsinit.h"
+  14:Ourtasks/adcparamsinit.c **** #include "adcparams.h"
+  15:Ourtasks/adcparamsinit.c **** #include "ADCTask.h"
+  16:Ourtasks/adcparamsinit.c **** #include "morse.h"
+  17:Ourtasks/adcparamsinit.c **** 
+  18:Ourtasks/adcparamsinit.c **** /*                        Min  Typ  Max 
+  19:Ourtasks/adcparamsinit.c **** Internal reference F103: 1.16 1.20 1.26 V 
+  20:Ourtasks/adcparamsinit.c **** Internal reference F407: 1.18 1.20 1.24 V 
+  21:Ourtasks/adcparamsinit.c **** */
+  22:Ourtasks/adcparamsinit.c **** // Define limits for initialization check
+  23:Ourtasks/adcparamsinit.c **** #define VREFMIN (1.15)
+ARM GAS  /tmp/cc20zgYn.s 			page 2
+
+
+  24:Ourtasks/adcparamsinit.c **** #define VREFMAX (1.27)
+  25:Ourtasks/adcparamsinit.c **** 
+  26:Ourtasks/adcparamsinit.c **** /* *************************************************************************
+  27:Ourtasks/adcparamsinit.c **** void adcparamsinit_init(struct ADCFUNCTION* p);
+  28:Ourtasks/adcparamsinit.c ****  *	@brief	: Load structs for compensation, calibration and filtering all ADC channels
+  29:Ourtasks/adcparamsinit.c ****  * @param	: p = Pointer to struct "everything" for this ADC module
+  30:Ourtasks/adcparamsinit.c ****  * *************************************************************************/
+  31:Ourtasks/adcparamsinit.c **** 
+  32:Ourtasks/adcparamsinit.c **** /* Reproduced for convenience
+  33:Ourtasks/adcparamsinit.c **** 
+  34:Ourtasks/adcparamsinit.c ****  ADC reading sequence/array indices                         
+  35:Ourtasks/adcparamsinit.c ****  These indices -=>MUST<= match the hardware ADC scan sequence    *
+  36:Ourtasks/adcparamsinit.c **** #define ADC1IDX_HIGHVOLT1     0   // PA1 IN1  - Battery voltage
+  37:Ourtasks/adcparamsinit.c **** #define ADC1IDX_HIGHVOLT2     1   // PA2 IN2  - DMOC +
+  38:Ourtasks/adcparamsinit.c **** #define ADC1IDX_HIGHVOLT3     2   // PA3 IN3  - DMOC -
+  39:Ourtasks/adcparamsinit.c **** #define ADC1IDX_HIGHVOLT4     3   // PA4 IN4  - spare
+  40:Ourtasks/adcparamsinit.c **** #define ADC1IDX_INTERNALTEMP  4   // IN17     - Internal temperature sensor
+  41:Ourtasks/adcparamsinit.c **** #define ADC1IDX_INTERNALVREF  5   // IN18     - Internal voltage reference
+  42:Ourtasks/adcparamsinit.c **** */
+  43:Ourtasks/adcparamsinit.c **** 
+  44:Ourtasks/adcparamsinit.c **** void adcparamsinit_init(struct ADCFUNCTION* p)
+  45:Ourtasks/adcparamsinit.c **** {
+  36              		.loc 1 45 0
+  37              		.cfi_startproc
+  38              		@ args = 0, pretend = 0, frame = 0
+  39              		@ frame_needed = 0, uses_anonymous_args = 0
+  40              	.LVL0:
+  41 0000 2DE9D04F 		push	{r4, r6, r7, r8, r9, r10, fp, lr}
+  42              	.LCFI0:
+  43              		.cfi_def_cfa_offset 32
+  44              		.cfi_offset 4, -32
+  45              		.cfi_offset 6, -28
+  46              		.cfi_offset 7, -24
+  47              		.cfi_offset 8, -20
+  48              		.cfi_offset 9, -16
+  49              		.cfi_offset 10, -12
+  50              		.cfi_offset 11, -8
+  51              		.cfi_offset 14, -4
+  52 0004 0446     		mov	r4, r0
+  46:Ourtasks/adcparamsinit.c **** /* => Reproduced for convenience <= 
+  47:Ourtasks/adcparamsinit.c **** struct ADCFUNCTION
+  48:Ourtasks/adcparamsinit.c **** {
+  49:Ourtasks/adcparamsinit.c **** 	struct ADCCONTACTORLC lc;     // Local Copy of parameters
+  50:Ourtasks/adcparamsinit.c **** 	struct ADCINTERNAL    intern; // Vref & temperature
+  51:Ourtasks/adcparamsinit.c **** 	struct ADCABSOLUTE    hv[4];  // High voltages
+  52:Ourtasks/adcparamsinit.c **** 	struct ADCCHANNEL	 chan[ADC1IDX_ADCSCANSIZE]; // ADC sums
+  53:Ourtasks/adcparamsinit.c **** 	uint32_t ctr; // Running count of updates.
+  54:Ourtasks/adcparamsinit.c **** 	uint32_t idx_xsum;
+  55:Ourtasks/adcparamsinit.c **** };
+  56:Ourtasks/adcparamsinit.c **** 
+  57:Ourtasks/adcparamsinit.c **** struct ADCINTERNAL
+  58:Ourtasks/adcparamsinit.c **** {
+  59:Ourtasks/adcparamsinit.c **** 	struct IIRFILTERL iiradcvref; // Intermediate filter params: vref 
+  60:Ourtasks/adcparamsinit.c **** 	struct IIRFILTERL iiradctemp; // Intermediate filter params: temperature sensor
+  61:Ourtasks/adcparamsinit.c **** 
+  62:Ourtasks/adcparamsinit.c **** 	uint32_t adcfilvref;  // Filtered ADC[Vref]
+  63:Ourtasks/adcparamsinit.c **** 	uint32_t adcfiltemp;  // Filtered ADC[temperature]
+ARM GAS  /tmp/cc20zgYn.s 			page 3
+
+
+  64:Ourtasks/adcparamsinit.c **** 
+  65:Ourtasks/adcparamsinit.c **** 	uint32_t adcvref;    // Do I need this?
+  66:Ourtasks/adcparamsinit.c **** 	uint32_t adccmpvref; // scaled vref compensated for temperature
+  67:Ourtasks/adcparamsinit.c **** 
+  68:Ourtasks/adcparamsinit.c **** 	double dvref;        // (double) vref computed from calibration params
+  69:Ourtasks/adcparamsinit.c **** 	uint32_t vref;       // (scaled) vref computed from calibration params
+  70:Ourtasks/adcparamsinit.c **** 
+  71:Ourtasks/adcparamsinit.c **** 	uint32_t iRslope;    // (scaled) Reciprocal of temperature sensor slope
+  72:Ourtasks/adcparamsinit.c **** 	uint32_t iv25s;      // (scaled) (V25 * iRslope)
+  73:Ourtasks/adcparamsinit.c **** 	double   V25;        // (double) Computed V25 (no)
+  74:Ourtasks/adcparamsinit.c **** 	uint32_t vrefRs;     // (scaled) Vref / slope
+  75:Ourtasks/adcparamsinit.c **** 	uint32_t irmtemp;    // (scaled) calibration temperature
+  76:Ourtasks/adcparamsinit.c **** 	uint32_t itemp;      // (scaled) temperature (degC)
+  77:Ourtasks/adcparamsinit.c **** };
+  78:Ourtasks/adcparamsinit.c **** */
+  79:Ourtasks/adcparamsinit.c **** 
+  80:Ourtasks/adcparamsinit.c **** /* Internal sensors. */
+  81:Ourtasks/adcparamsinit.c **** 	// Pointers to filter constants 
+  82:Ourtasks/adcparamsinit.c **** 	p->chan[ADC1IDX_INTERNALVREF].iir.pprm = &p->lc.calintern.iiradcvref;
+  53              		.loc 1 82 0
+  54 0006 00F11003 		add	r3, r0, #16
+  55 000a C0F83032 		str	r3, [r0, #560]
+  83:Ourtasks/adcparamsinit.c **** 	p->chan[ADC1IDX_INTERNALTEMP].iir.pprm = &p->lc.calintern.iiradctemp;
+  56              		.loc 1 83 0
+  57 000e 00F11803 		add	r3, r0, #24
+  58 0012 C0F8F031 		str	r3, [r0, #496]
+  84:Ourtasks/adcparamsinit.c **** 
+  85:Ourtasks/adcparamsinit.c **** 	// Compute a scaled integer vref from measurements
+  86:Ourtasks/adcparamsinit.c **** 	double dadcvdd     = p->lc.calintern.adcvdd; // ADC reading (~27360)
+  59              		.loc 1 86 0
+  60 0016 806C     		ldr	r0, [r0, #72]
+  61              	.LVL1:
+  62 0018 FFF7FEFF 		bl	__aeabi_ui2d
+  63              	.LVL2:
+  64 001c 0646     		mov	r6, r0
+  65 001e 0F46     		mov	r7, r1
+  66              	.LVL3:
+  87:Ourtasks/adcparamsinit.c **** 	p->intern.dvref = p->lc.calintern.dvdd * (dadcvdd / 65520.0);
+  67              		.loc 1 87 0
+  68 0020 D4E90CAB 		ldrd	r10, [r4, #48]
+  69 0024 76A3     		adr	r3, .L6
+  70 0026 D3E90023 		ldrd	r2, [r3]
+  71 002a FFF7FEFF 		bl	__aeabi_ddiv
+  72              	.LVL4:
+  73 002e 0246     		mov	r2, r0
+  74 0030 0B46     		mov	r3, r1
+  75 0032 5046     		mov	r0, r10
+  76 0034 5946     		mov	r1, fp
+  77 0036 FFF7FEFF 		bl	__aeabi_dmul
+  78              	.LVL5:
+  79 003a 8046     		mov	r8, r0
+  80 003c 8946     		mov	r9, r1
+  81 003e C4E92E89 		strd	r8, [r4, #184]
+  88:Ourtasks/adcparamsinit.c **** 	p->intern.vref  = (p->intern.dvref * (1 << ADCSCALEbits) ); // Scaled uint32_t; 
+  82              		.loc 1 88 0
+  83 0042 0022     		movs	r2, #0
+  84 0044 764B     		ldr	r3, .L6+32
+ARM GAS  /tmp/cc20zgYn.s 			page 4
+
+
+  85 0046 FFF7FEFF 		bl	__aeabi_dmul
+  86              	.LVL6:
+  87 004a FFF7FEFF 		bl	__aeabi_d2uiz
+  88              	.LVL7:
+  89 004e C4F8C000 		str	r0, [r4, #192]
+  89:Ourtasks/adcparamsinit.c **** 	p->intern.adcvref = (65520.0 * p->intern.dvref) / p->lc.calintern.dvdd;
+  90              		.loc 1 89 0
+  91 0052 6BA3     		adr	r3, .L6
+  92 0054 D3E90023 		ldrd	r2, [r3]
+  93 0058 4046     		mov	r0, r8
+  94 005a 4946     		mov	r1, r9
+  95 005c FFF7FEFF 		bl	__aeabi_dmul
+  96              	.LVL8:
+  97 0060 5246     		mov	r2, r10
+  98 0062 5B46     		mov	r3, fp
+  99 0064 FFF7FEFF 		bl	__aeabi_ddiv
+ 100              	.LVL9:
+ 101 0068 FFF7FEFF 		bl	__aeabi_d2uiz
+ 102              	.LVL10:
+ 103 006c C4F8B000 		str	r0, [r4, #176]
+  90:Ourtasks/adcparamsinit.c **** 
+  91:Ourtasks/adcparamsinit.c **** 	// Check for out-of-datasheet Vref spec 
+  92:Ourtasks/adcparamsinit.c **** 	if ((p->intern.dvref < (VREFMIN)) || (p->intern.dvref > (VREFMAX))) 
+ 104              		.loc 1 92 0
+ 105 0070 65A3     		adr	r3, .L6+8
+ 106 0072 D3E90023 		ldrd	r2, [r3]
+ 107 0076 4046     		mov	r0, r8
+ 108 0078 4946     		mov	r1, r9
+ 109 007a FFF7FEFF 		bl	__aeabi_dcmplt
+ 110              	.LVL11:
+ 111 007e 38B9     		cbnz	r0, .L2
+ 112              		.loc 1 92 0 is_stmt 0 discriminator 1
+ 113 0080 63A3     		adr	r3, .L6+16
+ 114 0082 D3E90023 		ldrd	r2, [r3]
+ 115 0086 4046     		mov	r0, r8
+ 116 0088 4946     		mov	r1, r9
+ 117 008a FFF7FEFF 		bl	__aeabi_dcmpgt
+ 118              	.LVL12:
+ 119 008e 10B1     		cbz	r0, .L3
+ 120              	.L2:
+  93:Ourtasks/adcparamsinit.c **** 	{
+  94:Ourtasks/adcparamsinit.c **** 		morse_trap(81);
+ 121              		.loc 1 94 0 is_stmt 1
+ 122 0090 5120     		movs	r0, #81
+ 123 0092 FFF7FEFF 		bl	morse_trap
+ 124              	.LVL13:
+ 125              	.L3:
+  95:Ourtasks/adcparamsinit.c **** 	}
+  96:Ourtasks/adcparamsinit.c **** 	p->chan[ADC1IDX_INTERNALTEMP].dscale = p->lc.calintern.dvdd / 65520.0;
+ 126              		.loc 1 96 0
+ 127 0096 5AA3     		adr	r3, .L6
+ 128 0098 D3E90023 		ldrd	r2, [r3]
+ 129 009c D4E90C01 		ldrd	r0, [r4, #48]
+ 130 00a0 FFF7FEFF 		bl	__aeabi_ddiv
+ 131              	.LVL14:
+ 132 00a4 C4E98601 		strd	r0, [r4, #536]
+  97:Ourtasks/adcparamsinit.c **** 	p->chan[ADC1IDX_INTERNALVREF].dscale = 1.0;
+ARM GAS  /tmp/cc20zgYn.s 			page 5
+
+
+ 133              		.loc 1 97 0
+ 134 00a8 0022     		movs	r2, #0
+ 135 00aa 5E4B     		ldr	r3, .L6+36
+ 136 00ac C4E99623 		strd	r2, [r4, #600]
+  98:Ourtasks/adcparamsinit.c **** 
+  99:Ourtasks/adcparamsinit.c **** 	// Reciprocal of temperature sensor slope ( ~65536/4.3E-3 = (232.55 << 16) )
+ 100:Ourtasks/adcparamsinit.c **** 	p->intern.iRslope  = (double)((1 << ADCSCALEbits) * (1000)) / p->lc.calintern.dslope;
+ 137              		.loc 1 100 0
+ 138 00b0 D4E90E89 		ldrd	r8, [r4, #56]
+ 139 00b4 4246     		mov	r2, r8
+ 140 00b6 4B46     		mov	r3, r9
+ 141 00b8 57A1     		adr	r1, .L6+24
+ 142 00ba D1E90001 		ldrd	r0, [r1]
+ 143 00be FFF7FEFF 		bl	__aeabi_ddiv
+ 144              	.LVL15:
+ 145 00c2 FFF7FEFF 		bl	__aeabi_d2uiz
+ 146              	.LVL16:
+ 147 00c6 C4F8C400 		str	r0, [r4, #196]
+ 101:Ourtasks/adcparamsinit.c **** 
+ 102:Ourtasks/adcparamsinit.c **** 
+ 103:Ourtasks/adcparamsinit.c **** 	// Room temp calibration offset (7/17/19) Is this needed?)
+ 104:Ourtasks/adcparamsinit.c **** 	p->intern.irmtemp = ((double)(1 << ADCSCALEbits) * (double)(p->lc.calintern.drmtemp));// / p->lc.c
+ 148              		.loc 1 104 0
+ 149 00ca 0022     		movs	r2, #0
+ 150 00cc 544B     		ldr	r3, .L6+32
+ 151 00ce D4E90801 		ldrd	r0, [r4, #32]
+ 152 00d2 FFF7FEFF 		bl	__aeabi_dmul
+ 153              	.LVL17:
+ 154 00d6 FFF7FEFF 		bl	__aeabi_d2uiz
+ 155              	.LVL18:
+ 156 00da C4F8D000 		str	r0, [r4, #208]
+ 105:Ourtasks/adcparamsinit.c **** 	
+ 106:Ourtasks/adcparamsinit.c **** 	p->intern.yRs = ((double)((1 << ADCSCALEbitsy) * 1000) / p->lc.calintern.dslope);
+ 157              		.loc 1 106 0
+ 158 00de 4246     		mov	r2, r8
+ 159 00e0 4B46     		mov	r3, r9
+ 160 00e2 0020     		movs	r0, #0
+ 161 00e4 5049     		ldr	r1, .L6+40
+ 162 00e6 FFF7FEFF 		bl	__aeabi_ddiv
+ 163              	.LVL19:
+ 164 00ea FFF7FEFF 		bl	__aeabi_d2uiz
+ 165              	.LVL20:
+ 166 00ee C4F8D800 		str	r0, [r4, #216]
+ 107:Ourtasks/adcparamsinit.c **** 
+ 108:Ourtasks/adcparamsinit.c **** 	p->intern.iv25 = (uint32_t)((double)(1 << ADCSCALEbitsy) * p->lc.calintern.dvtemp);
+ 167              		.loc 1 108 0
+ 168 00f2 0022     		movs	r2, #0
+ 169 00f4 4D4B     		ldr	r3, .L6+44
+ 170 00f6 D4E90A01 		ldrd	r0, [r4, #40]
+ 171 00fa FFF7FEFF 		bl	__aeabi_dmul
+ 172              	.LVL21:
+ 173 00fe FFF7FEFF 		bl	__aeabi_d2uiz
+ 174              	.LVL22:
+ 175 0102 C4F8DC00 		str	r0, [r4, #220]
+ 109:Ourtasks/adcparamsinit.c **** 
+ 110:Ourtasks/adcparamsinit.c **** /* => Reproduced for convenience <= 
+ 111:Ourtasks/adcparamsinit.c **** struct ADCCALABS
+ARM GAS  /tmp/cc20zgYn.s 			page 6
+
+
+ 112:Ourtasks/adcparamsinit.c **** {
+ 113:Ourtasks/adcparamsinit.c **** 	struct IIR_L_PARAM iir; // Filter: Time constant, integer scaling
+ 114:Ourtasks/adcparamsinit.c **** 	uint32_t adcvn;    // (ADC reading) vn 
+ 115:Ourtasks/adcparamsinit.c ****    double   dvn;      // (double) measured vn (volts)
+ 116:Ourtasks/adcparamsinit.c **** };
+ 117:Ourtasks/adcparamsinit.c **** */
+ 118:Ourtasks/adcparamsinit.c **** /* Absolute:  Battery string. */
+ 119:Ourtasks/adcparamsinit.c **** 	p->chan[ADC1IDX_HIGHVOLT1].iir.pprm = &p->lc.abs[0].iir; // Filter param pointer
+ 176              		.loc 1 119 0
+ 177 0106 04F15003 		add	r3, r4, #80
+ 178 010a C4F8F030 		str	r3, [r4, #240]
+ 120:Ourtasks/adcparamsinit.c **** 	p->chan[ADC1IDX_HIGHVOLT1].k   = (p->lc.abs[0].dvn / p->intern.dvref) * (dadcvdd / p->lc.abs[0].ad
+ 179              		.loc 1 120 0
+ 180 010e D4E92EAB 		ldrd	r10, [r4, #184]
+ 181 0112 5246     		mov	r2, r10
+ 182 0114 5B46     		mov	r3, fp
+ 183 0116 D4E91801 		ldrd	r0, [r4, #96]
+ 184 011a FFF7FEFF 		bl	__aeabi_ddiv
+ 185              	.LVL23:
+ 186 011e 8046     		mov	r8, r0
+ 187 0120 8946     		mov	r9, r1
+ 188 0122 A06D     		ldr	r0, [r4, #88]
+ 189 0124 FFF7FEFF 		bl	__aeabi_ui2d
+ 190              	.LVL24:
+ 191 0128 0246     		mov	r2, r0
+ 192 012a 0B46     		mov	r3, r1
+ 193 012c 3046     		mov	r0, r6
+ 194 012e 3946     		mov	r1, r7
+ 195 0130 FFF7FEFF 		bl	__aeabi_ddiv
+ 196              	.LVL25:
+ 197 0134 0246     		mov	r2, r0
+ 198 0136 0B46     		mov	r3, r1
+ 199 0138 4046     		mov	r0, r8
+ 200 013a 4946     		mov	r1, r9
+ 201 013c FFF7FEFF 		bl	__aeabi_dmul
+ 202              	.LVL26:
+ 203 0140 C4E94401 		strd	r0, [r4, #272]
+ 121:Ourtasks/adcparamsinit.c **** 	p->chan[ADC1IDX_HIGHVOLT1].dscale   = p->chan[ADC1IDX_HIGHVOLT1].dscale;
+ 122:Ourtasks/adcparamsinit.c **** 
+ 123:Ourtasks/adcparamsinit.c **** /* Absolute:  DMOC+ */
+ 124:Ourtasks/adcparamsinit.c **** 	p->chan[ADC1IDX_HIGHVOLT2].iir.pprm = &p->lc.abs[1].iir; // Filter param pointer
+ 204              		.loc 1 124 0
+ 205 0144 04F16803 		add	r3, r4, #104
+ 206 0148 C4F83031 		str	r3, [r4, #304]
+ 125:Ourtasks/adcparamsinit.c **** 	p->chan[ADC1IDX_HIGHVOLT2].k   = (p->lc.abs[1].dvn / p->intern.dvref) * (dadcvdd / p->lc.abs[1].ad
+ 207              		.loc 1 125 0
+ 208 014c 5246     		mov	r2, r10
+ 209 014e 5B46     		mov	r3, fp
+ 210 0150 D4E91E01 		ldrd	r0, [r4, #120]
+ 211 0154 FFF7FEFF 		bl	__aeabi_ddiv
+ 212              	.LVL27:
+ 213 0158 8046     		mov	r8, r0
+ 214 015a 8946     		mov	r9, r1
+ 215 015c 206F     		ldr	r0, [r4, #112]
+ 216 015e FFF7FEFF 		bl	__aeabi_ui2d
+ 217              	.LVL28:
+ 218 0162 0246     		mov	r2, r0
+ARM GAS  /tmp/cc20zgYn.s 			page 7
+
+
+ 219 0164 0B46     		mov	r3, r1
+ 220 0166 3046     		mov	r0, r6
+ 221 0168 3946     		mov	r1, r7
+ 222 016a FFF7FEFF 		bl	__aeabi_ddiv
+ 223              	.LVL29:
+ 224 016e 0246     		mov	r2, r0
+ 225 0170 0B46     		mov	r3, r1
+ 226 0172 4046     		mov	r0, r8
+ 227 0174 4946     		mov	r1, r9
+ 228 0176 FFF7FEFF 		bl	__aeabi_dmul
+ 229              	.LVL30:
+ 230 017a C4E95401 		strd	r0, [r4, #336]
+ 126:Ourtasks/adcparamsinit.c **** 	p->chan[ADC1IDX_HIGHVOLT2].dscale   = p->chan[ADC1IDX_HIGHVOLT2].dscale;
+ 127:Ourtasks/adcparamsinit.c **** 
+ 128:Ourtasks/adcparamsinit.c **** /* Absolute:  DMOC- */
+ 129:Ourtasks/adcparamsinit.c **** 	p->chan[ADC1IDX_HIGHVOLT3].iir.pprm = &p->lc.abs[2].iir; // Filter param pointer
+ 231              		.loc 1 129 0
+ 232 017e 04F18003 		add	r3, r4, #128
+ 233 0182 C4F87031 		str	r3, [r4, #368]
+ 130:Ourtasks/adcparamsinit.c **** 	p->chan[ADC1IDX_HIGHVOLT3].k   = (p->lc.abs[2].dvn / p->intern.dvref) * (dadcvdd / p->lc.abs[2].ad
+ 234              		.loc 1 130 0
+ 235 0186 5246     		mov	r2, r10
+ 236 0188 5B46     		mov	r3, fp
+ 237 018a D4E92401 		ldrd	r0, [r4, #144]
+ 238 018e FFF7FEFF 		bl	__aeabi_ddiv
+ 239              	.LVL31:
+ 240 0192 8046     		mov	r8, r0
+ 241 0194 8946     		mov	r9, r1
+ 242 0196 D4F88800 		ldr	r0, [r4, #136]
+ 243 019a FFF7FEFF 		bl	__aeabi_ui2d
+ 244              	.LVL32:
+ 245 019e 0246     		mov	r2, r0
+ 246 01a0 0B46     		mov	r3, r1
+ 247 01a2 3046     		mov	r0, r6
+ 248 01a4 3946     		mov	r1, r7
+ 249 01a6 FFF7FEFF 		bl	__aeabi_ddiv
+ 250              	.LVL33:
+ 251 01aa 0246     		mov	r2, r0
+ 252 01ac 0B46     		mov	r3, r1
+ 253 01ae 4046     		mov	r0, r8
+ 254 01b0 4946     		mov	r1, r9
+ 255 01b2 FFF7FEFF 		bl	__aeabi_dmul
+ 256              	.LVL34:
+ 257 01b6 C4E96401 		strd	r0, [r4, #400]
+ 131:Ourtasks/adcparamsinit.c **** 	p->chan[ADC1IDX_HIGHVOLT3].dscale   = p->chan[ADC1IDX_HIGHVOLT3].dscale;
+ 132:Ourtasks/adcparamsinit.c **** 
+ 133:Ourtasks/adcparamsinit.c **** /* Absolute:  spare */
+ 134:Ourtasks/adcparamsinit.c **** 	p->chan[ADC1IDX_HIGHVOLT4].iir.pprm = &p->lc.abs[3].iir; // Filter param pointer
+ 258              		.loc 1 134 0
+ 259 01ba 04F19803 		add	r3, r4, #152
+ 260 01be C4F8B031 		str	r3, [r4, #432]
+ 135:Ourtasks/adcparamsinit.c **** 	p->chan[ADC1IDX_HIGHVOLT4].k   = (p->lc.abs[3].dvn / p->intern.dvref) * (dadcvdd / p->lc.abs[3].ad
+ 261              		.loc 1 135 0
+ 262 01c2 5246     		mov	r2, r10
+ 263 01c4 5B46     		mov	r3, fp
+ 264 01c6 D4E92A01 		ldrd	r0, [r4, #168]
+ 265 01ca FFF7FEFF 		bl	__aeabi_ddiv
+ARM GAS  /tmp/cc20zgYn.s 			page 8
+
+
+ 266              	.LVL35:
+ 267 01ce 8046     		mov	r8, r0
+ 268 01d0 8946     		mov	r9, r1
+ 269 01d2 D4F8A000 		ldr	r0, [r4, #160]
+ 270 01d6 FFF7FEFF 		bl	__aeabi_ui2d
+ 271              	.LVL36:
+ 272 01da 0246     		mov	r2, r0
+ 273 01dc 0B46     		mov	r3, r1
+ 274 01de 3046     		mov	r0, r6
+ 275 01e0 3946     		mov	r1, r7
+ 276 01e2 FFF7FEFF 		bl	__aeabi_ddiv
+ 277              	.LVL37:
+ 278 01e6 0246     		mov	r2, r0
+ 279 01e8 0B46     		mov	r3, r1
+ 280 01ea 4046     		mov	r0, r8
+ 281 01ec 4946     		mov	r1, r9
+ 282 01ee FFF7FEFF 		bl	__aeabi_dmul
+ 283              	.LVL38:
+ 284 01f2 C4E97401 		strd	r0, [r4, #464]
+ 285 01f6 BDE8D08F 		pop	{r4, r6, r7, r8, r9, r10, fp, pc}
+ 286              	.LVL39:
+ 287              	.L7:
+ 288 01fa 00BFAFF3 		.align	3
+ 288      0080
+ 289              	.L6:
+ 290 0200 00000000 		.word	0
+ 291 0204 00FEEF40 		.word	1089469952
+ 292 0208 66666666 		.word	1717986918
+ 293 020c 6666F23F 		.word	1072850534
+ 294 0210 52B81E85 		.word	-2061584302
+ 295 0214 EB51F43F 		.word	1072976363
+ 296 0218 00000000 		.word	0
+ 297 021c 00406F41 		.word	1097809920
+ 298 0220 0000D040 		.word	1087373312
+ 299 0224 0000F03F 		.word	1072693248
+ 300 0228 0040FF40 		.word	1090469888
+ 301 022c 00006040 		.word	1080033280
+ 302              		.cfi_endproc
+ 303              	.LFE292:
+ 305              		.text
+ 306              	.Letext0:
+ 307              		.file 2 "/home/deh/launchpad/gcc-arm-none-eabi-5_4-2016q3/arm-none-eabi/include/machine/_default_t
+ 308              		.file 3 "/home/deh/launchpad/gcc-arm-none-eabi-5_4-2016q3/arm-none-eabi/include/sys/_stdint.h"
+ 309              		.file 4 "Ourtasks/iir_filter_lx.h"
+ 310              		.file 5 "Ourtasks/adc_idx_v_struct.h"
+ 311              		.file 6 "Ourtasks/adcparams.h"
+ 312              		.file 7 "Drivers/CMSIS/Include/cmsis_gcc.h"
+ 313              		.file 8 "Drivers/CMSIS/Include/core_cm4.h"
+ 314              		.file 9 "Ourwares/morse.h"
+ARM GAS  /tmp/cc20zgYn.s 			page 9
+
+
+DEFINED SYMBOLS
+                            *ABS*:00000000 adcparamsinit.c
+     /tmp/cc20zgYn.s:28     .text.adcparamsinit_init:00000000 $t
+     /tmp/cc20zgYn.s:33     .text.adcparamsinit_init:00000000 adcparamsinit_init
+     /tmp/cc20zgYn.s:290    .text.adcparamsinit_init:00000200 $d
+                     .debug_frame:00000010 $d
+
+UNDEFINED SYMBOLS
+__aeabi_ui2d
+__aeabi_ddiv
+__aeabi_dmul
+__aeabi_d2uiz
+__aeabi_dcmplt
+__aeabi_dcmpgt
+morse_trap

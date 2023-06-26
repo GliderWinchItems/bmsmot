@@ -1,0 +1,46 @@
+build-notes.txt
+
+06/18/2023
+
+1. Voltage divider
+R15 - 110K
+R14 - 28.7K
+
+2. 0.1 instead of 50n
+C103,C104,C105
+
+2. H11L1 - Need pullups
+
+- The output is open drain and needs a
+pullup. The processor internal pullup
+is weak.
+
+- 5.6K tacked to pins was used.
+
+3. AC-DET H11L1 gnd & output error
+
+- Hack needed to reverse GND and output.
+
+4. 'V1 pcb layout was updated for pullups
+and AC-DET wiring.
+
+5. Hack for keyswitch 
+
+R104 and D100 serve to turn on PFET 12v
+power switch.
+
+- Remove R104 & D100.
+- Add NFET with +/- Vgs across D100 pads
+(gnd and gate). 
+- Cut trace going to PA12 
+- Jumper wire from PA12 side of cut to
+NFET drain.
+- Update eagle bmsmot-v1
+
+6. Coin-cell polarity protection
+
+Added 18K resistor in + trace to prevent
+reversed coin-cell insertion from damaging
+processor via VBAT.
+
+
