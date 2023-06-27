@@ -28,28 +28,10 @@ extern ADC_HandleTypeDef hadc1;
 
 extern osThreadId ContactorTaskHandle;
 
-/* *************************************************************************
- * osThreadId xADCTaskCreate(uint32_t taskpriority);
- * @brief	: Create task; task handle created is global for all to enjoy!
- * @param	: taskpriority = Task priority (just as it says!)
- * @return	: ADCTaskHandle
- * *************************************************************************/
-osThreadId xADCTaskCreate(uint32_t taskpriority)
-{
-#if 0	
- 	osThreadDef(ADCTask, StartADCTask, osPriorityNormal, 0, 96);
-	ADCTaskHandle = osThreadCreate(osThread(ADCTask), NULL);
-	vTaskPrioritySet( ADCTaskHandle, taskpriority );
-	return ADCTaskHandle;
-#endif
-	
-	BaseType_t ret = xTaskCreate(StartADCTask, "ADCTask",\
-     (96), NULL, taskpriority, &ADCTaskHandle);
-	if (ret != pdPASS) return NULL;
+#include "DTW_counter.h"
+uint32_t  debugADCt1;
+uint32_t  debugADCt2;
 
-	return ADCTaskHandle;
-
-}
 /* *************************************************************************
  * void StartADCTask(void const * argument);
  *	@brief	: Task startup
@@ -80,6 +62,9 @@ osDelay(20); // Debugging
 		xTaskNotifyWait(noteused, 0, &noteval, portMAX_DELAY);
 		noteused = 0;	// Accumulate bits in 'noteval' processed.
 
+debugADCt2 = DTWTIME - debugADCt1;
+debugADCt1 = DTWTIME;
+
 		/* We handled one, or both, noteval bits */
 		noteused |= (pblk->notebit1 | pblk->notebit2);
 
@@ -105,6 +90,7 @@ osDelay(20); // Debugging
 		adcsumdb[3] = adc1.chan[3].sum;
 		adcsumdb[4] = adc1.chan[4].sum;
 		adcsumdb[5] = adc1.chan[5].sum;
+		adcsumdb[6] = adc1.chan[6].sum;
 		adcdbctr += 1;
 #endif
 
@@ -113,11 +99,35 @@ osDelay(20); // Debugging
 
 		/* Extended sum for smoothing and display. */
 		adcextendsum(&adc1);
-
+#if 0
 		/* Notify ContactorTask that new readings are ready. */
 		if( SensorTaskHandle == NULL) morse_trap(22); // JIC task has not been created
 		
 		xTaskNotify(SensorTaskHandle, CNCTBIT00, eSetBits);
+#endif
   }
+}
+/* *************************************************************************
+ * osThreadId xADCTaskCreate(uint32_t taskpriority);
+ * @brief	: Create task; task handle created is global for all to enjoy!
+ * @param	: taskpriority = Task priority (just as it says!)
+ * @return	: ADCTaskHandle
+ * *************************************************************************/
+osThreadId xADCTaskCreate(uint32_t taskpriority)
+{
+	
+ 	osThreadDef(ADCTask, StartADCTask, osPriorityNormal, 0, 96);
+	ADCTaskHandle = osThreadCreate(osThread(ADCTask), NULL);
+	vTaskPrioritySet( ADCTaskHandle, taskpriority );
+	return ADCTaskHandle;
+
+// CMISIS 2
+#if 0	
+	BaseType_t ret = xTaskCreate(StartADCTask, "ADCTask",\
+     (96), NULL, taskpriority, &ADCTaskHandle);
+	if (ret != pdPASS) return NULL;
+
+	return ADCTaskHandle;
+#endif
 }
 

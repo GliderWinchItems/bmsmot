@@ -46,7 +46,7 @@ struct ADCDMATSKBLK* adctask_init(ADC_HandleTypeDef* phadc,\
 	struct ADCDMATSKBLK* pblk = &adc1dmatskblk[0]; // ADC1 only for now
 
 	/* 'adcparams.h' MUST match what STM32CubeMX set up. */
-	if (ADC1IDX_ADCSCANSIZE != phadc->Init.NbrOfConversion) morse_trap(61);//return NULL;
+	if (ADC1IDX_ADCSCANSIZE != phadc->Init.NbrOfConversion) morse_trap(66);//return NULL;
 
 	/* ADC DMA summation length must match 1/2 DMA buffer sizing. */
 	if (ADCFASTSUM16SIZE != ADC1DMANUMSEQ) morse_trap(62);

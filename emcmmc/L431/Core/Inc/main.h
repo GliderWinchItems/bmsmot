@@ -63,7 +63,7 @@ void Error_Handler(void);
 #define LED_RED_Pin GPIO_PIN_1
 #define LED_RED_GPIO_Port GPIOB
 /* USER CODE BEGIN Private defines */
-
+#define HUARTMON  huart1 // uart  for PC monitoring
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus

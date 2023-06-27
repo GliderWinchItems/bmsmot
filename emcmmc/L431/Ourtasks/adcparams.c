@@ -135,9 +135,11 @@ void adcparams_cal(void)
 	p->chan[ADC1IDX_HIGHVOLT3].adcfil =	iir_filter_lx_do(&p->chan[ADC1IDX_HIGHVOLT3].iir, &p->chan[ADC1IDX_HIGHVOLT3].sum);
 	// 3 PA4 IN4-spare
 	p->chan[ADC1IDX_HIGHVOLT4].adcfil =	iir_filter_lx_do(&p->chan[ADC1IDX_HIGHVOLT4].iir, &p->chan[ADC1IDX_HIGHVOLT4].sum);
-	// 4 IN17-Internal temperature sensor
+	// 4 PA4 IN9-spare
+	p->chan[ADC1IDX_HALL_SENSE].adcfil =	iir_filter_lx_do(&p->chan[ADC1IDX_HIGHVOLT4].iir, &p->chan[ADC1IDX_HIGHVOLT4].sum);
+	// 5 IN17-Internal temperature sensor
 	p->chan[ADC1IDX_INTERNALTEMP].adcfil =	iir_filter_lx_do(&p->chan[ADC1IDX_INTERNALTEMP].iir, &p->chan[ADC1IDX_INTERNALTEMP].sum);
-	// 5 IN18-Internal voltage reference
+	// 6 IN18-Internal voltage reference
 	p->chan[ADC1IDX_INTERNALVREF].adcfil =	iir_filter_lx_do(&p->chan[ADC1IDX_INTERNALVREF].iir, &p->chan[ADC1IDX_INTERNALVREF].sum);
 
 	/* First: Update ADCvref used in subsequent computations. */
@@ -151,6 +153,7 @@ void adcparams_cal(void)
 	absolute(p, ADC1IDX_HIGHVOLT2); // 
 	absolute(p, ADC1IDX_HIGHVOLT3); // 
 	absolute(p, ADC1IDX_HIGHVOLT4); // 
+	absolute(p, ADC1IDX_HALL_SENSE); // 
   
 	return;
 }

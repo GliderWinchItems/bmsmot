@@ -37,17 +37,18 @@ static void adctoserial(char* p);
  * *************************************************************************/
 osThreadId xSensorTaskCreate(uint32_t taskpriority)
 {
-#if 0	
+	
  	osThreadDef(SensorTask, StartSensorTask, osPriorityNormal, 0, 192);
 	SensorTaskHandle = osThreadCreate(osThread(SensorTask), NULL);
 	vTaskPrioritySet( SensorTaskHandle, taskpriority );
 	return SensorTaskHandle;
-#endif
 
+#if 0
 	BaseType_t ret = xTaskCreate(StartSensorTask, "SensorTask",\
      (192), NULL, taskpriority, &SensorTaskHandle);
 	if (ret != pdPASS) return NULL;
-	return SensorTaskHandle;	
+	return SensorTaskHandle;
+#endif
 }
 /* *************************************************************************
  * void StartSensorTask(void const * argument);

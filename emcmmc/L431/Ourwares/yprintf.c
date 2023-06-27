@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "yprintf.h"
+#include "semphr.h"
 
 osSemaphoreId vsnprintfSemaphoreHandle;
 static uint8_t sw = 0;	// OTO initiationzation switch

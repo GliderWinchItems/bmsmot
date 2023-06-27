@@ -11,7 +11,13 @@
 #include "malloc.h"
 
 #include "SerialTaskSend.h"
+
+#include "stm32l4xx_hal_usart.h"
+#include "stm32l4xx_hal_uart.h"
+
+#include "main.h"
 #include "morse.h"
+
 
 /*
 Goals: 
@@ -100,7 +106,8 @@ the tasks using this routine.
 
 //static osStaticThreadDef_t SerialTaskSendControlBlock;
 
-osThreadId SerialTaskHandle = NULL;
+//osThreadId SerialTaskHandle = NULL;
+TaskHandle_t SerialTaskHandle = NULL;
 
 
 /* Queue */
@@ -186,7 +193,6 @@ taskEXIT_CRITICAL();
  * *************************************************************************/
 void StartSerialTaskSend(void* argument1)
 {
-	BaseType_t Qret;	// queue receive return
 	struct SERIALSENDTASKBCB*  pssb; // Copied item from queue
 	struct SSCIRBUF* ptmp;	// Circular buffer pointer block pointer
 
@@ -197,9 +203,7 @@ void StartSerialTaskSend(void* argument1)
 		{
 		/* Wait indefinitely for someone to load something into the queue */
 		/* Skip over empty returns, and NULL pointers that would cause trouble */
-			Qret = xQueueReceive(SerialTaskSendQHandle,&pssb,portMAX_DELAY);
-			if (Qret == pdPASS) // Break loop if not empty
-				break;
+			xQueueReceive(SerialTaskSendQHandle,&pssb,portMAX_DELAY);
 		} while ((pssb->phuart == NULL) || (pssb->tskhandle == NULL));
 
 		/* Add Q item to linked list for this uart/usart */
@@ -222,10 +226,15 @@ void StartSerialTaskSend(void* argument1)
 			if (ptmp->padd == ptmp->pend) ptmp->padd = ptmp->pbegin;
 			{		
    	   /* If HAL for this uart/usart is busy nothing happens. */
+				
 				if (ptmp->dmaflag == 0) // send buffer via char-by-char or dma 
+				{
 		 			HAL_UART_Transmit_IT((UART_HandleTypeDef*)pssb->phuart,pssb->pbuf,pssb->size);
-				else		
+				}
+				else
+				{
  					HAL_UART_Transmit_DMA((UART_HandleTypeDef*)pssb->phuart,pssb->pbuf,pssb->size);
+				}
 			}
 		}
 	}
@@ -247,11 +256,11 @@ UBaseType_t uxPriority,
 TaskHandle_t *pxCreatedTask );
 */
 	BaseType_t ret = xTaskCreate(StartSerialTaskSend, "SerialTaskSend",\
-     256, NULL, taskpriority,\
+     (128), NULL, taskpriority,\
      &SerialTaskHandle);
 	if (ret != pdPASS) return NULL;
 
-	SerialTaskSendQHandle = xQueueCreate(QUEUESIZE, sizeof(struct SERIALSENDTASKBCB) );
+	SerialTaskSendQHandle = xQueueCreate(QUEUESIZE, sizeof(struct SERIALSENDTASKBCB*) );
 	if (SerialTaskSendQHandle == NULL) return NULL;
 	return SerialTaskHandle;
 }
@@ -272,13 +281,13 @@ void HAL_UART_TxCpltCallback(UART_HandleTypeDef *phuart)
 		ptmp1 = ptmp1->pnext; // Step to next uart
 	}
 
-	/* Pointer to buffer control block for next buffer to send. */
+	/* Pointr to buffer control block for next buffer to send. */
 	pbcb = *ptmp1->ptake;
 
    /* Release buffer just sent to it can be reused. */
-	xSemaphoreGiveFromISR( pbcb->semaphore, &xHigherPriorityTaskWoken );
+	xSemaphoreGiveFromISR(pbcb->semaphore,&xHigherPriorityTaskWoken);
 
-	/* Advance 'take' pointer of circular bcb buffer. */
+	/* Advance 'take' pointer of circular buffer. */
 	ptmp1->ptake += 1;	// Advance ptr with wraparound
 	if (ptmp1->ptake == ptmp1->pend) ptmp1->ptake = ptmp1->pbegin;	
 
@@ -287,9 +296,13 @@ void HAL_UART_TxCpltCallback(UART_HandleTypeDef *phuart)
 	{
 		pbcb = *ptmp1->ptake;
 		if (ptmp1->dmaflag == 0)
+		{
 			HAL_UART_Transmit_IT (pbcb->phuart,pbcb->pbuf,pbcb->size);
+		}
 		else
+		{
 			HAL_UART_Transmit_DMA(pbcb->phuart,pbcb->pbuf,pbcb->size);
+		}
 	}
 	portYIELD_FROM_ISR( xHigherPriorityTaskWoken );
 	return;

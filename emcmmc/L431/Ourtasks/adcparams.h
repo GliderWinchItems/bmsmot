@@ -22,7 +22,7 @@ Voltage at 25 °C 1.34 1.43 1.52 V
 #include "cic_filter_l_N2_M3.h"
 
 #define ADC1DMANUMSEQ        16 // Number of DMA scan sequences in 1/2 DMA buffer
-#define ADC1IDX_ADCSCANSIZE   6 // Number ADC channels read
+#define ADC1IDX_ADCSCANSIZE   7 // Number ADC channels read
 #define ADCSCALEbits         14 // 2^x scale large
 #define ADCSCALEbitsy         7 // 2^x scale small
 #define ADCSCALEbitsitmp      3 // 2^x scale just enough
@@ -30,12 +30,13 @@ Voltage at 25 °C 1.34 1.43 1.52 V
 
 /* ADC reading sequence/array indices                         */
 /* These indices -=>MUST<= match the hardware ADC scan sequence    */
-#define ADC1IDX_HIGHVOLT1     0   // PA1 IN1  - Battery voltage
-#define ADC1IDX_HIGHVOLT2     1   // PA2 IN2  - DMOC +
-#define ADC1IDX_HIGHVOLT3     2   // PA3 IN3  - DMOC -
-#define ADC1IDX_HIGHVOLT4     3   // PA4 IN4  - spare
-#define ADC1IDX_INTERNALTEMP  4   // IN17     - Internal temperature sensor
+#define ADC1IDX_HIGHVOLT1     0   // PC0 IN1  - Battery voltage
+#define ADC1IDX_HIGHVOLT2     1   // PC1 IN2  - DMOC +
+#define ADC1IDX_HIGHVOLT3     2   // PC2 IN3  - DMOC -
+#define ADC1IDX_HIGHVOLT4     3   // PC3 IN4  - spare
+#define ADC1IDX_HALL_SENSE    4   // PA4 IN9  - Hall Effect Sensor
 #define ADC1IDX_INTERNALVREF  5   // IN18     - Internal voltage reference
+#define ADC1IDX_INTERNALTEMP  6   // IN17     - Internal temperature sensor
 
 /* Copied for convenience.
 // IIR filter (int) parameters

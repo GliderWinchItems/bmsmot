@@ -1,6 +1,6 @@
 Configuration	L431
 STM32CubeMX 	6.3.0
-Date	06/25/2023
+Date	06/27/2023
 MCU	STM32L431RCTx
 
 
@@ -11,6 +11,7 @@ ADC1	IN2 Single-ended	ADC1_IN2	PC1
 ADC1	IN3 Single-ended	ADC1_IN3	PC2
 ADC1	IN4 Single-ended	ADC1_IN4	PC3
 ADC1	IN9 Single-ended	ADC1_IN9	PA4
+ADC1	Temperature Sensor Channel	ADC1_TempSens_Input	VP_ADC1_TempSens_Input
 ADC1	Vrefint Channel	ADC1_Vref_Input	VP_ADC1_Vref_Input
 SPI1	Full-Duplex Master	SPI1_MISO	PA6
 SPI1	Full-Duplex Master	SPI1_MOSI	PA7
@@ -83,6 +84,7 @@ ADC1	IN2 Single-ended	ADC1_IN2	PC1
 ADC1	IN3 Single-ended	ADC1_IN3	PC2
 ADC1	IN4 Single-ended	ADC1_IN4	PC3
 ADC1	IN9 Single-ended	ADC1_IN9	PA4
+ADC1	Temperature Sensor Channel	ADC1_TempSens_Input	VP_ADC1_TempSens_Input
 ADC1	Vrefint Channel	ADC1_Vref_Input	VP_ADC1_Vref_Input
 SPI1	Full-Duplex Master	SPI1_MISO	PA6
 SPI1	Full-Duplex Master	SPI1_MOSI	PA7
