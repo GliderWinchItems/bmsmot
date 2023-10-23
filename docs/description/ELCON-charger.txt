@@ -1,0 +1,48 @@
+01/26/2023
+
+Charger heartbeat--
+
+cangate--
+Left justified
+C7FA872C
+
+Right justified 29b
+18FF50E5
+
+
+Cable--
+GRY CAN-L
+BRN CAN-H
+BLK GND
+RED +13.85v
+
+
+Charger transmits--
+Cangate 'm' shows this msg--
+C7FA872C 8 00 08 00 00 18 00 00 00
+
+[0-1] Out volts (0.1) Big endian
+[2-3] Out ams (0.1) Big endian
+[4] Status
+  0 - Hardware failure
+  1 - Over temperature
+  2 - Input voltage ng
+  3 - Battery disconnected or reversed
+  4 - Communication timed out
+ [5] Temp
+ [6-7] - Reserved
+
+
+Charger receives--
+C0372FA0 1806E5F4
+[0-1] Max volts (0.1) Big endian
+[2-3] Max ams (0.1) Big endian
+   [3] hi-ord bit: 0 = charging; 1 = discharging (????)
+[4] Control
+   0 - Charger is starting up to charge
+   1 - Battery protection, charge close output
+[5]
+   0 - Charging mode
+   1 - Heating mode
+[6-7]  Reserved
+
