@@ -1,0 +1,13 @@
+#!/bin/bash
+
+echo "SCRIPT-FLASH FILE NAME: $1"
+echo
+
+openocd  \
+		       -f interface/stlink-v2-1.cfg \
+		       -f target/stm32f4x_stlink.cfg \
+		       -c "init" -c "reset halt" \
+		       -c "flash write_image erase $1.srec" \
+		       -c "reset" \
+		       -c "shutdown" $NULL
+

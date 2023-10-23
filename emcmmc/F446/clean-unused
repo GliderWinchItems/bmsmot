@@ -1,0 +1,19 @@
+rm Ourtasks/fetonoff.c
+rm Ourtasks/bqview.c
+rm Ourtasks/bq_func_init.c
+rm Ourtasks/LedTask.c
+rm Ourtasks/chgr_items.c
+rm Ourtasks/fanop.c
+rm Ourtasks/bmsspi.c
+rm Ourtasks/BMSTask.c
+rm Ourtasks/pec15_reg.c
+
+rm Ourtasks/fetonoff.h
+rm Ourtasks/bqview.h
+rm Ourtasks/bq_func_init.h
+rm Ourtasks/LedTask.h
+rm Ourtasks/chgr_items.h
+rm Ourtasks/fanop.h
+rm Ourtasks/bmsspi.h
+rm Ourtasks/BMSTask.h
+rm Ourtasks/pec15_reg.h

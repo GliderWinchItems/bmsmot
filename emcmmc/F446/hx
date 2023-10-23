@@ -1,0 +1,1 @@
+hexdump -C build/*.xbin | head -n 4;echo; hexdump -C build/*.xbin | tail -n 5

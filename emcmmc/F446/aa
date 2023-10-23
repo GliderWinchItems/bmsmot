@@ -1,0 +1,1 @@
+./mm A0000000; ./script-flash build/F446

@@ -1,0 +1,9 @@
+#!/bin/bash
+# Compile and load with SWD
+# E.g. ./ff B0A00000
+
+./cc $1
+cd build
+../script-flash bms1818
+cd -
+

@@ -1,0 +1,12 @@
+./Ourtasks/cellbal.c:150:	TIM1->CCR1 = flag_trickle;
+./Ourtasks/ChgrTask.c:81:			TIM1->CCR1 = bqfunction.tim1_ccr1; // Set charge rate
+./Ourtasks/ChgrTask.c:87:				TIM1->CCR1 = bqfunction.lc.tim1_ccr1_on_vlc; // Set vlc rate
+./Ourtasks/ChgrTask.c:91:				TIM1->CCR1 = 0;	// FET is off
+./Ourtasks/BQTask.c:74://	TIM1->CCR1 = p->tim1_ccr1; // Set charge rate
+./Ourtasks/BQTask.c:76:	TIM1->CCR1 = 0; // Set charge rate
+./Ourtasks/BQTask.c:130:		TIM1->CCR1 = bqfunction.tim1_ccr1; // Set charge rate
+./Ourtasks/BQTask.c:136:			TIM1->CCR1 = bqfunction.lc.tim1_ccr1_on_vlc; // Set vlc rate
+./Ourtasks/fetonoff.c:43:		 	TIM1->CCR1 = 0; // FET ON time
+./Ourtasks/fetonoff.c:71:		 	TIM1->CCR1 = pbq->tim1_ccr1; // FET ON time
+./Ourtasks/chgr_items.c:66:	TIM1->CCR1 = 0; // Initialize to OFF
+./Ourtasks/chgr_items.c:67://TIM1->CCR1 = bqfunction.tim1_ccr1;

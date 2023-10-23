@@ -1,0 +1,33 @@
+#!/bin/bash
+# Example: Specify CAN ID to select parameter files
+# e.g. CAN ID = A0000000
+# ./mm A0000000
+
+rm build/F446.elf
+export FLOAT_TYPE=hard
+
+# Parameters for CAN ID specified by $1
+if [ -r params/$1-adc_idx_v_struct.c ]; then
+	export ADC_PARAM=$1-adc_idx_v_struct.c
+else
+	echo params/$1-adc_idx_v_struct.c does not exist
+	exit 1;
+fi	
+
+if [ -r params/$1-emc_idx_v_struct.c ]; then
+	export EMC_PARAM=$1-emc_idx_v_struct.c
+else
+	echo params/$1-emc_idx_v_struct.c does not exist
+	exit 2;
+fi	
+echo "################ CAN ID  ################"
+echo $1
+echo "################ PARAMETER FILES ################"
+echo $ADC_PARAM : $EMC_PARAM
+
+export I_AM_CANID=0x$1
+
+./script-all F446
+
+
+
