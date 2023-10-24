@@ -39,6 +39,7 @@ struct RYREQ_Q
  /* ############################################################################# */
  void TIM5_IRQ_Handler(void);  // Keep-alive timer
  void TIM13_IRQ_Handler(void); // Pull-in delay timer
+ void TIM9_IRQ_Handler(void);
  /* ############################################################################# */
 
 extern TaskHandle_t RyTaskHandle;

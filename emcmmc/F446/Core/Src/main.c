@@ -1251,9 +1251,9 @@ void StartDefaultTask(void const * argument)
   rytest[1].preq = &rytest[1].rytest;
   rytest[2].preq = &rytest[2].rytest;
 
-  rytest[0].inc = 10;
+  rytest[0].inc =  8;
   rytest[1].inc =  1;
-  rytest[2].inc = 10;
+  rytest[2].inc =  8;
 
   
   struct SERIALSENDTASKBCB* pbuf1 = getserialbuf(&HUARTMON,144);
@@ -1294,20 +1294,36 @@ uint32_t ctr2 = 0;
     extern uint32_t debugry5;
     extern uint32_t debugry6;
     extern uint32_t debugry7;
-    extern uint32_t debugryx;
-    extern uint32_t debugry[];
     yprintf(&pbuf2,": %d %d %d %d %d %d %d:", debugry1,debugry2,debugry3,debugry4,debugry5,debugry6,debugry7);
-    for (int j = 0; j < debugryx; j++)
-      yprintf(&pbuf1," %d",debugry[j]);
+//  extern uint32_t debugryx;
+//  extern uint32_t debugry[];    
+//    for (int j = 0; j < debugryx; j++)
+//      yprintf(&pbuf1," %d",debugry[j]);
 
     for (int j = 0; j < NRYTEST; j++)
     {
       yprintf(&pbuf1," %d", rytest[j].rytest.pwm);
     }
 
+struct RELAYWV // Working variables
+{
+   uint32_t kp_wv; // Maximum time duration (ms) between keep-alive requests
+   uint16_t pulldelay_wv; // Delay time duration (ms) before pwm for relay pull-in
+   uint8_t pwm_wv;     // PWM percent when energized: (0 - 100)
+   int8_t on;         // minus = pulling in; zero = OFF; plus = pulled & pwm'ing
+   uint8_t cancel;   // 1 = cancel request for delay; 0 = not cancel
+   uint8_t kp_flag;   // Upon interrupt: 1 = reset kp time; 0 = let kp_wv countdown or remain zero
+};
+extern struct RELAYWV relaywv[];
+
+    for (int j = 0; j < NRYTEST; j++)
+    {
+      yprintf(&pbuf1," %d", relaywv[j].kp_wv );      
+    }
+
     /* Repeat */
     ctr2 +=1 ;
-    if (ctr2 >= 20)
+    if (ctr2 >= 60)
     {
       ctr2 = 0;
       ctr = 0;

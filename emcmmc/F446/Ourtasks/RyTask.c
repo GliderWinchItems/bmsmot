@@ -116,6 +116,8 @@ static uint8_t delay_flag; // 1 = TIM9 delay is in-progress; 0 = idle
  * *************************************************************************/
 static void rydbuf_startdelay(uint8_t idx)
 { // Here, a time delay is not in progress
+	if (delay_flag != 0) morse_trap(714);
+
 	// Pull-in at 100%
 	ry_setpwm(100, idx); // Set 100% pwm for this ry
 
@@ -336,16 +338,11 @@ void StartRyTask(void* argument)
 
 	ry_init(); // Start timers that drive relay fets
 
-//ry_setpwm(100,0);
-//for (int i = 0; i < 12; i++)
-//	ry_setpwm(100,i);
-//osDelay(10);
-
 	for (;;)
 	{
 		/* Enable interrupts since disabled below.  */
 		TIM9->DIER  = 0x1; //  Delay timer: UG interrupt
-//		TIM5->DIER |= 0x2; //  Keep-alive timer: OC1 
+		TIM5->DIER |= 0x2; //  Keep-alive timer: OC1 
 
 		/* Check queue of loaded items. */
 		ret = xQueueReceive(RyTaskReadReqQHandle,&pssb,500000);
@@ -355,7 +352,8 @@ void StartRyTask(void* argument)
 debugry[debugryx] = pssb->idx;
 debugryx += 1;
 if (debugryx >= 16) debugryx = 0;
-			if (pssb->idx >= NRELAYS) morse_trap(883); // Argh!
+
+			if (pssb->idx >= NRELAYS) morse_trap(716); // Argh!
 
 			/* Disable delay timer interrupt jic. */
 			TIM9->DIER = 0;	
@@ -416,13 +414,13 @@ debugry2 += 1;
 					{ // Here, this relay is already on the request list
 						// Either it is currently doing a pull-in or
 						// it will be come up as the buffer is processed.
-						prybuf_tmp->pwm = pwmtim; // Replace 255 if necessary
+						ry_setpwm(pwmtim,pssb->idx); // Set pwm
 					}
 					else
 					{ // Here, not on the delay buffer 
 						// Add this relay to the delay buffer.
 HAL_GPIO_WritePin(GPIOB, GPIO_PIN_13, GPIO_PIN_RESET); // RED ON
-osDelay(30);
+osDelay(10);
 HAL_GPIO_WritePin(GPIOB, GPIO_PIN_13, GPIO_PIN_SET); // RED OFF							
 						rybuf_add(pwmtim, pssb->idx); // Add to request buffer
 						if (delay_flag == 0)
@@ -466,21 +464,23 @@ TaskHandle_t xRyTaskCreate(uint32_t taskpriority)
 void TIM5_IRQ_Handler(void)
 {
 //morse_trap(456);
+debugry1 += 1;
+
 	TIM5->SR = ~0x2; // Clear flag CH1
 
-	/* Next interrupt time */
-	TIM5->CCR1 += KPUPDATEDUR;// 100;// TIM5: 10ms between OC 
-return;
-	/* Check one relay each interrupt. */
+	/* Next interrupt time (10 ms between OC interrupts) */
+	TIM5->CCR1 += KPUPDATEDUR;
+
+	/* Check one relay each OC interrupt. */
 	idx_kp += 1;
 	if (idx_kp >= NRELAYS) idx_kp = 0;
 
 	/* Countdown the keep-alive time. */
 	if (relaywv[idx_kp].kp_wv != 0)
-	{ // Here, keep-alive is counting
+	{ // Here, keep-alive countdown in progress
 		relaywv[idx_kp].kp_wv -= 1;
 		if (relaywv[idx_kp].kp_wv == 0)
-		{ // Here, countdown has ended
+		{ // Here, countdown ended
 			relaywv[idx_kp].on = 0; // Set status to OFF
 			ry_setpwm(0,idx_kp);    // Set 0% duty pwm
 			rybuf_cancel(idx_kp);   // Clear any pending updates
@@ -495,9 +495,9 @@ return;
 	{ // Here, keep-alive count at zero 
 		if (relaywv[idx_kp].on != 0)
 		{ // Here, ka expired, but relay shows ON
-			relaywv[idx_kp].on = 0; // Set status to OFF
-			ry_setpwm(0,idx_kp);    // Set 0% duty pwm
-			rybuf_cancel(idx_kp);   // Clear any pending updates
+			relaywv[idx_kp].on = 0; // Set status to OFF jic
+			ry_setpwm(0,idx_kp);    // Set 0% duty pwm jic
+			rybuf_cancel(idx_kp);   // Clear any pending updates jic
 			if ((delay_flag != 0) && (idx_kp == idx_delay))
 			{ // Here pull-in delay in progress for this relay
 				idx_abort = 1; //
@@ -516,13 +516,10 @@ void TIM9_IRQ_Handler(void)
 	struct RELAYDBUF* ptmp;	
 	TIM9->SR = ~0x1; // Clear UG interrupt flag
 
-if (prybuf_take == prybuf_add)	
-{
-  delay_flag = 0;
-  debugryx = 0;
-  morse_trap(543);
-  return;
-}
+	delay_flag = 0; // Delay timing is not active	
+
+if (prybuf_take == prybuf_add) morse_trap(715);
+
 	/* Skip updating pwm and status if this delay aborted. */
 	if (idx_abort == 0)
 	{ // Here, no request to abort this current pull-in.
@@ -538,20 +535,13 @@ if (prybuf_take == prybuf_add)
 
 	/* More relays waiting for pull-in delay? */
 	ptmp = rybuf_next();
-	if (prybuf_take == prybuf_add)	
-	{
-debugry5  += 1;	
-debugryx = 0;	  
-	  delay_flag = 0;
-	  return;
-	}
-	if (ptmp != NULL)
+
+	if (prybuf_take != prybuf_add)
 	{ // Here, buffer holds a not-cancelled entry
 		rydbuf_startdelay(ptmp->idx); // Load ry & start TIM9		
 debugry4 += 1;		
 		return; 
 	}
-	delay_flag = 0; // Delay timing is not active
 debugryx = 0;	
 	return;
 }

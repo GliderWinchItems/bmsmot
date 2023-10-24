@@ -33,7 +33,7 @@ void emc_idx_v_struct_hardcode_params(struct EMCLC* p)
 
    int i;
    /* Default for all relays. */
-   #define KYTODEFAULT (120*5) // 5 sec: Keep alive timer: (1 count = 10ms per OC, 12 relays per cycle)
+   #define KYTODEFAULT ((5 * 100)/12) // 5 sec: Keep alive timer: (1 count = 10ms per OC, 12 relays per cycle)
    #define PULLINDEFAULT (1000) // 1 sec: (delay timer: 1 count = 0.1ms)
    #define HOLDPWM  5 //(25) // Holding percent pwm (when commanded with 255 pct pwm)
    for (i = 0; i < NRELAY; i++)
