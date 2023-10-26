@@ -118,6 +118,8 @@ static void rydbuf_startdelay(uint8_t idx)
 { // Here, a time delay is not in progress
 	if (delay_flag != 0) morse_trap(714);
 
+	delay_flag = 1; // Delay timing is active
+	
 	// Pull-in at 100%
 	ry_setpwm(100, idx); // Set 100% pwm for this ry
 
@@ -129,8 +131,6 @@ static void rydbuf_startdelay(uint8_t idx)
 
 	relaywv[idx].cancel = 0; // Reset any prior cancellations
 
-	delay_flag = 1; // Delay timing is active
-	
 	// Set delay: TIM9 (does not have a count-down direction mode)
 	TIM9->CNT  = 0;
 	TIM9->ARR  = (10 * emcfunction.lc.relay[idx].pulldelay);
@@ -372,7 +372,7 @@ if (debugryx >= 16) debugryx = 0;
 
 			/* Simple case where no pull-in delay is used. */
 			if (emcfunction.lc.relay[pssb->idx].pulldelay == 0)
-			{ // Here, no pull-in delay involved (e.g. pump motor)
+			{ // Here, no pull-in delay involved (e.g. pump motor, or fan)
 				relaywv[pssb->idx].pwm_wv = pwmtim; // Update working pwm
 				ry_setpwm(pssb->pwm,pssb->idx); // Update FET pwm drive
 morse_trap(111);
@@ -387,36 +387,28 @@ debugry2 += 1;
 				relaywv[pssb->idx].on = 0; // Ry status: OFF
 				// Set cancel flag for all buffered entries for this relay
 				rybuf_cancel(pssb->idx);
-				// Special case: timer is timing this relay now?
+				// Special case: timer is timing this relay pullin now?
 				if (idx_delay == pssb->idx)
 				{ // Here delay timer in progress for this relay
 					TIM9->CR1 = 0x0; // Stop timer
 					TIM9->SR = ~0x1; // Clear interrupt flag if on.
-					idx_abort = 0; // ISR skips updating pwm
+				  	idx_abort = 0; // ISR skips updating pwm (necssary???)
 
 					/* More relays waiting for pull-in delay? */
-					if ((ptmp=rybuf_next()) != NULL)
-					{ // Here, buffer has a not-cancelled entry
+					ptmp = rybuf_next();
+					if (prybuf_take != prybuf_add)
+					{ // Here, buffer holds a not-cancelled entry
 						rydbuf_startdelay(ptmp->idx); // Load ry & start TIM9						
-						continue; 
 					}					
 				}
 			}
 			else
-			{ // Here, request is to start the relay (w pull-in delay)
-//morse_trap(333);
+			{ // Here, request is to start or update the relay (w pull-in delay)
 				if (relaywv[pssb->idx].on == 0)
 				{ // Relay is off, start 100% pwm and pull-in delay
 					// Check relay is already in the delay buffer
-//morse_trap(555);
 					prybuf_tmp = rydbuf_search(pssb->idx);
-					if (prybuf_tmp != NULL)
-					{ // Here, this relay is already on the request list
-						// Either it is currently doing a pull-in or
-						// it will be come up as the buffer is processed.
-						ry_setpwm(pwmtim,pssb->idx); // Set pwm
-					}
-					else
+					if (prybuf_tmp == NULL)
 					{ // Here, not on the delay buffer 
 						// Add this relay to the delay buffer.
 HAL_GPIO_WritePin(GPIOB, GPIO_PIN_13, GPIO_PIN_RESET); // RED ON
@@ -429,10 +421,13 @@ HAL_GPIO_WritePin(GPIOB, GPIO_PIN_13, GPIO_PIN_SET); // RED OFF
 debugry3 += 1;							
 						}
 					}
+					else
+					{ // Here, this relay is on the delay buffer
+						// Let original pull-in request set holding pwm
+					}
 				}
 				else
-				{ // Here, relay is already ON, so update pwm
-//morse_trap(666);				
+				{ // Here, relay status is already ON, so update pwm
 					ry_setpwm(pwmtim,pssb->idx); // Set pwm
 				}
 			}
@@ -461,6 +456,9 @@ TaskHandle_t xRyTaskCreate(uint32_t taskpriority)
  * void TIM5_IRQ_Handler(void);
  * KP (keep-alive) timer (0.1ms)
  * ############################################################################# */
+/*
+NOTE: TIM5 and TIM9 expected to be at the same interrupt priority level!
+*/
 void TIM5_IRQ_Handler(void)
 {
 //morse_trap(456);
@@ -483,7 +481,7 @@ debugry1 += 1;
 		{ // Here, countdown ended
 			relaywv[idx_kp].on = 0; // Set status to OFF
 			ry_setpwm(0,idx_kp);    // Set 0% duty pwm
-			rybuf_cancel(idx_kp);   // Clear any pending updates
+			rybuf_cancel(idx_kp); // Clear any pending pullins jic
 			if ((delay_flag != 0) &&
 				(idx_kp == idx_delay))
 			{ // Here pull-in delay in progress for this relay
@@ -497,7 +495,7 @@ debugry1 += 1;
 		{ // Here, ka expired, but relay shows ON
 			relaywv[idx_kp].on = 0; // Set status to OFF jic
 			ry_setpwm(0,idx_kp);    // Set 0% duty pwm jic
-			rybuf_cancel(idx_kp);   // Clear any pending updates jic
+			rybuf_cancel(idx_kp); // Clear any pending pullins jic
 			if ((delay_flag != 0) && (idx_kp == idx_delay))
 			{ // Here pull-in delay in progress for this relay
 				idx_abort = 1; //
@@ -510,6 +508,9 @@ debugry1 += 1;
  * void TIM9_IRQ_Handler(void);
  * @brief	: TIM9--pull-in delay timer (prescale:0.1 ms ticks)
  * ############################################################################# */
+/*
+NOTE: TIM5 and TIM9 expected to be at the same interrupt priority level!
+*/
 uint32_t debugry8;
 void TIM9_IRQ_Handler(void)
 {
@@ -552,7 +553,7 @@ debugryx = 0;
 
 void TIM13_IRQ_Handler(void)
 {
-	TIM13->SR = ~0x3; // 
+	TIM13->SR = ~0x3; // JIC
 	return;
 }
 

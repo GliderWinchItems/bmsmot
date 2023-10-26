@@ -1251,9 +1251,9 @@ void StartDefaultTask(void const * argument)
   rytest[1].preq = &rytest[1].rytest;
   rytest[2].preq = &rytest[2].rytest;
 
-  rytest[0].inc =  8;
+  rytest[0].inc =  5;
   rytest[1].inc =  1;
-  rytest[2].inc =  8;
+  rytest[2].inc =  5;
 
   
   struct SERIALSENDTASKBCB* pbuf1 = getserialbuf(&HUARTMON,144);
