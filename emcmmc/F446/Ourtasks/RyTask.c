@@ -56,6 +56,12 @@ uint32_t debugry6;
 uint32_t debugry7;
 uint32_t debugry[16];
 uint32_t debugryx;
+#define BOUNCESZ 16
+uint32_t debugry_ext3_trise[BOUNCESZ];
+uint32_t debugry_ext3_tfall[BOUNCESZ];
+uint32_t debugry_ext3_idxrise;
+uint32_t debugry_ext3_idxfall;
+uint32_t debugry_ext3_inc(uint32_t n);
 
 static void ry_setpwm(uint32_t pwm, uint8_t idx);
 
@@ -121,8 +127,8 @@ static void rydbuf_startdelay(uint8_t idx)
 	delay_flag = 1; // Delay timing is active
 	
 	// Pull-in at 100%
-	ry_setpwm(100, idx); // Set 100% pwm for this ry
-
+//	ry_setpwm(100, idx); // Set 100% pwm for this ry
+	ry_setpwm(65, idx); // Test pull-in delay
 	// Set delay countdown
 	relaywv[idx].on = -1; // Set status: delay in progress
 
@@ -136,7 +142,7 @@ static void rydbuf_startdelay(uint8_t idx)
 	TIM9->ARR  = (10 * emcfunction.lc.relay[idx].pulldelay);
 	TIM9->SR   = 0x0; // Clear interrupt flags jic
 	TIM9->CR1  = 0x9; // Start counting (upwards), one-shot mode
-debugry6 += 1;
+
 	return;
 }
 /* *************************************************************************
@@ -279,6 +285,13 @@ static void ry_setpwm(uint32_t pwmx, uint8_t idx)
 		break;
 	case 1: // OA2 T12C2
 		TIM12->CCR2 = pwm;
+
+if ((pwmx != 40) && (pwmx != 0))
+{ // Cause relay to close
+	debugry_ext3_trise[0] = DTWTIME;
+	debugry_ext3_idxrise = 1;	
+debugry6 += 1;	
+}
 		break;
 	case 2: // OA3 T2C4
 		TIM2->CCR4 = pwm;
@@ -385,6 +398,7 @@ morse_trap(111);
 debugry2 += 1;				
 				ry_setpwm(pssb->pwm, pssb->idx); // Set relay FET off
 				relaywv[pssb->idx].on = 0; // Ry status: OFF
+				
 				// Set cancel flag for all buffered entries for this relay
 				rybuf_cancel(pssb->idx);
 				// Special case: timer is timing this relay pullin now?
@@ -557,3 +571,24 @@ void TIM13_IRQ_Handler(void)
 	return;
 }
 
+
+
+uint32_t debugry_ext3_inc(uint32_t n)
+{
+	n += 1;
+	if (n >= BOUNCESZ)
+		n -= 1;
+	return n;
+}
+
+void EXTI3_IRQ_Handler_RY(void)
+{
+	debugry_ext3_trise[debugry_ext3_idxrise] = DTWTIME;
+
+	debugry_ext3_idxrise += 1;
+	if (debugry_ext3_idxrise >= 16)
+		debugry_ext3_idxrise = 15;
+
+	EXTI->PR = (1<<3); // Clear Pending Register flag
+	return;
+}

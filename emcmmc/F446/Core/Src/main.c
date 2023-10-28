@@ -377,7 +377,7 @@ static void MX_ADC1_Init(void)
   hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
   hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
   hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
-  hadc1.Init.NbrOfConversion = 12;
+  hadc1.Init.NbrOfConversion = 11;
   hadc1.Init.DMAContinuousRequests = ENABLE;
   hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
   if (HAL_ADC_Init(&hadc1) != HAL_OK)
@@ -411,7 +411,6 @@ static void MX_ADC1_Init(void)
   }
   /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
   */
-  sConfig.Channel = ADC_CHANNEL_13;
   sConfig.Rank = 4;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
   {
@@ -472,15 +471,6 @@ static void MX_ADC1_Init(void)
   */
   sConfig.Channel = ADC_CHANNEL_VBAT;
   sConfig.Rank = 11;
-  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
-  */
-  sConfig.Channel = ADC_CHANNEL_6;
-  sConfig.Rank = 12;
-  sConfig.SamplingTime = ADC_SAMPLETIME_56CYCLES;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
   {
     Error_Handler();
@@ -1178,10 +1168,16 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : PC0 PC1 PC2 PC3 */
-  GPIO_InitStruct.Pin = GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_3;
+  /*Configure GPIO pins : PC0 PC1 PC2 */
+  GPIO_InitStruct.Pin = GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_2;
   GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : PC3 */
+  GPIO_InitStruct.Pin = GPIO_PIN_3;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING_FALLING;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
   /*Configure GPIO pin : M_RESET_Pin */
@@ -1209,6 +1205,10 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(JP14_IN_GPIO_Port, &GPIO_InitStruct);
+
+  /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI3_IRQn, 10, 0);
+  HAL_NVIC_EnableIRQ(EXTI3_IRQn);
 
 }
 
@@ -1244,16 +1244,16 @@ void StartDefaultTask(void const * argument)
   rytest[2].rytest.idx =  2; // Relay index (0 - 11)
 
   rytest[0].rytest.pwm =  5; // PWM after delay (0 - 100);
-  rytest[1].rytest.pwm =  5; // PWM after delay (0 - 100);
+  rytest[1].rytest.pwm = 25; // PWM after delay (0 - 100);
   rytest[2].rytest.pwm =  5; // PWM after delay (0 - 100);
 
   rytest[0].preq = &rytest[0].rytest;
   rytest[1].preq = &rytest[1].rytest;
   rytest[2].preq = &rytest[2].rytest;
 
-  rytest[0].inc =  5;
-  rytest[1].inc =  1;
-  rytest[2].inc =  5;
+  rytest[0].inc =  0;
+  rytest[1].inc =  0;
+  rytest[2].inc =  0;
 
   
   struct SERIALSENDTASKBCB* pbuf1 = getserialbuf(&HUARTMON,144);
@@ -1285,8 +1285,9 @@ uint32_t ctr2 = 0;
     HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, GPIO_PIN_RESET); // GRN ON
         osDelay(50);
     HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, GPIO_PIN_SET); // GRN OFF
-      osDelay(100-50);
+      osDelay(500-50);
 
+#if 0
     extern uint32_t debugry1;
     extern uint32_t debugry2;
     extern uint32_t debugry3;
@@ -1304,26 +1305,33 @@ uint32_t ctr2 = 0;
     {
       yprintf(&pbuf1," %d", rytest[j].rytest.pwm);
     }
+#endif    
+ #define BOUNCESZ 16
+extern uint32_t debugry_ext3_trise[BOUNCESZ];
+extern uint32_t debugry_ext3_tfall[BOUNCESZ];
+extern uint32_t debugry_ext3_idxrise;
+extern uint32_t debugry_ext3_idxfall; 
+extern uint32_t debugry6;
+    yprintf(&pbuf1," %d:", debugry6);
+    for (int j = 0; j < debugry_ext3_idxrise; j++)
+      yprintf(&pbuf1," %d", (debugry_ext3_trise[j]-debugry_ext3_trise[0])/180);
 
-struct RELAYWV // Working variables
-{
-   uint32_t kp_wv; // Maximum time duration (ms) between keep-alive requests
-   uint16_t pulldelay_wv; // Delay time duration (ms) before pwm for relay pull-in
-   uint8_t pwm_wv;     // PWM percent when energized: (0 - 100)
-   int8_t on;         // minus = pulling in; zero = OFF; plus = pulled & pwm'ing
-   uint8_t cancel;   // 1 = cancel request for delay; 0 = not cancel
-   uint8_t kp_flag;   // Upon interrupt: 1 = reset kp time; 0 = let kp_wv countdown or remain zero
-};
-extern struct RELAYWV relaywv[];
+   rytest[1].rytest.pwm = 0;
+    qret=xQueueSendToBack(RyTaskReadReqQHandle, &rytest[1].preq, portMAX_DELAY);
+     if (qret == errQUEUE_FULL) morse_trap(123); 
 
-    for (int j = 0; j < NRYTEST; j++)
-    {
-      yprintf(&pbuf1," %d", relaywv[j].kp_wv );      
-    }
+     osDelay(500);    
 
+    rytest[1].rytest.pwm = 40;
+    qret=xQueueSendToBack(RyTaskReadReqQHandle, &rytest[1].preq, portMAX_DELAY);
+     if (qret == errQUEUE_FULL) morse_trap(123); 
+
+     if (ctr2++ >= 10) while(1==1);
+     
+#if 0
     /* Repeat */
     ctr2 +=1 ;
-    if (ctr2 >= 60)
+    if (ctr2 >= 120)
     {
       ctr2 = 0;
       ctr = 0;
@@ -1331,14 +1339,10 @@ extern struct RELAYWV relaywv[];
       for (int j = 0; j < NRYTEST; j++)
       {
         qret=xQueueSendToBack(RyTaskReadReqQHandle, &rytest[j].preq, portMAX_DELAY);
-        if (qret == errQUEUE_FULL) morse_trap(123);  
-        rytest[j].rytest.pwm += rytest[j].inc;
-        if (rytest[j].rytest.pwm >= 100)
-        {
-            rytest[j].rytest.pwm = 0;
-        }
+        if (qret == errQUEUE_FULL) morse_trap(123); 
       }
     }
+#endif    
   }
   /* USER CODE END 5 */
 }

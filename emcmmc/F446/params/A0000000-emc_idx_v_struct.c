@@ -33,9 +33,9 @@ void emc_idx_v_struct_hardcode_params(struct EMCLC* p)
 
    int i;
    /* Default for all relays. */
-   #define KYTODEFAULT ((5 * 100)/12) // 5 sec: Keep alive timer: (1 count = 10ms per OC, 12 relays per cycle)
+   #define KYTODEFAULT ((8 * 100)/12) // 5 sec: Keep alive timer: (1 count = 10ms per OC, 12 relays per cycle)
    #define PULLINDEFAULT (1000) // 1 sec: (delay timer: 1 count = 0.1ms)
-   #define HOLDPWM  5 //(25) // Holding percent pwm (when commanded with 255 pct pwm)
+   #define HOLDPWM  25 // Holding percent pwm (when commanded with 255 pct pwm)
    for (i = 0; i < NRELAY; i++)
    {
       // TIM5 interrupt 100/sec, 1 out of 12 relays each interrupt
@@ -44,9 +44,9 @@ void emc_idx_v_struct_hardcode_params(struct EMCLC* p)
       p->relay[i].pwm       = HOLDPWM; // After pull-in pwm (0 - 100%)
    }
    /* Override defaults. */
-   p->relay[ 0].pulldelay =  900; //
-   p->relay[ 1].pulldelay =  600; //
-   p->relay[ 2].pulldelay =  300; //   
+   p->relay[ 0].pulldelay =  500; //
+   p->relay[ 1].pulldelay =  400; //
+   p->relay[ 2].pulldelay =  600; //   
    p->relay[ 3].pulldelay =  100; //
    p->relay[ 4].pulldelay =  100; //
    p->relay[ 5].pulldelay =  100; //
