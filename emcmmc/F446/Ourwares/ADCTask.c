@@ -14,7 +14,7 @@
 #include "ADCTask.h"
 #include "adctask.h"
 #include "morse.h"
-#include "adcfastsum16.h"
+//#include "adcfastsum16.h"
 //#include "adcextendsum.h"
 #include "rtcregs.h"
 
@@ -32,6 +32,11 @@ extern osThreadId defaultTaskHandle;
 
 float fclpos;
 
+
+uint32_t debugadc1;
+uint32_t debugadc2;
+uint32_t debugadcctr;
+
 /* *************************************************************************
  * void StartADCTask(void const * argument);
  *	@brief	: Task startup
@@ -46,6 +51,7 @@ void StartADCTask(void *argument)
 	uint16_t* pdma;
 	float ftmp;
 	struct ADCCHANNEL* pz;
+	struct ADCCHANNEL* pzend;
 	
 	/* A notification copies the internal notification word to this. */
 	uint32_t noteval = 0;    // Receives notification word upon an API notify
@@ -60,8 +66,10 @@ void StartADCTask(void *argument)
   	/* Infinite loop */
   	for(;;)
   	{
+debugadc1 = DTWTIME;
 		/* Wait for DMA interrupt */
 		xTaskNotifyWait(0,0xffffffff, &noteval, portMAX_DELAY);
+debugadc2 = DTWTIME - debugadc1;
 
 		if (noteval & TSK02BIT02)
 		{
@@ -72,39 +80,52 @@ p16 = pdma;
 		{
 			pdma = adc1dmatskblk[0].pdma2;
 		}
-		/* Sum the readings 1/2 of DMA buffer to an array. */
-//		adcfastsum16(&adc1.chan[0], pdma); // Fast in-line addition
 
-		// Sum two scans in 1/2 DMA buffer. */
+		// Sum 12 scans in 1/2 DMA buffer. */
+		pz = &adc1.chan[0];
+		pzend = &adc1.chan[ADCDIRECTMAX];
+
+		while (pz != pzend)
+		{
+			pz->sum = 
+			   *(pdma + ADCDIRECTMAX     * 0)
+			 + *(pdma + ADCDIRECTMAX     * 1)
+			 + *(pdma + ADCDIRECTMAX     * 2)
+			 + *(pdma + ADCDIRECTMAX     * 3)
+			 + *(pdma + ADCDIRECTMAX     * 4)
+			 + *(pdma + ADCDIRECTMAX     * 5)
+			 + *(pdma + ADCDIRECTMAX     * 6)
+			 + *(pdma + ADCDIRECTMAX     * 7)
+			 + *(pdma + ADCDIRECTMAX     * 8)
+			 + *(pdma + ADCDIRECTMAX     * 9)
+			 + *(pdma + ADCDIRECTMAX     *10)
+			 + *(pdma + ADCDIRECTMAX     *11)
+			 + *(pdma + ADCDIRECTMAX     *12)
+			 + *(pdma + ADCDIRECTMAX     *13)
+			 + *(pdma + ADCDIRECTMAX     *14)
+			 + *(pdma + ADCDIRECTMAX     *15);
+			 pdma += 1;
+			 pz += 1;
+		}		 
+
 		pz = &adc1.chan[0];
 
-		(pz + 0)->sum = *(pdma + 0) + *(pdma + 0 + ADCDIRECTMAX);
-		(pz + 1)->sum = *(pdma + 1) + *(pdma + 1 + ADCDIRECTMAX);
-		(pz + 2)->sum = *(pdma + 2) + *(pdma + 2 + ADCDIRECTMAX);
-		(pz + 3)->sum = *(pdma + 3) + *(pdma + 3 + ADCDIRECTMAX);
-		(pz + 4)->sum = *(pdma + 4) + *(pdma + 4 + ADCDIRECTMAX);
-		(pz + 5)->sum = *(pdma + 5) + *(pdma + 5 + ADCDIRECTMAX);
-		(pz + 6)->sum = *(pdma + 6) + *(pdma + 6 + ADCDIRECTMAX);
-		(pz + 7)->sum = *(pdma + 7) + *(pdma + 7 + ADCDIRECTMAX);
-		(pz + 8)->sum = *(pdma + 8) + *(pdma + 8 + ADCDIRECTMAX);
-		(pz + 9)->sum = *(pdma + 9) + *(pdma + 9 + ADCDIRECTMAX);
-		(pz + 10)->sum= *(pdma +10) + *(pdma +10 + ADCDIRECTMAX);
-
 /* WOW. Optimizer does the following with one cycle per statement! */
-dbg_adcsum[0] = (pz + 0)->sum;
-dbg_adcsum[1] = (pz + 1)->sum;		
-dbg_adcsum[2] = (pz + 2)->sum;		
-dbg_adcsum[3] = (pz + 3)->sum;		
-dbg_adcsum[4] = (pz + 4)->sum;		
-dbg_adcsum[5] = (pz + 5)->sum;		
-dbg_adcsum[6] = (pz + 6)->sum;		
-dbg_adcsum[7] = (pz + 7)->sum;		
-dbg_adcsum[8] = (pz + 8)->sum;	
-dbg_adcsum[9] = (pz + 9)->sum;	
-dbg_adcsum[10] = (pz +10)->sum;	
+dbg_adcsum[0]  = (pz +  0)->sum;
+dbg_adcsum[1]  = (pz +  1)->sum;		
+dbg_adcsum[2]  = (pz +  2)->sum;		
+dbg_adcsum[3]  = (pz +  3)->sum;		
+dbg_adcsum[4]  = (pz +  4)->sum;		
+dbg_adcsum[5]  = (pz +  5)->sum;		
+dbg_adcsum[6]  = (pz +  6)->sum;		
+dbg_adcsum[7]  = (pz +  7)->sum;		
+dbg_adcsum[8]  = (pz +  8)->sum;	
+dbg_adcsum[9]  = (pz +  9)->sum;	
+dbg_adcsum[10] = (pz + 10)->sum;	
+dbg_adcsum[11] = (pz + 11)->sum;	
 
 		adc1.ctr += 1; // Update count
-
+debugadcctr = adc1.ctr;		
 		// Calibrate and Pass sum through IIR filter
 		for (int i = 0; i < ADCDIRECTMAX; i++)
 		{ // Calibrate and filter sums
@@ -115,8 +136,8 @@ dbg_adcsum[10] = (pz +10)->sum;
 			pz->sum = 0; // Zero sum in prep for next cycle.
 			pz += 1;
 		}
-
-		if (adc1.abs[8].f < adc1.lc.powergone)
+#if 0
+		if (adc1.abs[6].f < adc1.lc.powergone)
 		{ // Here, assume CAN power has been cut off
 			/* Processor likely running on Cell #3 power,
 			   which is connected when PC13 is ON. */
@@ -129,6 +150,7 @@ osDelay(20);                 // Short delay for red led blink
 			HAL_GPIO_WritePin(GPIOC,GPIO_PIN_13,GPIO_PIN_RESET);
 			while(1==1);
 		}
+#endif		
   	}
   	return; // Never never
 }

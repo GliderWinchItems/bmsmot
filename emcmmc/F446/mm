@@ -14,10 +14,10 @@ else
 	exit 1;
 fi	
 
-if [ -r params/$1-emc_idx_v_struct.c ]; then
-	export EMC_PARAM=$1-emc_idx_v_struct.c
+if [ -r params/$1-emcl_idx_v_struct.c ]; then
+	export EMC_PARAM=$1-emcl_idx_v_struct.c
 else
-	echo params/$1-emc_idx_v_struct.c does not exist
+	echo params/$1-emcl_idx_v_struct.c does not exist
 	exit 2;
 fi	
 echo "################ CAN ID  ################"

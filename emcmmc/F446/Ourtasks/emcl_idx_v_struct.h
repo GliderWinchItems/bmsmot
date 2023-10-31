@@ -11,8 +11,8 @@
 #include "iir_f1.h"
 #include "RyTask.h"
 
-#ifndef __EMC_IDX_V_STRUCT
-#define __EMC_IDX_V_STRUCT
+#ifndef __EMCL_IDX_V_STRUCT
+#define __EMCL_IDX_V_STRUCT
 
 #define EMCL_STATUS   60 // Report status
 #define EMCL_PWM_REP  61 // Report relay pwm
@@ -34,7 +34,7 @@ struct RELAY
 };
 
 /* Parameters levelwind instance (LC = Local Copy) */
-struct EMCLC
+struct EMCLLC
  {
 /* NOTE: all suffix _t parameters are times in milliseconds */
 	uint32_t size;
@@ -69,7 +69,7 @@ struct EMCLC
  };
 
 /* *************************************************************************/
- void emc_idx_v_struct_hardcode_params(struct EMCLC* p);
+ void emcl_idx_v_struct_hardcode_params(struct EMCLLC* p);
 /* @brief : Init struct from hard-coded parameters (rather than database params in highflash)
  * @return  : 0
  * *************************************************************************/

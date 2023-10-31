@@ -60,6 +60,14 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define JP9_THERM_Pin GPIO_PIN_0
+#define JP9_THERM_GPIO_Port GPIOC
+#define JP8_THERM_Pin GPIO_PIN_1
+#define JP8_THERM_GPIO_Port GPIOC
+#define JP10_THERM_Pin GPIO_PIN_2
+#define JP10_THERM_GPIO_Port GPIOC
+#define JP11_THERM_Pin GPIO_PIN_3
+#define JP11_THERM_GPIO_Port GPIOC
 #define M_RESET_Pin GPIO_PIN_5
 #define M_RESET_GPIO_Port GPIOA
 #define JP34_AC_Pin GPIO_PIN_6

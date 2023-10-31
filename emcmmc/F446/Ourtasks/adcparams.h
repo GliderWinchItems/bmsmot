@@ -23,14 +23,14 @@
 #define ADC1IDX_THERMISTOR2	  1 // PC1 IN11   JP8  Thermistor
 #define ADC1IDX_THERMISTOR3   2 // PC2 IN12   JP10 Thermistor
 #define ADC1IDX_THERMISTOR4   3	// PC3 IN13   JP11 Thermistor
-#define ADC1IDX_DIVIDEDSPARE  4	// PC4 IN14   10k|10k divider
+#define ADC1IDX_DIVIDEDSPARE  4	// PC4 IN14   JP17 Spare: 10k|10k divider
 #define ADC1IDX_PRESS_SENSE   5	// PC5 IN15   JP24 Pressure sensor
 #define ADC1IDX_12V_POWR      6	// PA7 IN7    12v Power supply
 #define ADC1IDX_BATTLEAK_P    7	// PB0 IN8    Battery string plus leakage
 #define ADC1IDX_BATTLEAK_M    8	// PB1 IN9    Battery string minus leakage
-#define ADC1IDX_INTERNALVREF  9 // IN17   Internal voltage reference
-#define ADC1IDX_INTERNALTEMP 10 // IN18   Internal temperature or VBAT
-#define ADC1IDX_ACTRANSFRMR  11 // PA6 IN6    AC transformer w offset
+#define ADC1IDX_ACTRANSFRMR   9 // PA6 IN6    JP34 AC Transformer
+#define ADC1IDX_INTERNALVBAT 10 // IN18       VBAT
+#define ADC1IDX_INTERNALVREF 11 // IN17       VREF
 
 /* This holds calibration values common to all ADC modules. 
      Some of these are not used. */

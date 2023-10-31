@@ -125,11 +125,11 @@ int adc_idx_v_struct_hardcode_params(struct ADCLC* p)
 	p->cabs[ADC1IDX_INTERNALVREF].scale     = 1.478422E-04f;
 	p->cabs[ADC1IDX_INTERNALVREF].ioffset    = 0;  // Offset before scale
 
-// ADC1IDX_INTERNALTEMP 10 // IN18   Internal temperature or VBAT
-	p->cabs[ADC1IDX_INTERNALTEMP].iir_f1.coef     = CELLTC; // Filter time constant
-	p->cabs[ADC1IDX_INTERNALTEMP].iir_f1.skipctr  = SKIPCT;  // Initial skip
-	p->cabs[ADC1IDX_INTERNALTEMP].scale     = 1.478422E-04f;
-	p->cabs[ADC1IDX_INTERNALTEMP].ioffset    = 0;  // Offset before scale
+// ADC1IDX_INTERNALVBAT 10 // IN18   Internal temperature or VBAT
+	p->cabs[ADC1IDX_INTERNALVBAT].iir_f1.coef     = CELLTC; // Filter time constant
+	p->cabs[ADC1IDX_INTERNALVBAT].iir_f1.skipctr  = SKIPCT;  // Initial skip
+	p->cabs[ADC1IDX_INTERNALVBAT].scale     = 1.478422E-04f;
+	p->cabs[ADC1IDX_INTERNALVBAT].ioffset    = 0;  // Offset before scale
 
 
 	/* Initialize iir filter. */

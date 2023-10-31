@@ -1,5 +1,5 @@
 /******************************************************************************
-* File Name          : RyTask.h
+* File Name          : RyTask.c
 * Date First Issued  : 06/14/2023
 * Description        : Relay Task
 *******************************************************************************/
@@ -39,29 +39,14 @@ Some relays may not have a keep-alive. A ~0L timeout skips the keep-alive.
 #include "main.h"
 #include "morse.h"
 #include "RyTask.h"
-#include "emc_idx_v_struct.h"
+#include "emcl_idx_v_struct.h"
+#include "EMCLTask.h"
 #include "DTW_counter.h"
 
 extern TIM_HandleTypeDef htim1;
 extern TIM_HandleTypeDef htim2;
 extern TIM_HandleTypeDef htim3;
 extern TIM_HandleTypeDef htim12;
-
-uint32_t debugry1;
-uint32_t debugry2;
-uint32_t debugry3;
-uint32_t debugry4;
-uint32_t debugry5;
-uint32_t debugry6;
-uint32_t debugry7;
-uint32_t debugry[16];
-uint32_t debugryx;
-#define BOUNCESZ 16
-uint32_t debugry_ext3_trise[BOUNCESZ];
-uint32_t debugry_ext3_tfall[BOUNCESZ];
-uint32_t debugry_ext3_idxrise;
-uint32_t debugry_ext3_idxfall;
-uint32_t debugry_ext3_inc(uint32_t n);
 
 static void ry_setpwm(uint32_t pwm, uint8_t idx);
 
@@ -92,9 +77,6 @@ struct RELAYWV // Working variables
    uint8_t kp_flag;   // Upon interrupt: 1 = reset kp time; 0 = let kp_wv countdown or remain zero
 };
 struct RELAYWV relaywv[NRELAYS];
-
-struct EMCLC emclc;
-
 
 struct RELAYDBUF // Buffer: relay requests pending turn-on delay
 {
@@ -127,8 +109,8 @@ static void rydbuf_startdelay(uint8_t idx)
 	delay_flag = 1; // Delay timing is active
 	
 	// Pull-in at 100%
-//	ry_setpwm(100, idx); // Set 100% pwm for this ry
-	ry_setpwm(65, idx); // Test pull-in delay
+	ry_setpwm(100, idx); // Set 100% pwm for this ry
+
 	// Set delay countdown
 	relaywv[idx].on = -1; // Set status: delay in progress
 
@@ -139,7 +121,7 @@ static void rydbuf_startdelay(uint8_t idx)
 
 	// Set delay: TIM9 (does not have a count-down direction mode)
 	TIM9->CNT  = 0;
-	TIM9->ARR  = (10 * emcfunction.lc.relay[idx].pulldelay);
+	TIM9->ARR  = (10 * emclfunction.lc.relay[idx].pulldelay);
 	TIM9->SR   = 0x0; // Clear interrupt flags jic
 	TIM9->CR1  = 0x9; // Start counting (upwards), one-shot mode
 
@@ -285,13 +267,6 @@ static void ry_setpwm(uint32_t pwmx, uint8_t idx)
 		break;
 	case 1: // OA2 T12C2
 		TIM12->CCR2 = pwm;
-
-if ((pwmx != 40) && (pwmx != 0))
-{ // Cause relay to close
-	debugry_ext3_trise[0] = DTWTIME;
-	debugry_ext3_idxrise = 1;	
-debugry6 += 1;	
-}
 		break;
 	case 2: // OA3 T2C4
 		TIM2->CCR4 = pwm;
@@ -347,7 +322,7 @@ void StartRyTask(void* argument)
 	struct RELAYDBUF* ptmp;		
 	uint32_t pwmtim;
 
-	emc_idx_v_struct_hardcode_params(&emclc);
+	emcl_idx_v_struct_hardcode_params(&emclfunction.lc);
 
 	ry_init(); // Start timers that drive relay fets
 
@@ -362,10 +337,6 @@ void StartRyTask(void* argument)
 		if (ret == pdPASS)
 		{ // Here, not a timeout waiting for a request
 			// Out-of-range relay index check
-debugry[debugryx] = pssb->idx;
-debugryx += 1;
-if (debugryx >= 16) debugryx = 0;
-
 			if (pssb->idx >= NRELAYS) morse_trap(716); // Argh!
 
 			/* Disable delay timer interrupt jic. */
@@ -373,18 +344,18 @@ if (debugryx >= 16) debugryx = 0;
 			/* Disable keep-live timer jic. */
 			TIM5->DIER &= ~0x2; // Capture 1 disable	
 			/* update the keep-alive timeout. */
-			relaywv[pssb->idx].kp_wv = emcfunction.lc.relay[pssb->idx].kp; 
+			relaywv[pssb->idx].kp_wv = emclfunction.lc.relay[pssb->idx].kp; 
 
 			pssb->cancel = 0; // JIC!
 
 			/* Convert incoming pwm (0 - 100%) to timer pwm ticks */
 			if (pssb->pwm == 255) // Use parameter value?
-				pwmtim = emcfunction.lc.relay[pssb->idx].pwm;
+				pwmtim = emclfunction.lc.relay[pssb->idx].pwm;
 			else
 				pwmtim = pssb->pwm; // Use value in request
 
 			/* Simple case where no pull-in delay is used. */
-			if (emcfunction.lc.relay[pssb->idx].pulldelay == 0)
+			if (emclfunction     .lc.relay[pssb->idx].pulldelay == 0)
 			{ // Here, no pull-in delay involved (e.g. pump motor, or fan)
 				relaywv[pssb->idx].pwm_wv = pwmtim; // Update working pwm
 				ry_setpwm(pssb->pwm,pssb->idx); // Update FET pwm drive
@@ -395,7 +366,6 @@ morse_trap(111);
 			/* Here--this relay has a pull-in delay parameter specified. */
 			if (pssb->pwm == 0) // Is request to turn relay OFF?
 			{ // Here, new pwm request turns relay off
-debugry2 += 1;				
 				ry_setpwm(pssb->pwm, pssb->idx); // Set relay FET off
 				relaywv[pssb->idx].on = 0; // Ry status: OFF
 				
@@ -432,7 +402,6 @@ HAL_GPIO_WritePin(GPIOB, GPIO_PIN_13, GPIO_PIN_SET); // RED OFF
 						if (delay_flag == 0)
 						{ // Here, TIM9 is not currently timing a delay.
 							rydbuf_startdelay(pssb->idx);
-debugry3 += 1;							
 						}
 					}
 					else
@@ -475,9 +444,6 @@ NOTE: TIM5 and TIM9 expected to be at the same interrupt priority level!
 */
 void TIM5_IRQ_Handler(void)
 {
-//morse_trap(456);
-debugry1 += 1;
-
 	TIM5->SR = ~0x2; // Clear flag CH1
 
 	/* Next interrupt time (10 ms between OC interrupts) */
@@ -525,7 +491,6 @@ debugry1 += 1;
 /*
 NOTE: TIM5 and TIM9 expected to be at the same interrupt priority level!
 */
-uint32_t debugry8;
 void TIM9_IRQ_Handler(void)
 {
 	struct RELAYDBUF* ptmp;	
@@ -540,7 +505,7 @@ if (prybuf_take == prybuf_add) morse_trap(715);
 	{ // Here, no request to abort this current pull-in.
 		/* Switch pwm from 100% for pullin to holding pwm */
 		if (prybuf_take->pwm == 255) // Parameter versus request pwm
-			ry_setpwm(emclc.relay[idx_delay].pwm,idx_delay); // use parameter
+			ry_setpwm(emclfunction.lc.relay[idx_delay].pwm,idx_delay); // use parameter
 		else
 			ry_setpwm(prybuf_take->pwm,idx_delay); // Use request value
 
@@ -554,41 +519,7 @@ if (prybuf_take == prybuf_add) morse_trap(715);
 	if (prybuf_take != prybuf_add)
 	{ // Here, buffer holds a not-cancelled entry
 		rydbuf_startdelay(ptmp->idx); // Load ry & start TIM9		
-debugry4 += 1;		
 		return; 
 	}
-debugryx = 0;	
-	return;
-}
-/* #############################################################################
- * void TIM13_IRQ_Handler(void);
- * @brief	: TIM13-- (originally for pull-in delay, but doesn't do one shot mode)
- * ############################################################################# */
-
-void TIM13_IRQ_Handler(void)
-{
-	TIM13->SR = ~0x3; // JIC
-	return;
-}
-
-
-
-uint32_t debugry_ext3_inc(uint32_t n)
-{
-	n += 1;
-	if (n >= BOUNCESZ)
-		n -= 1;
-	return n;
-}
-
-void EXTI3_IRQ_Handler_RY(void)
-{
-	debugry_ext3_trise[debugry_ext3_idxrise] = DTWTIME;
-
-	debugry_ext3_idxrise += 1;
-	if (debugry_ext3_idxrise >= 16)
-		debugry_ext3_idxrise = 15;
-
-	EXTI->PR = (1<<3); // Clear Pending Register flag
 	return;
 }

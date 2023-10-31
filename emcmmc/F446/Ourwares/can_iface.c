@@ -21,7 +21,7 @@ This simplifies the issue of disabling of interrupts
 //#define CANMSGLOOPBACKSALL
 
 #ifdef CHEATINGONHAL
-#include "stm32f407.h" 	// **** CHEATING (processor dependent) ****
+#include "stm32f446.h" 	// **** CHEATING (processor dependent) ****
 #endif
 
 #include <malloc.h>

@@ -1,30 +1,34 @@
 /******************************************************************************
-* File Name          : A0000000-emc_idx_v_struct.c
+* File Name          : A0000000-emcl_idx_v_struct.c
 * Date First Issued  : 06/14/2023
 * Board              : bmsmot
-* Description        : Load EMC parameters
+* Description        : Load EMCL parameters
 *******************************************************************************/
 /*
+10/29/23 update for emc local
 */
-
-#include "emc_idx_v_struct.h"
+#include "emcl_idx_v_struct.h"
 #include "SerialTaskReceive.h"
 #include "morse.h"
 #include "../../../../GliderWinchCommons/embed/svn_common/trunk/db/gen_db.h"
 
+static uint8_t initsw = 0;
 /* *************************************************************************
- * void emc_idx_v_struct_hardcode_params(struct EMCLC* p);
+ * void emcl_idx_v_struct_hardcode_params(struct EMCLC* p);
  * @brief	: Init struct from hard-coded parameters (rather than database params in highflash)
  * @return	: 0
  * *************************************************************************/
-void emc_idx_v_struct_hardcode_params(struct EMCLC* p)
+void emcl_idx_v_struct_hardcode_params(struct EMCLLC* p)
 {
-	p->size    = 32;
+   if (initsw != 0)
+      return;
+   initsw = 1;
+	p->size    = 32; //
+
 	p->crc     = 0;   // TBD
    p->version = 1;   // 
 
 	/* Timings in milliseconds. Converted later to timer ticks. */
-
    p->hbct_t       = 4000; // Heartbeat ct: milliseconds between sending 
    p->hbct         =   64; // Number of swctr ticks between heartbeats
 //   p->adc_hb       = 64;     // Number of ticks for heartbeat ADC readout
@@ -60,11 +64,11 @@ void emc_idx_v_struct_hardcode_params(struct EMCLC* p)
       p->relay[i].pwm       =  100; // These (normally) are full on/off
    }
 
-// List of CAN ID's for setting up hw filter for incoming msgs
-//   p->cid_uni_bms_emc_i     = CANID_UNI_BMS_EMC_I;     // B0000000 UNIversal From EMC,  Incoming msg to BMS: X4=target CANID');   
-//   p->cid_uni_bms_pc_i      = CANID_UNI_BMS_PC_I;      // B0200000 UNIversal From PC,  Incoming msg to BMS: X4=target CANID');   
+// List of CAN ID's for suscribing to incoming msgs
+   p->cid_cmd_emcmmcx_pc  = CANID_CMD_EMCMMC1_PC; // 'A1600000','PC SENDS');
+   p->cid_cmd_emcmmcx_emc = CANID_CMD_EMCMMC1_EMC;// 'A1800000', EMC SENDS'); 
 
-// CAN ids BMS sends, others receive
-//   p->cid_msg_bms_cellvsmr = I_AM_CANID; // B0A00000
+// CAN ids EMCMMC sends, others receive
+   p->cid_unit_emcmmcx = I_AM_CANID; // A0000000
 	return;
 }

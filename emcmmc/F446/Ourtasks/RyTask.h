@@ -3,8 +3,6 @@
 * Date First Issued  : 06/14/2023
 * Description        : Relay Task
 *******************************************************************************/
-
-
 #ifndef __RYTASK
 #define __RYTASK
 
@@ -12,7 +10,7 @@
 #include "FreeRTOS.h"
 #include "cmsis_os.h"
 #include "stm32f4xx_hal.h"
-#include "EMCTask.h"
+//#include "EMCTask.h"
 
 /* Keep-Alive timer (TIM5) OC interrupt rate */
 // Prescalar = 9000; Sysclock = 180 MHz

@@ -1,17 +1,17 @@
 /******************************************************************************
-* File Name          : EMCTask.h
-* Date First Issued  : 06/14/2023
-* Description        : EMC task for bmsmot pcb
+* File Name          : EMCLTask.c
+* Date First Issued  : 10/29/2023
+* Description        : Energy Management Control Local task
 *******************************************************************************/
 
-#ifndef __EMCTASK
-#define __EMCTASK
+#ifndef __EMCLTASK
+#define __EMCLTASK
 
 #include <stdint.h>
 #include "FreeRTOS.h"
 #include "cmsis_os.h"
 //#include "stm32l4xx_hal.h"
-#include "emc_idx_v_struct.h"
+#include "emcl_idx_v_struct.h"
 #include "CanTask.h"
 #include "adc_idx_v_struct.h"
 
@@ -21,11 +21,11 @@ struct EMCREQ_Q
 };
 
 
-/* Working struct for BQ function. */
-struct EMCFUNCTION
+/* Working struct for EMC local function. */
+struct EMCLFUNCTION
 {
    // Parameter loaded either by high-flash copy, or hard-coded subroutine
-	struct EMCLC lc; // Fixed parameters, (lc = Local Copy)
+	struct EMCLLC lc; // Fixed parameters, (lc = Local Copy)
 
 //	struct ADCFUNCTION* padc; // Pointer to ADC working struct
 
@@ -67,14 +67,14 @@ struct EMCFUNCTION
 	struct CANTXQMSG canmsg;
 };
 /* *************************************************************************/
-osThreadId xEMCTaskCreate(uint32_t taskpriority);
+osThreadId xEMCLTaskCreate(uint32_t taskpriority);
 /* @brief	: Create task; task handle created is global for all to enjoy!
  * @param	: taskpriority = Task priority (just as it says!)
- * @return	: EMCTaskHandle
+ * @return	: EMCLTaskHandle
  * *************************************************************************/
 
- extern TaskHandle_t EMCTaskHandle;
- extern struct EMCFUNCTION emcfunction;
+ extern TaskHandle_t EMCLTaskHandle;
+ extern struct EMCLFUNCTION emclfunction;
 
 
 

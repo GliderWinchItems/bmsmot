@@ -157,63 +157,22 @@ static uint8_t for_us(struct CANRCVBUF* pcan, struct EMCFUNCTION* p)
 	return 1; // Skip. This request is not for us.
 }
 /* *************************************************************************
- *  void CanComm_qreq(uint32_t reqcode, uint32_t setfets, struct CANRCVBUF* pcan);
- *	@brief	: Queue request to BMSTask.c
- *  @param  : reqcode = see BMSTask.h 
- *  @param  : setfets = bits to set discharge fets (if so commanded)
- *  @param  : idx = this queue request slot
- *  @param  : notebit = notification bit when BMSTask completes request
- * *************************************************************************/
-void CanComm_qreq(uint32_t reqcode, uint32_t setfets, struct CANRCVBUF* pcan)
-{
-#if 0	
-	struct CANQED* pcanqed;
-
-	/* Get a pointer to a free position. */
-    pcanqed = canqedadd();
-    // NULL means buffer is full.
-    if (pcanqed == NULL)
-    {
-morse_trap(654);    	
-    	return; // Screwed.
-	}
-
-    pcanqed->busy = 1;
-    pcanqed->time = DTWTIME;
-
-	/* Setup request for BMSTask. */
-	pcanqed->can = *pcan; // Save requesting CAN msg
-	pcanqed->bmsreq_c.reqcode  = reqcode; // BMSTask request code
-	pcanqed->bmsreq_c.setfets  = setfets; // Discharge fet bits to set
-    pcanqed->bmsreq_c.noteyes  = 1; // Yes, we will wait for notification
-
-    // Timeout check for missing notifications (debugging?)
-	canqed_time = xTaskGetTickCount(); // Update time
- 
-    // Queue request for BMSTask.c
-// ???? 	int ret = xQueueSendToBack(BMSTaskReadReqQHandle, &pcanqed->pbmsreq_c, 0);
- //   if (ret != pdPASS) morse_trap(650);	
-#endif 
-    return;
-}
-/* *************************************************************************
- * void CanComm_init(struct BQFUNCTION* p );
+ * void CanComm_init(struct EMCLFUNCTION* p );
  *	@brief	: Task startup
  * *************************************************************************/
-void CanComm_init(struct EMCFUNCTION* p )
+void CanComm_init(struct EMCLFUNCTION* p )
 {
-#if 0
 	uint8_t i;
 
 	/* Add CAN Mailboxes                               CAN     CAN ID             TaskHandle,Notify bit,Skip, Paytype */
-    p->pmbx_cid_uni_bms_emc_i      = MailboxTask_add(pctl0,p->lc.cid_uni_bms_emc_i, NULL, CANCOMMBIT00,0,U8); // universal #1
-    if (p->pmbx_cid_uni_bms_emc_i == NULL) morse_trap(622);
-    p->pmbx_cid_uni_bms_pc_i      = MailboxTask_add(pctl0,p->lc.cid_uni_bms_pc_i,   NULL, CANCOMMBIT01,0,U8); // universal #2
-    if (p->pmbx_cid_uni_bms_pc_i == NULL) morse_trap(622);
+    p->pmbx_cid_cmd_emcmmcx_pc      = MailboxTask_add(pctl0,p->lc.cid_cmd_emcmmcx_pc, NULL, CANCOMMBIT00,0,U8); // universal #1
+    if (p->pmbx_cid_cmd_emcmmcx_pc == NULL) morse_trap(622);
+    p->pmbx_cid_cmd_emcmmcx_emc      = MailboxTask_add(pctl0,p->lc.cid_cmd_emcmmcx_emc,   NULL, CANCOMMBIT01,0,U8); // universal #2
+    if (p->pmbx_cid_cmd_emcmmcx_emc == NULL) morse_trap(622);
 
     /* Add CAN msgs to incoming CAN hw filter. (Skip to allow all incoming msgs. */
- //   canfilt(603, p->pmbx_cid_uni_bms_emc_i);
- //   canfilt(603, p->pmbx_cid_uni_bms_pc_i);
+ //   canfilt(603, p->pmbx_cid_cmd_emcmmcx_emc);
+ //   canfilt(603, p->pmbx_cid_cmd_emcmmcx_pc);
 
 	/* Pre-load fixed data ib CAN msg to be sent. */
 	p->canmsg.pctl = pctl0;   // Control block for CAN module (CAN 1)
@@ -228,26 +187,9 @@ void CanComm_init(struct EMCFUNCTION* p )
 	can_hb.id       = p->lc.cid_msg_bms_cellvsmr;
 	can_hb.dlc      = 8;
 	can_hb.cd.ull   = 0; // Clear entire payload
-	can_hb.cd.uc[0] = CMD_CMD_CELLPOLL;  // request code (initial, changed later)
-	can_hb.cd.ui[1] = p->lc.cid_msg_bms_cellvsmr;
+	can_hb.cd.uc[0] = 0;  // request code (initial, changed later)
+	can_hb.cd.ui[1] = p->lc.cid_unit_emcmmcx;
 	
-	/* Circular buffer for saving CAN msg for queued BMSTask requests */
-	/* Pre-load fixed data into array for queuing BMSTask requests. */
-	for (i = 0; i < CANQEDSIZE; i++)
-	{
-		// Notification: task handle
-		canqed[i].bmsreq_c.bmsTaskHandle = xTaskGetCurrentTaskHandle();
-		// Pointer to request struct since BMSTask queue is pointers.
-		canqed[i].pbmsreq_c = &canqed[i].bmsreq_c;
-		// Notification bit 
-		canqed[i].bmsreq_c.tasknote  = (1 << (CANCOMMQUEUE + i));
-		// Show not busy
-		canqed[i].busy = 0;
-		// 
-		canqed[i].time = (DTWTIME + 8000000);
-	}
-	idxhb = 0; // Index for checking timeouts of notification failure
-#endif	
 	return;
 }
 /* *************************************************************************

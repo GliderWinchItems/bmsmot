@@ -40,11 +40,11 @@
 #include "yprintf.h"
 #include "ADCTask.h"
 #include "MailboxTask.h"
-#include "CanCommTask.h"
+//#include "CanCommTask.h"
 #include "rtcregs.h"
-#include "EMCTask.h"
+#include "EMCLTask.h"
 #include "RyTask.h"
-#include "emc_idx_v_struct.h"
+#include "emcl_idx_v_struct.h"
 
 #include "FreeRTOS.h"
 #include "semphr.h"
@@ -246,15 +246,14 @@ int main(void)
   TaskHandle_t rett = xRyTaskCreate(osPriorityNormal);
   if (rett == NULL) morse_trap(109);
 
-//  Thrdret = xADCTaskCreate(osPriorityNormal+2); // (arg) = priority
-//  if (Thrdret == NULL) morse_trap(117);
+  Thrdret = xADCTaskCreate(osPriorityNormal+2); // (arg) = priority
+  if (Thrdret == NULL) morse_trap(117);
 
   /* Create serial task (priority) */
-  // Task handle "osThreadId SerialTaskHandle" is global
   Thrdret = xSerialTaskSendCreate(osPriorityNormal); // Create task and set Task priority
   if (Thrdret == NULL) morse_trap(112);
 
-    /* Add bcb circular buffer to SerialTaskSend for usart3 -- PC monitor */
+  /* Add bcb circular buffer to SerialTaskSend for usart3 -- PC monitor */
   #define NUMCIRBCB3  16 // Size of circular buffer of BCB for usart3
   ret = xSerialTaskSendAdd(&HUARTMON, NUMCIRBCB3, 1); // dma
   if (ret < 0) morse_trap(14); // Panic LED flashing
@@ -271,15 +270,35 @@ int main(void)
   if (pctl1->ret < 0) morse_trap(88);  
 #endif
 
+   /* definition and creation of CanTxTask - CAN driver TX interface. */
+  QueueHandle_t QHret = xCanTxTaskCreate(osPriorityNormal+1, 48); // CanTask priority, Number of msgs in queue
+  if (QHret == NULL) morse_trap(120); // Panic LED flashing
+
+  /* definition and creation of CanRxTask - CAN driver RX interface. */
+  /* The MailboxTask takes care of the CANRx                         */
+//  Qidret = xCanRxTaskCreate(1, 32); // CanTask priority, Number of msgs in queue
+//  if (Qidret < 0) morse_trap(6); // Panic LED flashing
+
+  /* Create MailboxTask */
+  xMailboxTaskCreate(osPriorityNormal+1); // (arg) = priority
+
+  /* Create Mailbox control block w 'take' pointer for each CAN module. */
+  struct MAILBOXCANNUM* pmbxret;
+  // (CAN1 control block pointer, size of circular buffer)
+  pmbxret = MailboxTask_add_CANlist(pctl0, 32);
+  if (pmbxret == NULL) morse_trap(215);
+  pmbxret = MailboxTask_add_CANlist(pctl1, 32);
+  if (pmbxret == NULL) morse_trap(215);
+
   /* Create serial receiving task. */
   ret = xSerialTaskReceiveCreate(osPriorityNormal);
   if (ret != pdPASS) morse_trap(113);
 
-  /* Create EMCTask */
-  Thrdret = xEMCTaskCreate(osPriorityNormal);
+  /* Create EMCLTask */
+  Thrdret = xEMCLTaskCreate(osPriorityNormal);
   if (Thrdret == NULL) morse_trap(108);
 
-  emc_idx_v_struct_hardcode_params(&emcfunction.lc);
+  emcl_idx_v_struct_hardcode_params(&emclfunction.lc);
 
   /* USER CODE END RTOS_THREADS */
 
@@ -377,7 +396,7 @@ static void MX_ADC1_Init(void)
   hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
   hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
   hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
-  hadc1.Init.NbrOfConversion = 11;
+  hadc1.Init.NbrOfConversion = 12;
   hadc1.Init.DMAContinuousRequests = ENABLE;
   hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
   if (HAL_ADC_Init(&hadc1) != HAL_OK)
@@ -411,6 +430,7 @@ static void MX_ADC1_Init(void)
   }
   /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
   */
+  sConfig.Channel = ADC_CHANNEL_13;
   sConfig.Rank = 4;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
   {
@@ -471,6 +491,14 @@ static void MX_ADC1_Init(void)
   */
   sConfig.Channel = ADC_CHANNEL_VBAT;
   sConfig.Rank = 11;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
+  */
+  sConfig.Channel = ADC_CHANNEL_VREFINT;
+  sConfig.Rank = 12;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
   {
     Error_Handler();
@@ -1168,16 +1196,10 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : PC0 PC1 PC2 */
-  GPIO_InitStruct.Pin = GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_2;
+  /*Configure GPIO pins : JP9_THERM_Pin JP8_THERM_Pin JP10_THERM_Pin JP11_THERM_Pin */
+  GPIO_InitStruct.Pin = JP9_THERM_Pin|JP8_THERM_Pin|JP10_THERM_Pin|JP11_THERM_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
-
-  /*Configure GPIO pin : PC3 */
-  GPIO_InitStruct.Pin = GPIO_PIN_3;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING_FALLING;
-  GPIO_InitStruct.Pull = GPIO_PULLUP;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
   /*Configure GPIO pin : M_RESET_Pin */
@@ -1206,10 +1228,6 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(JP14_IN_GPIO_Port, &GPIO_InitStruct);
 
-  /* EXTI interrupt init*/
-  HAL_NVIC_SetPriority(EXTI3_IRQn, 10, 0);
-  HAL_NVIC_EnableIRQ(EXTI3_IRQn);
-
 }
 
 /* USER CODE BEGIN 4 */
@@ -1222,39 +1240,12 @@ static void MX_GPIO_Init(void)
   * @param  argument: Not used
   * @retval None
   */
-  #define NRYTEST 3
-  struct RYTEST
-  {
-    struct RYREQ_Q rytest;
-    struct RYREQ_Q* preq;
-    uint8_t inc; 
-  };
-  static struct RYTEST rytest[NRYTEST];
+
 
 /* USER CODE END Header_StartDefaultTask */
 void StartDefaultTask(void const * argument)
 {
   /* USER CODE BEGIN 5 */
-
-  /* Relay test */
-  uint32_t qret;
-
-  rytest[0].rytest.idx =  0; // Relay index (0 - 11)
-  rytest[1].rytest.idx =  1; // Relay index (0 - 11)
-  rytest[2].rytest.idx =  2; // Relay index (0 - 11)
-
-  rytest[0].rytest.pwm =  5; // PWM after delay (0 - 100);
-  rytest[1].rytest.pwm = 25; // PWM after delay (0 - 100);
-  rytest[2].rytest.pwm =  5; // PWM after delay (0 - 100);
-
-  rytest[0].preq = &rytest[0].rytest;
-  rytest[1].preq = &rytest[1].rytest;
-  rytest[2].preq = &rytest[2].rytest;
-
-  rytest[0].inc =  0;
-  rytest[1].inc =  0;
-  rytest[2].inc =  0;
-
   
   struct SERIALSENDTASKBCB* pbuf1 = getserialbuf(&HUARTMON,144);
   if (pbuf1 == NULL) morse_trap(115);
@@ -1269,14 +1260,10 @@ void StartDefaultTask(void const * argument)
   yprintf(&pbuf1,"\n\n\rPROGRAM STARTS");
 //HAL_GPIO_WritePin(GPIOB, GPIO_PIN_13, GPIO_PIN_SET); // RED OFF
 uint32_t ctr = 0;
-uint32_t ctr2 = 0;
   
-  for (int j = 0; j < NRYTEST; j++)
-  {
-    qret=xQueueSendToBack(RyTaskReadReqQHandle, &rytest[j].preq, portMAX_DELAY);
-    if (qret == errQUEUE_FULL) morse_trap(123);  
-  }
-
+//    qret=xQueueSendToBack(RyTaskReadReqQHandle, &rytest[j].preq, portMAX_DELAY);
+//    if (qret == errQUEUE_FULL) morse_trap(123);  
+uint32_t prev = 0;
 
   /* Infinite loop */
   for(;;)
@@ -1285,64 +1272,22 @@ uint32_t ctr2 = 0;
     HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, GPIO_PIN_RESET); // GRN ON
         osDelay(50);
     HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, GPIO_PIN_SET); // GRN OFF
-      osDelay(500-50);
+      osDelay(1000-50);
 
-#if 0
-    extern uint32_t debugry1;
-    extern uint32_t debugry2;
-    extern uint32_t debugry3;
-    extern uint32_t debugry4;
-    extern uint32_t debugry5;
-    extern uint32_t debugry6;
-    extern uint32_t debugry7;
-    yprintf(&pbuf2,": %d %d %d %d %d %d %d:", debugry1,debugry2,debugry3,debugry4,debugry5,debugry6,debugry7);
-//  extern uint32_t debugryx;
-//  extern uint32_t debugry[];    
-//    for (int j = 0; j < debugryx; j++)
-//      yprintf(&pbuf1," %d",debugry[j]);
-
-    for (int j = 0; j < NRYTEST; j++)
+extern uint32_t dbg_adcsum[ADCDIRECTMAX];
+    for (int j = 0; j < ADCDIRECTMAX; j++)
     {
-      yprintf(&pbuf1," %d", rytest[j].rytest.pwm);
+      yprintf(&pbuf1," %7d",dbg_adcsum[j]);
     }
-#endif    
- #define BOUNCESZ 16
-extern uint32_t debugry_ext3_trise[BOUNCESZ];
-extern uint32_t debugry_ext3_tfall[BOUNCESZ];
-extern uint32_t debugry_ext3_idxrise;
-extern uint32_t debugry_ext3_idxfall; 
-extern uint32_t debugry6;
-    yprintf(&pbuf1," %d:", debugry6);
-    for (int j = 0; j < debugry_ext3_idxrise; j++)
-      yprintf(&pbuf1," %d", (debugry_ext3_trise[j]-debugry_ext3_trise[0])/180);
-
-   rytest[1].rytest.pwm = 0;
-    qret=xQueueSendToBack(RyTaskReadReqQHandle, &rytest[1].preq, portMAX_DELAY);
-     if (qret == errQUEUE_FULL) morse_trap(123); 
-
-     osDelay(500);    
-
-    rytest[1].rytest.pwm = 40;
-    qret=xQueueSendToBack(RyTaskReadReqQHandle, &rytest[1].preq, portMAX_DELAY);
-     if (qret == errQUEUE_FULL) morse_trap(123); 
-
-     if (ctr2++ >= 10) while(1==1);
-     
-#if 0
-    /* Repeat */
-    ctr2 +=1 ;
-    if (ctr2 >= 120)
+extern uint32_t debugadcctr;    
+    yprintf(&pbuf2," : %d",debugadcctr-prev);
+    prev = debugadcctr;
+    yprintf(&pbuf1,"\n\r        ");
+extern struct ADCFUNCTION adc1;
+    for (int i= 0; i < ADCDIRECTMAX; i++)
     {
-      ctr2 = 0;
-      ctr = 0;
-    yprintf(&pbuf1,"\n\n");
-      for (int j = 0; j < NRYTEST; j++)
-      {
-        qret=xQueueSendToBack(RyTaskReadReqQHandle, &rytest[j].preq, portMAX_DELAY);
-        if (qret == errQUEUE_FULL) morse_trap(123); 
-      }
-    }
-#endif    
+      yprintf(&pbuf1," %7.1f",adc1.abs[i].filt);
+    }  
   }
   /* USER CODE END 5 */
 }
