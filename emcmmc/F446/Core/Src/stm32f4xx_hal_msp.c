@@ -125,12 +125,12 @@ void HAL_ADC_MspInit(ADC_HandleTypeDef* hadc)
     PB1     ------> ADC1_IN9
     */
     GPIO_InitStruct.Pin = JP9_THERM_Pin|JP8_THERM_Pin|JP10_THERM_Pin|JP11_THERM_Pin
-                          |JP17_SPARE_Pin|JP24_SPARE_Pin;
+                          |JP17_SPARE_Pin|JP24_Pressure_Pin;
     GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-    GPIO_InitStruct.Pin = JP34_AC_Pin|PWR12V__Pin;
+    GPIO_InitStruct.Pin = JP34_ACtransfrmr_Pin|PWR12V__Pin;
     GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
@@ -162,6 +162,36 @@ void HAL_ADC_MspInit(ADC_HandleTypeDef* hadc)
   /* USER CODE BEGIN ADC1_MspInit 1 */
 
   /* USER CODE END ADC1_MspInit 1 */
+  }
+  else if(hadc->Instance==ADC2)
+  {
+  /* USER CODE BEGIN ADC2_MspInit 0 */
+
+  /* USER CODE END ADC2_MspInit 0 */
+    /* Peripheral clock enable */
+    __HAL_RCC_ADC2_CLK_ENABLE();
+
+    __HAL_RCC_GPIOC_CLK_ENABLE();
+    __HAL_RCC_GPIOA_CLK_ENABLE();
+    /**ADC2 GPIO Configuration
+    PC1     ------> ADC2_IN11
+    PC2     ------> ADC2_IN12
+    PA6     ------> ADC2_IN6
+    PC5     ------> ADC2_IN15
+    */
+    GPIO_InitStruct.Pin = JP8_THERM_Pin|JP10_THERM_Pin|JP24_Pressure_Pin;
+    GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
+    GPIO_InitStruct.Pin = JP34_ACtransfrmr_Pin;
+    GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    HAL_GPIO_Init(JP34_ACtransfrmr_GPIO_Port, &GPIO_InitStruct);
+
+  /* USER CODE BEGIN ADC2_MspInit 1 */
+
+  /* USER CODE END ADC2_MspInit 1 */
   }
 
 }
@@ -195,9 +225,9 @@ void HAL_ADC_MspDeInit(ADC_HandleTypeDef* hadc)
     PB1     ------> ADC1_IN9
     */
     HAL_GPIO_DeInit(GPIOC, JP9_THERM_Pin|JP8_THERM_Pin|JP10_THERM_Pin|JP11_THERM_Pin
-                          |JP17_SPARE_Pin|JP24_SPARE_Pin);
+                          |JP17_SPARE_Pin|JP24_Pressure_Pin);
 
-    HAL_GPIO_DeInit(GPIOA, JP34_AC_Pin|PWR12V__Pin);
+    HAL_GPIO_DeInit(GPIOA, JP34_ACtransfrmr_Pin|PWR12V__Pin);
 
     HAL_GPIO_DeInit(GPIOB, STRING_PLUS_Pin|STRING_MINUS_Pin);
 
@@ -206,6 +236,28 @@ void HAL_ADC_MspDeInit(ADC_HandleTypeDef* hadc)
   /* USER CODE BEGIN ADC1_MspDeInit 1 */
 
   /* USER CODE END ADC1_MspDeInit 1 */
+  }
+  else if(hadc->Instance==ADC2)
+  {
+  /* USER CODE BEGIN ADC2_MspDeInit 0 */
+
+  /* USER CODE END ADC2_MspDeInit 0 */
+    /* Peripheral clock disable */
+    __HAL_RCC_ADC2_CLK_DISABLE();
+
+    /**ADC2 GPIO Configuration
+    PC1     ------> ADC2_IN11
+    PC2     ------> ADC2_IN12
+    PA6     ------> ADC2_IN6
+    PC5     ------> ADC2_IN15
+    */
+    HAL_GPIO_DeInit(GPIOC, JP8_THERM_Pin|JP10_THERM_Pin|JP24_Pressure_Pin);
+
+    HAL_GPIO_DeInit(JP34_ACtransfrmr_GPIO_Port, JP34_ACtransfrmr_Pin);
+
+  /* USER CODE BEGIN ADC2_MspDeInit 1 */
+
+  /* USER CODE END ADC2_MspDeInit 1 */
   }
 
 }
