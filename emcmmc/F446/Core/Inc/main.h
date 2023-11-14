@@ -60,6 +60,8 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define RTC_WAKE_FETGATE_Pin GPIO_PIN_13
+#define RTC_WAKE_FETGATE_GPIO_Port GPIOC
 #define JP9_THERM_Pin GPIO_PIN_0
 #define JP9_THERM_GPIO_Port GPIOC
 #define JP8_THERM_Pin GPIO_PIN_1
@@ -108,8 +110,11 @@ void Error_Handler(void);
 #define HDR_OC4_GPIO_Port GPIOA
 #define HDR_OC2_Pin GPIO_PIN_11
 #define HDR_OC2_GPIO_Port GPIOA
-#define ACDET_Pin GPIO_PIN_15
-#define ACDET_GPIO_Port GPIOA
+#define Keyswsense_Pin GPIO_PIN_12
+#define Keyswsense_GPIO_Port GPIOA
+#define ACzeroxing_Pin GPIO_PIN_15
+#define ACzeroxing_GPIO_Port GPIOA
+#define ACzeroxing_EXTI_IRQn EXTI15_10_IRQn
 #define JP21_FETSUB104_Pin GPIO_PIN_3
 #define JP21_FETSUB104_GPIO_Port GPIOB
 #define JP14_IN_Pin GPIO_PIN_4

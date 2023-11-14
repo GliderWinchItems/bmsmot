@@ -54,8 +54,9 @@ Temp(degree) = (V_sense - V_25)/Avg_slope + 25
 /* Calibration values common to all ADC modules. */
 struct ADCCALCOMMON adcommon;
 
-/* Everything for ADC1. */
+/* Everything for ADC */
 struct ADCFUNCTION adc1;
+struct ADCFUNCTION adc2;
 
 /* *************************************************************************
  * void adcparams_init(void);

@@ -355,7 +355,7 @@ void StartRyTask(void* argument)
 				pwmtim = pssb->pwm; // Use value in request
 
 			/* Simple case where no pull-in delay is used. */
-			if (emclfunction     .lc.relay[pssb->idx].pulldelay == 0)
+			if (emclfunction.lc.relay[pssb->idx].pulldelay == 0)
 			{ // Here, no pull-in delay involved (e.g. pump motor, or fan)
 				relaywv[pssb->idx].pwm_wv = pwmtim; // Update working pwm
 				ry_setpwm(pssb->pwm,pssb->idx); // Update FET pwm drive

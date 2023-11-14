@@ -17,7 +17,8 @@
 
 
 
-#define ADCSEQNUM 16  // Number of ADC scans in 1/2 of the DMA buffer
+#define ADC1SEQNUM 16 // Number of ADC1 scans in 1/2 of the DMA buffer
+#define ADC2SEQNUM (32*16) // Number of ADC2 scans in 1/2 of the DMA buffer
 
 /* *************************************************************************/
 osThreadId xADCTaskCreate(uint32_t taskpriority);
@@ -25,10 +26,14 @@ osThreadId xADCTaskCreate(uint32_t taskpriority);
  * @param	: taskpriority = Task priority (just as it says!)
  * @return	: ADCTaskHandle
  * *************************************************************************/
+/* #######################################################################
+   Pin 15 interrupt (AC opto-isolator) */
+   void EXTI15_IRQHandler(void);
+/*   ####################################################################### */
 
 extern TaskHandle_t ADCTaskHandle;// replace: extern osThreadId ADCTaskHandle;
 
-extern float    adcsumfilt[ADCDIRECTMAX]; // Filtered
+extern float    adcsumfilt[ADC1DIRECTMAX]; // Filtered
 
 extern uint8_t  adcsumidx; // Index for currently being summed
 

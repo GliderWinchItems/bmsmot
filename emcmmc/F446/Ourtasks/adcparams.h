@@ -92,8 +92,8 @@ struct ADCFUNCTION
 {
 	struct ADCLC lc;    // Local Copy of parameters
 	struct ADCCALCOMMON common; // Vref & temp stuff
-	struct ADCABS abs[ADCDIRECTMAX]; // Absolute readings calibrated
-	struct ADCCHANNEL chan[ADCDIRECTMAX]; //
+	struct ADCABS abs[ADC1DIRECTMAX]; // Absolute readings calibrated
+	struct ADCCHANNEL chan[ADC1DIRECTMAX]; //
 	uint32_t ctr; // Running count of updates.
 	uint8_t sumctr; // DMA summation counter
 };
@@ -114,6 +114,7 @@ extern struct ADCCALCOMMON adcommon;
 
 /* Everything for ADC1. */
 extern struct ADCFUNCTION adc1;
+extern struct ADCFUNCTION adc2;
 
 
 #endif

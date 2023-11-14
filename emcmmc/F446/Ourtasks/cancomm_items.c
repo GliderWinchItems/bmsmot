@@ -149,7 +149,7 @@ void cancomm_items_sendcmdr(struct CANRCVBUF* pi)
 #if 0
 	struct BQFUNCTION* p = &bqfunction;
 	struct CANRCVBUF* po = &p->canmsg.can;
-	float ftmp[ADCDIRECTMAX];
+	float ftmp[ADC1DIRECTMAX];
 	uint8_t i;
 
 	/* Pointer to payload 4 byte value is used often. */
@@ -256,16 +256,16 @@ void cancomm_items_sendcmdr(struct CANRCVBUF* pi)
 		break;		
 
  	case MISCQ_PROC_CAL: // Processor ADC calibrated readings
- 		for (i = 0; i < ADCDIRECTMAX; i++) // Copy struct items to float array
+ 		for (i = 0; i < ADC1DIRECTMAX; i++) // Copy struct items to float array
  			ftmp[i] = adc1.abs[i].filt;
  		ftmp[1] = adc1.common.degC; // Insert special internal temperature calibration 
- 		send_bms_array(po, &ftmp[0], ADCDIRECTMAX);
+ 		send_bms_array(po, &ftmp[0], ADC1DIRECTMAX);
  		break;
 
  	case MISCQ_PROC_ADC: // Processor ADC raw adc counts for making calibrations
-		for (i = 0; i < ADCDIRECTMAX; i++) // Copy struct items to float array
+		for (i = 0; i < ADC1DIRECTMAX; i++) // Copy struct items to float array
  			ftmp[i] = adc1.abs[i].sumsave;
-		send_bms_array(po, &ftmp[0], ADCDIRECTMAX); 	
+		send_bms_array(po, &ftmp[0], ADC1DIRECTMAX); 	
  		break;
 
 	case MISCQ_R_BITS:      // 21 Dump, dump2, heater, discharge bits

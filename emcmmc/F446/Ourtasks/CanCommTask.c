@@ -498,15 +498,15 @@ static uint8_t q_do(struct CANRCVBUF* pcan)
 	case MISCQ_TOPOFSTACK: // BMS top-of-stack voltage		send_bms_array(po, &bqfunction.cal_filt[19], 1);
  	case MISCQ_PROC_CAL: // Processor ADC calibrated readings
  	/*
- 		for (i = 0; i < ADCDIRECTMAX; i++) // Copy struct items to float array
+ 		for (i = 0; i < ADC1DIRECTMAX; i++) // Copy struct items to float array
  			ftmp[i] = adc1.abs[i].filt;
  		ftmp[1] = adc1.common.degC; // Insert special internal temperature calibration 
- 		send_bms_array(po, &ftmp[0], ADCDIRECTMAX);
+ 		send_bms_array(po, &ftmp[0], ADC1DIRECTMAX);
 	*/
  	case MISCQ_PROC_ADC: // Processor ADC raw adc counts for making calibrations
-	/*	for (i = 0; i < ADCDIRECTMAX; i++) // Copy struct items to float array
+	/*	for (i = 0; i < ADC1DIRECTMAX; i++) // Copy struct items to float array
  			ftmp[i] = adc1.abs[i].sumsave;
-		send_bms_array(po, &ftmp[0], ADCDIRECTMAX); 	 */
+		send_bms_array(po, &ftmp[0], ADC1DIRECTMAX); 	 */
 	case MISCQ_R_BITS:      // 21 Dump, dump2, heater, discharge bits
 	case MISCQ_CURRENT_CAL: // 24 Below cell #1 minus, current resistor: calibrated
 	case MISCQ_CURRENT_ADC: // 25 Below cell #1 minus, current resistor: adc counts	

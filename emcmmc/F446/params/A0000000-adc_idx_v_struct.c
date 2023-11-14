@@ -141,7 +141,7 @@ int adc_idx_v_struct_hardcode_params(struct ADCLC* p)
 
 
 	/* Initialize iir filter. */
-	for (int i = 0; i < ADCDIRECTMAX; i++)
+	for (int i = 0; i < ADC1DIRECTMAX; i++)
 	{
 		p->cabs[i].iir_f1.onemcoef = 1 - p->cabs[i].iir_f1.coef;
 	}

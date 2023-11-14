@@ -15,7 +15,7 @@
 #include "cmsis_os.h"
 #include "stm32f4xx_hal.h"
 
-#define ADCNUM 1  // Number of ADC modules
+#define ADCNUM 2  // Number of ADC modules
 
 /* Augment 'MX adc control block for dma buffering and summing */
 struct ADCDMATSKBLK
@@ -34,16 +34,22 @@ struct ADCDMATSKBLK
 struct ADCDMATSKBLK* adctask_init(ADC_HandleTypeDef* phadc,\
 	uint32_t  notebit1,\
 	uint32_t  notebit2,\
-	uint32_t* pnoteval);
+	uint32_t* pnoteval,\
+	uint32_t  adcseqnum,\
+	uint32_t  adcdirectmax,\
+	uint32_t  adcidx);
 /*	@brief	: Setup ADC DMA buffers and control block
- * @param	: phadc = pointer to ADC control block
+ * @param	: phadc = pointer to 'MX ADC control block
  * @param	: notebit1 = unique bit for notification @ 1/2 dma buffer
  * @param	: notebit2 = unique bit for notification @ end dma buffer
  * @param	: pnoteval = pointer to word receiving notification word from OS
+ * @param   : adcseqnum = number of ADC scans in 1/2 of the DMA buffer
+ * @param   : adcdirectmax = number of conversions in one adc scan
+ * @param   : adcidx = idx 0,1,2 for ADC 1,2,3
  * @return	: NULL = fail
  * *************************************************************************/
 
-extern struct ADCDMATSKBLK adc1dmatskblk[ADCNUM];
+extern struct ADCDMATSKBLK adcdmatskblk[ADCNUM];
 
 /* Calibration values common to all ADC modules. */
 extern struct ADCCALCOMMON adcommon;
