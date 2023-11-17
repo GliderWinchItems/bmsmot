@@ -337,11 +337,10 @@ void SystemClock_Config(void)
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
-  RCC_OscInitStruct.HSIState = RCC_HSI_ON;
-  RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
+  RCC_OscInitStruct.HSEState = RCC_HSE_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
-  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
+  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
   RCC_OscInitStruct.PLL.PLLM = 8;
   RCC_OscInitStruct.PLL.PLLN = 180;
   RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
@@ -552,7 +551,7 @@ static void MX_ADC2_Init(void)
   */
   sConfig.Channel = ADC_CHANNEL_6;
   sConfig.Rank = 1;
-  sConfig.SamplingTime = ADC_SAMPLETIME_56CYCLES;
+  sConfig.SamplingTime = ADC_SAMPLETIME_28CYCLES;
   if (HAL_ADC_ConfigChannel(&hadc2, &sConfig) != HAL_OK)
   {
     Error_Handler();
@@ -1325,6 +1324,7 @@ uint32_t ctr;
     HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, GPIO_PIN_SET); // GRN OFF
       osDelay(250-30);
 
+#if 0
 #define DEBUGSZ (513*8)
 extern uint32_t debugadcsumidx;
 extern uint16_t debugadcsum[];
@@ -1344,22 +1344,43 @@ extern uint32_t debugadc2ctr;
       {
           yprintf(&pbuf1,"\n\r%5d %9d",ctr++,debugadcsumidx);
       }
+#endif
 
 
-#if 0
+#if 1
 extern uint32_t exti15dtw_diff;
 extern uint32_t  exti15dtw_flag;
 extern uint32_t  exti15dtw_flag_prev;
-      yprintf(&pbuf1,"\n\r%8d %8d %8d",exti15dtw_flag-exti15dtw_flag_prev,exti15dtw_diff,exti15dtw_diff/180);
+
+extern uint32_t exti15dtw_accum_flag;
+extern int32_t  exti15dtw_accum_diff;
+if (exti15dtw_accum_flag != 0)
+{
+      yprintf(&pbuf1,"\n\r%9d %8d %8d",ctr++,exti15dtw_diff,exti15dtw_diff/180);
         exti15dtw_flag_prev = exti15dtw_flag;
+}        
+//extern uint32_t exti15dtw_irqctr;
+      //yprintf(&pbuf2," %8d",exti15dtw_irqctr);
 
 extern uint32_t exti15dtw_reg; 
 extern uint32_t debugadc2dma_pdma2;
 extern uint32_t adc2dma_cnt;
-        yprintf(&pbuf2," Reg: 0x%08X %7d %7d",adc2dma_cnt,debugadc2dma_pdma2,exti15dtw_reg);
+//        yprintf(&pbuf2," Reg: 0x%08X %7d %7d",adc2dma_cnt,debugadc2dma_pdma2,exti15dtw_reg);
 //extern exti15dtw_reg1;
 //      yprintf(&pbuf1," %d",exti15dtw_reg1);
 #endif
+
+extern uint32_t exti15dtw_accum_flag;
+extern int32_t  exti15dtw_accum_diff;
+if (exti15dtw_accum_flag != 0)
+{
+  exti15dtw_accum_flag = 0;
+  float faccum = (exti15dtw_accum_diff/240);
+  faccum = (faccum /180.0f);
+  yprintf(&pbuf1," %7d %10.1f %10.4f%% %10.3f",(exti15dtw_accum_diff/240),faccum,100.0f*((1E6f/60.0f)/faccum - 1.0f),(1E6f/faccum));
+}
+
+
   }
 
   /* USER CODE END 5 */

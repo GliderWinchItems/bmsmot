@@ -72,6 +72,7 @@ uint32_t exti15dtw_irqctr;
 uint64_t sumsq;      // Running accumulation of squares
 uint64_t sumsq_prev; // Saved sumsq (i.e. "previous")
 uint64_t sumsq_diff; // Difference: sumsqdiff = (new - previous)
+uint32_t sumsq_flag;  // Increments each time new sumsq saved
 
 uint64_t sumsq_ctr;      // Running count of readings
 uint64_t sumsq_ctr_prev; // Saved sumq_ctr (i.e. "previous")
@@ -141,10 +142,10 @@ debugadc2 = DTWTIME - debugadc1;
 				{
 					adc2dma_flag = 0;
 					adc2dma_cnt = (1024 - adc2dma_cnt);
-					if (adc2dma_cnt >= 512) 
-						adc2dma_cnt = 1023;// morse_trap(7111);
-					else if (adc2dma_cnt <= 0)
-						adc2dma_cnt = 1;
+					if (adc2dma_cnt > 511) 
+						adc2dma_cnt = 511;// morse_trap(7111);
+					else if (adc2dma_cnt < 0)
+						adc2dma_cnt = 0;
 				}
 			}
 			else
@@ -154,14 +155,15 @@ debugadc2 = DTWTIME - debugadc1;
 				{ // Zero crossing interrupt occured during dma of this buff half
 					adc2dma_flag = 0;
 					adc2dma_cnt = (512 - adc2dma_cnt);
-					if (adc2dma_cnt < 1) 
-						adc2dma_cnt = 512;// morse_trap(7222);
-					if (adc2dma_cnt == 0) 
-						adc2dma_cnt = 1;// morse_trap(7222);
+					if (adc2dma_cnt > 511) 
+						adc2dma_cnt = 511;// morse_trap(7111);
+					else if (adc2dma_cnt < 0)
+						adc2dma_cnt = 0;
 				}
 			}
 		uint16_t* pdma_save = pdma;			
 
+#if 0
 /* Save readings for output. */
 debugadc2ctr += 1;
 uint16_t* pdebug = &debugadcsum[debugadcsumidx];
@@ -194,6 +196,7 @@ debugadcsumidx += 512;
 debugadcsum[debugadcsumidx++] = 40000 + exti15dtw_irqctr;
 }
 //debugadc2t = DTWTIME - debugadc1t;	
+#endif
 
 			pdma = pdma_save; // Restore dma ptr
 
@@ -202,20 +205,24 @@ debugadcsum[debugadcsumidx++] = 40000 + exti15dtw_irqctr;
 			isumsq = 0; // 32b sum of squares
 			adcsum = 0; // 32b readings sum
 			/* Sum squares for buffer (inline code) */
-blkidx = 1000; // Skip EXTI marker for now
-			if (blkidx == 0)
-			{ // Here, no EXTI interrupt occured during this buffer loading
-debugadc1t = DTWTIME;				
-				sumsquaresfastest(); // No zero crossings in buffer
-debugadc2t = DTWTIME - debugadc1t;				
+			if (adc2dma_flag != 0)
+			{ // Here, EXTI interrupt occurred during this dma buffer
+				adc2dma_flag = 0;
+				// block/chunk where EXTI interrupt occured
+				blkidx = (adc2dma_cnt >> 5); // 32b chunks
+				// Index within block/chunk
+				blksubidx = (adc2dma_cnt & 0x1F);
+	debugadc1t = DTWTIME;				
+				sumsquareswithif(); // Zero crossings
+	debugadc2t = DTWTIME - debugadc1t;				
+				sumsq += isumsq; // Accum 64b sum squares
 			}
 			else
-			{ // Here, EXTI interrupt signals start/end of input AC
-debugadc1t = DTWTIME;				
-				sumsquareswithif(); // Zero crossings
-debugadc2t = DTWTIME - debugadc1t;				
+			{ // Here, no EXTI interrupt occured during this buffer loading
+//	debugadc1t = DTWTIME;				
+				sumsquaresfastest(); // No zero crossings in buffer
+//	debugadc2t = DTWTIME - debugadc1t;				
 			}
-			sumsq += isumsq; // Accum 64b sum squares
 		}
 
 		if ((noteval & TSK02BIT02) || (noteval & TSK02BIT03))
@@ -354,11 +361,15 @@ static void exti15_10_init(void)
 /* #######################################################################
    Pin 15 interrupt (AC opto-isolator)
    ####################################################################### */
+uint32_t exti15dtw_accum_flag;
+uint32_t exti15dtw_accum_ctr;
+int32_t  exti15dtw_accum_diff;
+uint32_t exti15dtw_accum_prev;
+uint32_t exti15dtw_accum;
 void EXTI15_IRQHandler(void)
 {
-
-	EXTI->PR = EXTI15REG
 	exti15dtw = DTWTIME;
+	EXTI->PR = EXTI15REG
 	if ((exti15dtw - exti15dtw_prev) > 10000)
 	{
 //exti15dtw_reg = *(uint32_t*)((uint8_t*)(0x40026400 + 0x14 + (0x18*2)));//*preg;
@@ -369,6 +380,15 @@ void EXTI15_IRQHandler(void)
 		exti15dtw_diff = exti15dtw - exti15dtw_prev;
 		exti15dtw_prev = exti15dtw;
 		exti15dtw_flag += 1;
+		exti15dtw_accum_ctr += 1;
+		if (exti15dtw_accum_ctr >= 240)
+		{
+			exti15dtw_accum = exti15dtw;
+			exti15dtw_accum_diff = (int32_t)(exti15dtw_accum - exti15dtw_accum_prev);
+			exti15dtw_accum_prev = exti15dtw_accum;
+			exti15dtw_accum_ctr = 0;
+			exti15dtw_accum_flag = 1;
+		}
 	}
 	exti15dtw_irqctr += 1;
 	return;
@@ -381,27 +401,31 @@ void loop32(void)
 {
 	for (int j = 0; j < 32; j++)
 	{
-		sumsq += *(pdma + j) * *(pdma + j);
+		isumsq += *(pdma + j) * *(pdma + j);
 		if (blksubidx == j)
 		{
+			sumsq += isumsq;
+			isumsq = 0;
 			sumsq_diff = sumsq - sumsq_prev;
 			sumsq_prev = sumsq;
+			sumsq_flag += 1;
 		}
 	}
+	pdma += 32;
 	return;
 }
-
 /* *************************************************************************
  * void sumsquareswithif(void);
- * @brief	: Inline sum squares with"if" between chunks
+ * @brief	: Inline: subtract offset, sum readings, sum squares with"if" between chunks
  * *************************************************************************/
 void sumsquareswithif(void)
 {
-	int i = 1;
+	int i = 0; // Block/chunk index
 	while (pdma != pdma_end)
 	{
+		isumsq = 0; // 32b accumulation of sum squares
 		if (blkidx == i)
-			loop32();
+			loop32(); // EXTI occurred during this "chunk"
 		else
 		{
 		/*  1 */ tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);
@@ -435,8 +459,9 @@ void sumsquareswithif(void)
 		/* 29 */ tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);
 		/* 30 */ tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);
 		/* 31 */ tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-		/* 32 */ tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+		/* 32 */ tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);			
 		}
+		sumsq += isumsq; // 64b accumulation of squares	
 		i += 1;
 	}		
 		return;
@@ -444,14 +469,13 @@ void sumsquareswithif(void)
 
 /* *************************************************************************
  * void sumsquaresfastest(void);
- * @brief	: Inline sum squares with"if" between chunks
+ * @brief	: Inline: subtract offset, sum readings, sum squares
  * *************************************************************************/
 void sumsquaresfastest(void)
 {
-// ##########################################################################
-
 	while (pdma != pdma_end)
 	{
+		isumsq = 0; // 32b accumulation of sum squares
 	/*  1 */  tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);
 	/*  2 */  tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);
 	/*  3 */  tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);
@@ -484,7 +508,7 @@ void sumsquaresfastest(void)
 	/* 30 */  tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);
 	/* 31 */  tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);
 	/* 32 */  tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-
+		sumsq += isumsq; // 64b accumulation of squares	
 	}	
 	return;
 }
