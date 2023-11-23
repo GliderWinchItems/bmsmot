@@ -30,7 +30,7 @@ int adc_idx_v_struct_hardcode_params(struct ADCLC* p)
 	p->calintern.iiradctemp.scale = 4;
 
 	// Internal voltage ref: ADC1IDX_INTERNALVREF // IN18     - Internal voltage reference
-	p->calintern.fvdd   = 3.298f;   // Vdd for following Vref ADC reading
+	p->calintern.fvdd   = 3.298f;  // Vdd for following Vref ADC reading
 	p->calintern.adcvdd = 27093;   //(16*1495.5) ADC reading (DMA sum) for above Vdd
 	p->calintern.fvref  = 1.223f;  // reference voltage
 
@@ -39,12 +39,12 @@ int adc_idx_v_struct_hardcode_params(struct ADCLC* p)
 	p->calintern.frmtemp   = 25.0f;  // Room temp for ADC reading     
 	p->calintern.fslope    =  4.3f;   // mv/degC slope of temperature sensor
 	p->calintern.fvreftmpco= 15.0f;    // Vref temp coefficient (15 is based on similar parts)
-	p->calintern.fvtemp    =  1.40f;  // Vtemp voltage at 25 degC
+	p->calintern.fvtemp    =  1.40f;    // Vtemp voltage at 25 degC
 
 	p->calintern.vcc = 3.3033; // 3.3v regulator measured voltage
 	p->powergone = 9.0f; // Below this assume CAN power is gone
 
-
+	p->offset = 1884; // Initial ADC2 zero input offset
 
 /* ADC channels.*/
 #define CELLTC 0.95f // Default filter time constant
@@ -145,6 +145,11 @@ int adc_idx_v_struct_hardcode_params(struct ADCLC* p)
 	{
 		p->cabs[i].iir_f1.onemcoef = 1 - p->cabs[i].iir_f1.coef;
 	}
+
+/* ############## ADC2 ########################## */
+	p->offset = 1884; // Initial ADC2 zero input offset
+
+
 
 	return 0;	
 }

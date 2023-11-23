@@ -71,6 +71,8 @@ struct ADCCALABS
 	struct ADC1CALINTERNAL calintern; // Vref and Temp internal sensors
 	struct ADCCALABS cabs[ADC1DIRECTMAX]; // Processor ADC Absolute readings
 	float powergone; // Begin ending sequence when DC-DC converter voltage drops below this
+
+	uint16_t offset; // Initial ADC2 zero input offset
  };
 
 /* **************************************************************************************/

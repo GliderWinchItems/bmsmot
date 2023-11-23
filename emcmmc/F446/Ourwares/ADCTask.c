@@ -6,6 +6,7 @@
 *******************************************************************************/
 /* 10/23/2020: Revised for Levelwind */
 
+#include <math.h>
 #include "FreeRTOS.h"
 #include "task.h"
 #include "cmsis_os.h"
@@ -57,9 +58,6 @@ uint32_t adc2dma_flag;
 uint32_t exti15dtw_reg;
 uint32_t exti15dtw_reg1;
 
-static uint32_t adcsum;
-static uint16_t* pdma_end;
-static uint32_t isumsq;
 
 
 uint32_t exti15dtw;
@@ -69,6 +67,17 @@ uint32_t exti15dtw_flag;
 uint32_t exti15dtw_flag_prev;
 uint32_t exti15dtw_irqctr;
 
+static uint32_t adcaccum; // Running accumulation of ADC2 
+static uint32_t adcaccum_prev; // Previous adcaccum_save
+static uint32_t adcaccum_diff; // Difference: (save - prev)
+
+static uint32_t adc2ctr;       // Running count of ADC2 readings
+static uint32_t adc2ctr_prev;  // Previous adc2ctr saved
+static uint32_t adc2ctr_diff;  // Difference: (save - prev)
+
+static uint16_t* pdma_end;
+static uint32_t isumsq;   // 32b sum of (reading - offset)^squared
+
 uint64_t sumsq;      // Running accumulation of squares
 uint64_t sumsq_prev; // Saved sumsq (i.e. "previous")
 uint64_t sumsq_diff; // Difference: sumsqdiff = (new - previous)
@@ -77,6 +86,9 @@ uint32_t sumsq_flag;  // Increments each time new sumsq saved
 uint64_t sumsq_ctr;      // Running count of readings
 uint64_t sumsq_ctr_prev; // Saved sumq_ctr (i.e. "previous")
 uint64_t sumsq_ctr_diff; // Difference: sumsqdiff = (new - previous)
+
+//I might want to make this a circular buffer
+struct ADC2COMPUTED adc2computed; // Computed results of a cycle
 
 #define OFFSET 1884
 uint16_t offset = OFFSET; // Initial = calibration offset
@@ -88,13 +100,23 @@ uint16_t blksubidx; // Within block index (0 - 31)
 static uint16_t* pdma;
 static 	int32_t tmp;
 
+struct SUMSQBUNDLE
+{
+	uint16_t* pdma;
+	uint32_t adcaccum;
+	uint32_t isumsq;
+	uint16_t offset;
+	uint16_t n;
+};
+
+struct SUMSQBUNDLE sumsqbundle;
+
+
 uint32_t debugdma;
 /* *************************************************************************
  * void StartADCTask(void const * argument);
  *	@brief	: Task startup
  * *************************************************************************/
-uint16_t* p16;
-
 void StartADCTask(void *argument)
 {
 	#define TSK02BIT02	(1 << 0)  // Task notification bit for ADC1 dma 1st 1/2 (adctask.c)
@@ -135,33 +157,25 @@ debugadc1 = DTWTIME;
 debugadc2 = DTWTIME - debugadc1;
 		if ((noteval & TSK02BIT04) || (noteval & TSK02BIT05))
 		{ // ADC2 notification
+			/* Set pointer to the half-buffer just completed.
+			   Compute index (offset) into that half-buffer
+			   where the EXTI interrupt took place. 
+
+			   Note: adc2dma_cnt is the DMA NDTR register that 
+			   holds the number of "items" remaining to be stored. 
+			   */
 			if ((noteval & TSK02BIT04) != 0)
-			{ // Here, dma half complete notification
+			{ // Here, dma half buffer complete notification
 				pdma = adcdmatskblk[1].pdma1;
-				if (adc2dma_flag != 0)
-				{
-					adc2dma_flag = 0;
-					adc2dma_cnt = (1024 - adc2dma_cnt);
-					if (adc2dma_cnt > 511) 
-						adc2dma_cnt = 511;// morse_trap(7111);
-					else if (adc2dma_cnt < 0)
-						adc2dma_cnt = 0;
-				}
+				adc2dma_cnt = (1024 - adc2dma_cnt);
 			}
 			else
-			{ // Here, dma full complete notification
+			{ // Here, dma full buffer complete notification
 				pdma = adcdmatskblk[1].pdma2;
-				if (adc2dma_flag != 0)
-				{ // Zero crossing interrupt occured during dma of this buff half
-					adc2dma_flag = 0;
-					adc2dma_cnt = (512 - adc2dma_cnt);
-					if (adc2dma_cnt > 511) 
-						adc2dma_cnt = 511;// morse_trap(7111);
-					else if (adc2dma_cnt < 0)
-						adc2dma_cnt = 0;
-				}
+				adc2dma_cnt = (512 - adc2dma_cnt);
 			}
-		uint16_t* pdma_save = pdma;			
+
+uint16_t* pdma_save = pdma;	// Debugging code might increment pdma
 
 #if 0
 /* Save readings for output. */
@@ -198,24 +212,31 @@ debugadcsum[debugadcsumidx++] = 40000 + exti15dtw_irqctr;
 //debugadc2t = DTWTIME - debugadc1t;	
 #endif
 
-			pdma = pdma_save; // Restore dma ptr
+pdma = pdma_save; // Restore dma ptr
 
 //debugadc1t = DTWTIME;
-			pdma_end = pdma + (32*16); // DMA 1/2 buffer end address
-			isumsq = 0; // 32b sum of squares
-			adcsum = 0; // 32b readings sum
-			/* Sum squares for buffer (inline code) */
+
+			/* Highly inlined: subtract offset, sum readings, sum squares */
+			pdma_end = pdma + ADC2SEQNUM;//(32*16) DMA 1/2 buffer end address
+			isumsq = 0; // 32b sum of squares over a 32 reading "chunk"
+
 			if (adc2dma_flag != 0)
-			{ // Here, EXTI interrupt occurred during this dma buffer
-				adc2dma_flag = 0;
+			{ // Zero crossing interrupt occured during dma of this buff half
+				adc2dma_flag = 0; // Reset flag
+
+				// Possible for dma to have stored after EXTI saved cnt
+				if (adc2dma_cnt > (ADC2SEQNUM-1)) // (511)
+					adc2dma_cnt = (ADC2SEQNUM-1);// morse_trap(7111);
+				else if (adc2dma_cnt < 0)
+					adc2dma_cnt = 0;// morse_trap(7222);
+
 				// block/chunk where EXTI interrupt occured
-				blkidx = (adc2dma_cnt >> 5); // 32b chunks
+				blkidx = (adc2dma_cnt >> 5); // 32 reading chunks
 				// Index within block/chunk
 				blksubidx = (adc2dma_cnt & 0x1F);
 	debugadc1t = DTWTIME;				
-				sumsquareswithif(); // Zero crossings
+				sumsquareswithif(); // Zero crossings check
 	debugadc2t = DTWTIME - debugadc1t;				
-				sumsq += isumsq; // Accum 64b sum squares
 			}
 			else
 			{ // Here, no EXTI interrupt occured during this buffer loading
@@ -223,24 +244,39 @@ debugadcsum[debugadcsumidx++] = 40000 + exti15dtw_irqctr;
 				sumsquaresfastest(); // No zero crossings in buffer
 //	debugadc2t = DTWTIME - debugadc1t;				
 			}
+
+// Something to cause comiler to include the code
+void sumsquaresgoto(void);			
+if (blkidx == 65535)
+	sumsquaresgoto();
+
+void sumsquaresasm(uint16_t* pread, uint32_t nadcaccum, uint16_t noffset, uint32_t nsumsq, uint32_t n);
+if (blkidx == 65534)
+	sumsquaresasm(pdma,adcaccum,offset,isumsq,15);
+
+//void fastsumming(uint16_t* pread, uint32_t nadcaccum, uint16_t noffset, uint32_t nsumsq, uint32_t n);
+
+sumsqbundle.pdma = pdma;
+sumsqbundle.adcaccum = adcaccum;
+sumsqbundle.isumsq = isumsq;
+sumsqbundle.offset = offset;
+sumsqbundle.n = 0xA;
+void fastsumming(struct SUMSQBUNDLE* psumsqbundle);
+if (blkidx == 65533)
+	fastsumming(&sumsqbundle);
 		}
 
+	/* ========= ADC1 notification handle here. ========= */
 		if ((noteval & TSK02BIT02) || (noteval & TSK02BIT03))
 		{ // ADC1 notification
 			if (noteval & TSK02BIT02)
-			{
 				pdma = adcdmatskblk[0].pdma1;
-//	p16 = pdma;			
-			}
 			else
-			{
 				pdma = adcdmatskblk[0].pdma2;
-			}
 
-			// Sum 16 12 item scans from 1/2 DMA buffer. */
+			// Sum 16 twelve-input scans in 1/2 DMA buffer. */
 			pz = &adc1.chan[0];
 			pzend = &adc1.chan[ADC1DIRECTMAX];
-
 			while (pz != pzend)
 			{
 				pz->sum = 
@@ -264,10 +300,10 @@ debugadcsum[debugadcsumidx++] = 40000 + exti15dtw_irqctr;
 				 pz += 1;
 			}		 
 
-			pz = &adc1.chan[0];
-
-	/* WOW. Optimizer does the following with one cycle per statement! */
-// NB: use a memory-memory dma here?
+// Save output for main, debugging and whatever...
+	pz = &adc1.chan[0];
+/* WOW. Optimizer does the following with one cycle per statement! */
+// NB: could use a memory-memory dma here?
 	dbg_adcsum[0]  = (pz +  0)->sum;
 	dbg_adcsum[1]  = (pz +  1)->sum;		
 	dbg_adcsum[2]  = (pz +  2)->sum;		
@@ -282,7 +318,8 @@ debugadcsum[debugadcsumidx++] = 40000 + exti15dtw_irqctr;
 	dbg_adcsum[11] = (pz + 11)->sum;	
 
 			adc1.ctr += 1; // Update count
-	debugadcctr = adc1.ctr;		
+	debugadcctr = adc1.ctr;	
+
 			// Calibrate and Pass sum through IIR filter
 			for (int i = 0; i < ADC1DIRECTMAX; i++)
 			{ // Calibrate and filter sums
@@ -370,16 +407,20 @@ void EXTI15_IRQHandler(void)
 {
 	exti15dtw = DTWTIME;
 	EXTI->PR = EXTI15REG
+	// JIC, as there is no hysteresis on opto-isolator
 	if ((exti15dtw - exti15dtw_prev) > 10000)
 	{
-//exti15dtw_reg = *(uint32_t*)((uint8_t*)(0x40026400 + 0x14 + (0x18*2)));//*preg;
+//Debug: exti15dtw_reg = *(uint32_t*)((uint8_t*)(0x40026400 + 0x14 + (0x18*2)));
 
-	adc2dma_cnt = *(uint32_t*)(&hdma_adc2.Instance->NDTR);
-	adc2dma_flag = 1;		
+		// Save DMA storing position: cnt is =>remaining<= count of dma items 
+		adc2dma_cnt = *(uint32_t*)(&hdma_adc2.Instance->NDTR);
+		adc2dma_flag = 1; // DMA task notification processing sees this flag	
 
 		exti15dtw_diff = exti15dtw - exti15dtw_prev;
 		exti15dtw_prev = exti15dtw;
 		exti15dtw_flag += 1;
+
+// Debug: check system timer over a number of EXTI interrupts		
 		exti15dtw_accum_ctr += 1;
 		if (exti15dtw_accum_ctr >= 240)
 		{
@@ -390,6 +431,7 @@ void EXTI15_IRQHandler(void)
 			exti15dtw_accum_flag = 1;
 		}
 	}
+	// If this counter is larger than exti15dtw_accum_ctr there are hysteresis interrupts.
 	exti15dtw_irqctr += 1;
 	return;
 }
@@ -401,13 +443,38 @@ void loop32(void)
 {
 	for (int j = 0; j < 32; j++)
 	{
-		isumsq += *(pdma + j) * *(pdma + j);
+		adc2ctr += 1; // Running total of number of ADC2 readings
+		// Sum (reading - offset)
+		uint32_t tmp = *(pdma + j); 
+
+		adcaccum += tmp; // Sum (reading)
+		tmp -= offset;
+		// Sum (reading - offset) squared
+		isumsq += tmp * tmp; 
+		// Check if EXTI interrupt occurred at this reading
 		if (blksubidx == j)
-		{
-			sumsq += isumsq;
-			isumsq = 0;
+		{ // Here EXTI interrupt occurred on this reading
+			sumsq += isumsq; // Sum to 64b accum
+			isumsq = 0;      // Reset 32b accum
+
+/* Might want to change the to have parameter for number of EXTI's between saves. */
+			// Number of readings 
+			adc2ctr_diff = adc2ctr - adc2ctr_prev;
+			adc2ctr_prev = adc2ctr;
+			// Sum of (reading - offset)
+			adcaccum_diff = adcaccum - adcaccum_prev;
+			adcaccum_prev = adcaccum;
+			// Sum of (reading - offset)^2
 			sumsq_diff = sumsq - sumsq_prev;
-			sumsq_prev = sumsq;
+			sumsq_prev = sumsq; // Duration between
+
+		// Might want to put this into a circular buffer
+			adc2computed.sumsq = sumsq_diff;
+			adc2computed.sum   = adcaccum_diff;
+			adc2computed.n     = adc2ctr_diff;
+			adc2computed.fsum  = (float)adc2computed.sum/adc2computed.n;
+			adc2computed.fsqr  = sqrtf((float)adc2computed.sumsq/adc2computed.n);
+
 			sumsq_flag += 1;
 		}
 	}
@@ -428,38 +495,39 @@ void sumsquareswithif(void)
 			loop32(); // EXTI occurred during this "chunk"
 		else
 		{
-		/*  1 */ tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-		/*  2 */ tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-		/*  3 */ tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-		/*  4 */ tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-		/*  5 */ tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-		/*  6 */ tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-		/*  7 */ tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-		/*  8 */ tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-		/*  9 */ tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-		/* 10 */ tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-		/* 11 */ tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-		/* 12 */ tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-		/* 13 */ tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-		/* 14 */ tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-		/* 15 */ tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-		/* 16 */ tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-		/* 17 */ tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-		/* 18 */ tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-		/* 19 */ tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-		/* 20 */ tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-		/* 21 */ tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-		/* 22 */ tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-		/* 23 */ tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-		/* 24 */ tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-		/* 25 */ tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-		/* 26 */ tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-		/* 27 */ tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-		/* 28 */ tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-		/* 29 */ tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-		/* 30 */ tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-		/* 31 */ tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-		/* 32 */ tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);			
+		/*  1 */ tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+		/*  2 */ tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+		/*  3 */ tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+		/*  4 */ tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+		/*  5 */ tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+		/*  6 */ tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+		/*  7 */ tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+		/*  8 */ tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+		/*  9 */ tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+		/* 10 */ tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+		/* 11 */ tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+		/* 12 */ tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+		/* 13 */ tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+		/* 14 */ tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+		/* 15 */ tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+		/* 16 */ tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+		/* 17 */ tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+		/* 18 */ tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+		/* 19 */ tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+		/* 20 */ tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+		/* 21 */ tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+		/* 22 */ tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+		/* 23 */ tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+		/* 24 */ tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+		/* 25 */ tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+		/* 26 */ tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+		/* 27 */ tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+		/* 28 */ tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+		/* 29 */ tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+		/* 30 */ tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+		/* 31 */ tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+		/* 32 */ tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);	
+			adc2ctr += 32; // Running total of number of ADC2 readings	
 		}
 		sumsq += isumsq; // 64b accumulation of squares	
 		i += 1;
@@ -476,39 +544,159 @@ void sumsquaresfastest(void)
 	while (pdma != pdma_end)
 	{
 		isumsq = 0; // 32b accumulation of sum squares
-	/*  1 */  tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-	/*  2 */  tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-	/*  3 */  tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-	/*  4 */  tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-	/*  5 */  tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-	/*  6 */  tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-	/*  7 */  tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-	/*  8 */  tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-	/*  9 */  tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-	/* 10 */  tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-	/* 11 */  tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-	/* 12 */  tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-	/* 13 */  tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-	/* 14 */  tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-	/* 15 */  tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-	/* 16 */  tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-	/* 17 */  tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-	/* 18 */  tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-	/* 19 */  tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-	/* 20 */  tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-	/* 21 */  tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-	/* 22 */  tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-	/* 23 */  tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-	/* 24 */  tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-	/* 25 */  tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-	/* 26 */  tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-	/* 27 */  tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-	/* 28 */  tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-	/* 29 */  tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-	/* 30 */  tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-	/* 31 */  tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-	/* 32 */  tmp = *pdma; pdma += 1; adcsum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+	/*  1 */  tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+	/*  2 */  tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+	/*  3 */  tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+	/*  4 */  tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+	/*  5 */  tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+	/*  6 */  tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+	/*  7 */  tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+	/*  8 */  tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+	/*  9 */  tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+	/* 10 */  tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+	/* 11 */  tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+	/* 12 */  tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+	/* 13 */  tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+	/* 14 */  tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+	/* 15 */  tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+	/* 16 */  tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+	/* 17 */  tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+	/* 18 */  tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+	/* 19 */  tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+	/* 20 */  tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+	/* 21 */  tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+	/* 22 */  tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+	/* 23 */  tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+	/* 24 */  tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+	/* 25 */  tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+	/* 26 */  tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+	/* 27 */  tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+	/* 28 */  tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+	/* 29 */  tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+	/* 30 */  tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+	/* 31 */  tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+	/* 32 */  tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
 		sumsq += isumsq; // 64b accumulation of squares	
 	}	
+	adc2ctr += 512; // Running total of number of ADC2 readings
+	return;
+}
+void sumsquaresasm(uint16_t* pread, uint32_t nadcaccum, uint16_t noffset, uint32_t nsumsq, uint32_t n)
+{
+	int32_t ntmp;
+
+ asm goto (
+        "bx r7 "  // %l == lowercase L
+        :
+        :
+        :
+        : sumstart          // specify c label(s) here
+    );	
+
+//asm volatile(
+//    "mov lr, %1\n\t"
+//    "bx %0\n\t"
+//    : : "r" (main), "r" (sumstart)); 
+
+sumstart:	
+	ntmp = *pread++; nadcaccum += ntmp; ntmp -= noffset; nsumsq += (ntmp * ntmp);
+	ntmp = *pread++; nadcaccum += ntmp; ntmp -= noffset; nsumsq += (ntmp * ntmp);
+	ntmp = *pread++; nadcaccum += ntmp; ntmp -= noffset; nsumsq += (ntmp * ntmp);
+	ntmp = *pread++; nadcaccum += ntmp; ntmp -= noffset; nsumsq += (ntmp * ntmp);
+	ntmp = *pread++; nadcaccum += ntmp; ntmp -= noffset; nsumsq += (ntmp * ntmp);
+	ntmp = *pread++; nadcaccum += ntmp; ntmp -= noffset; nsumsq += (ntmp * ntmp);
+	ntmp = *pread++; nadcaccum += ntmp; ntmp -= noffset; nsumsq += (ntmp * ntmp);
+	ntmp = *pread++; nadcaccum += ntmp; ntmp -= noffset; nsumsq += (ntmp * ntmp);
+	ntmp = *pread++; nadcaccum += ntmp; ntmp -= noffset; nsumsq += (ntmp * ntmp);
+	ntmp = *pread++; nadcaccum += ntmp; ntmp -= noffset; nsumsq += (ntmp * ntmp);
+	ntmp = *pread++; nadcaccum += ntmp; ntmp -= noffset; nsumsq += (ntmp * ntmp);
+	ntmp = *pread++; nadcaccum += ntmp; ntmp -= noffset; nsumsq += (ntmp * ntmp);
+	ntmp = *pread++; nadcaccum += ntmp; ntmp -= noffset; nsumsq += (ntmp * ntmp);
+	ntmp = *pread++; nadcaccum += ntmp; ntmp -= noffset; nsumsq += (ntmp * ntmp);
+	ntmp = *pread++; nadcaccum += ntmp; ntmp -= noffset; nsumsq += (ntmp * ntmp);
+	ntmp = *pread++; nadcaccum += ntmp; ntmp -= noffset; nsumsq += (ntmp * ntmp);
+	ntmp = *pread++; nadcaccum += ntmp; ntmp -= noffset; nsumsq += (ntmp * ntmp);
+	ntmp = *pread++; nadcaccum += ntmp; ntmp -= noffset; nsumsq += (ntmp * ntmp);
+	ntmp = *pread++; nadcaccum += ntmp; ntmp -= noffset; nsumsq += (ntmp * ntmp);
+	ntmp = *pread++; nadcaccum += ntmp; ntmp -= noffset; nsumsq += (ntmp * ntmp);
+	ntmp = *pread++; nadcaccum += ntmp; ntmp -= noffset; nsumsq += (ntmp * ntmp);
+	ntmp = *pread++; nadcaccum += ntmp; ntmp -= noffset; nsumsq += (ntmp * ntmp);
+	ntmp = *pread++; nadcaccum += ntmp; ntmp -= noffset; nsumsq += (ntmp * ntmp);
+	ntmp = *pread++; nadcaccum += ntmp; ntmp -= noffset; nsumsq += (ntmp * ntmp);
+	ntmp = *pread++; nadcaccum += ntmp; ntmp -= noffset; nsumsq += (ntmp * ntmp);
+	ntmp = *pread++; nadcaccum += ntmp; ntmp -= noffset; nsumsq += (ntmp * ntmp);
+	ntmp = *pread++; nadcaccum += ntmp; ntmp -= noffset; nsumsq += (ntmp * ntmp);
+	ntmp = *pread++; nadcaccum += ntmp; ntmp -= noffset; nsumsq += (ntmp * ntmp);
+	ntmp = *pread++; nadcaccum += ntmp; ntmp -= noffset; nsumsq += (ntmp * ntmp);
+	ntmp = *pread++; nadcaccum += ntmp; ntmp -= noffset; nsumsq += (ntmp * ntmp);
+	ntmp = *pread++; nadcaccum += ntmp; ntmp -= noffset; nsumsq += (ntmp * ntmp);
+	ntmp = *pread++; nadcaccum += ntmp; ntmp -= noffset; nsumsq += (ntmp * ntmp);
+	adcaccum = nadcaccum;
+	isumsq += nsumsq;
+	adc2ctr += 512;
+	return;
+
+}
+
+
+void items(uint16_t* pdma, uint32_t adcaccum, uint16_t offset, uint32_t isumsq, uint32_t idx);
+
+void sumsquaresgoto(void)
+{
+	while (pdma != pdma_end)
+	{
+		if (adc2dma_flag == 0)
+		{
+			items(pdma,adcaccum,offset,isumsq,0);
+		}
+		else
+		{
+			adc2dma_flag = 0;
+			items(pdma,adcaccum,offset,isumsq,(32-blksubidx));
+			loop32();
+			items(pdma,adcaccum,offset,isumsq,(blksubidx - 1));
+		}
+		return;
+	}
+}
+
+void items(uint16_t* pdma, uint32_t adcaccum, uint16_t offset, uint32_t isumsq, uint32_t idx)
+{
+
+	switch(idx)	{
+case  1: tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+case  2: tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+case  3: tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+case  4: tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+case  5: tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+case  6: tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+case  7: tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+case  8: tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+case  9: tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+case  10: tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+case  11: tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+case  12: tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+case  13: tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+case  14: tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+case  15: tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+case  16: tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+case  17: tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+case  18: tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+case  19: tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+case  20: tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+case  21: tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+case  22: tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+case  23: tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+case  24: tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+case  25: tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+case  26: tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+case  27: tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+case  28: tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+case  29: tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+case  30: tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+case  31: tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+case  32: tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
+	}
+	sumsq += isumsq; // 64b accumulation of squares	
 	return;
 }

@@ -70,6 +70,7 @@ struct ADCCALCOMMON
 	int64_t ll_80caldiff;
 	uint32_t ui_cal1;
 	uint32_t ui_tmp;
+
 };
 
 /* Working values for absolute voltages adjusted using Vref. */
@@ -90,12 +91,14 @@ struct ADCCHANNEL
 /* Everything for the ADC in one struct. */
 struct ADCFUNCTION
 {
+	// ADC1 & ADC2
 	struct ADCLC lc;    // Local Copy of parameters
 	struct ADCCALCOMMON common; // Vref & temp stuff
 	struct ADCABS abs[ADC1DIRECTMAX]; // Absolute readings calibrated
 	struct ADCCHANNEL chan[ADC1DIRECTMAX]; //
 	uint32_t ctr; // Running count of updates.
 	uint8_t sumctr; // DMA summation counter
+
 };
 
 
@@ -114,7 +117,7 @@ extern struct ADCCALCOMMON adcommon;
 
 /* Everything for ADC1. */
 extern struct ADCFUNCTION adc1;
-extern struct ADCFUNCTION adc2;
+//extern struct ADCFUNCTION adc2;
 
 
 #endif

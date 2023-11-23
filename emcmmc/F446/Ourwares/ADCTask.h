@@ -15,10 +15,18 @@
 #include "main.h"
 #include "adc_idx_v_struct.h"
 
-
-
 #define ADC1SEQNUM 16 // Number of ADC1 scans in 1/2 of the DMA buffer
 #define ADC2SEQNUM (32*16) // Number of ADC2 scans in 1/2 of the DMA buffer
+
+/* Computation between EXTI interrupts. */
+struct ADC2COMPUTED
+{
+	uint64_t sumsq; // Sum (reading - offset)^2
+	uint32_t sum;   // Sum reading
+	uint32_t n;     // Number of readings in above sums
+	float fsum;     // sum/n
+	float fsqr;     // sqrtf (sumsq/n)
+};
 
 /* *************************************************************************/
 osThreadId xADCTaskCreate(uint32_t taskpriority);

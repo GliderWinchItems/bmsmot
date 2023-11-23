@@ -29,6 +29,7 @@
 #include <string.h>
 #include "morse.h"
 #include "DTW_counter.h"
+#include <math.h>
 
 #include "adcparams.h"
 #include "SerialTaskSend.h"

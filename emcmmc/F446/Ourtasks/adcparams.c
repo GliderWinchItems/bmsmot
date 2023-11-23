@@ -56,7 +56,7 @@ struct ADCCALCOMMON adcommon;
 
 /* Everything for ADC */
 struct ADCFUNCTION adc1;
-struct ADCFUNCTION adc2;
+//struct ADCFUNCTION adc2;
 
 /* *************************************************************************
  * void adcparams_init(void);

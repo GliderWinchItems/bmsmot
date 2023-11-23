@@ -120,7 +120,9 @@ C_SOURCES += Ourtasks/EMCLTask.c
 
 # ASM sources
 ASM_SOURCES =  \
-startup_stm32f446xx.S
+startup_stm32f446xx.S \
+
+ASM_SOURCES += Ourtasks/fastsumming.S
 
 #startup_stm32f446xx.s
 
