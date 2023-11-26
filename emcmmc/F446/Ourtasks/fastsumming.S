@@ -16,70 +16,85 @@
   .section  .text
   .type  fastsumming, %function
 
-      .macro  sumz from=0, to=31
-  ldrh  r1, [r6]
-  add   r3, r1
-  subs  r1, r1, r2
-  mla   r4, r1, r1, r4
-  add   r6, r7
-     .if     \to-\from
-        sumz     "(\from+1)",\to
-        .endif
-        .endm
+  .macro  sumz from=0, to=31
+loop\@ :
+  ldrh  r4, [r6, #\@*2]
+  add   r3, r4
+  subs  r4, r4, r5
+  smlal   r1, r2, r4, r4
+    .if     \to-\from
+      sumz "(\from+1)",\to
+    .endif
+    .endm
 
-fastsumming:  
-  push  {r4, r5, r6, r7, r8}
-
-/*
-C call to this--
-void fastsumming(struct SUMSQBUNDLE* psumsqbundle);
-Where pointer is the following--
+/* C call to this--
+void fastsumming(struct SUMSQBUNDLE* psumsqbundle, uint16_t idx);
+   psumsqbundle = pointer (r0) to following struct--
 struct SUMSQBUNDLE
 {
-  uint16_t* pdma;
-  uint32_t adcaccum;
-  uint32_t isumsq;
-  uint16_t offset;
-  uint16_t n;
+  uint64_t sumsq;     @  +0 Sum of (reading - offset)^2
+  uint16_t* pdma;     @  +8 Ptr to dma buffer 
+  uint16_t* pdma_end; @  +12 Ptr to dma buffer end+1
+  uint32_t adcaccum;  @  +16 Sum of readings
+  uint32_t adc2ctr;   @  +20 Running count of readings in both sums
+  uint32_t offset;    @  +24 ADC2 offset with zero input 
 };
+  r1 = idx: 0 - 31 (not checked. MUST BE IN THIS RANGE)
 
-Upon completion this routine 
-updates sumsqbundle except: offset, n
+  return: updates sumsqbundle: .sumsq .adcaccum .adc2ctr */
+@ ===================================================
+@ Struct pointer offsets 
+    #define SUMSQ     0   
+    #define PDMA      8
+    #define PDMA_END 12
+    #define ADCACCUM 16
+    #define ADC2CTR  20
+    #define OFFSET   24
+@ =================================================== /*  
+  Register usage--
+r0 = pointer to sumsqbundle struct (passed in function call)
+r1 = sumsq lo-ord | idx (count_to_do) (passed in function call)
+r2 = sumsq hi-ord
+r3 = sum readings (adcaccum)
+r4 = ADC reading (*pdma)
+r5 = ADC2 zero input offset (offset) | adc2ctr update
+r6 = pointer to input buffer (pdma)           */
+@ ===================================================
+fastsumming:  
+  push  {r4, r5, r6}
+@ ===================================================
 
-Register usage--
-r0 = pointer to sumsqbundle struct
-r1 = reading
-r2 = offset
-r3 = sum readings
-r4 = sum square of (reading - offset)
-r5 = number to do
-r6 = pointer to input buffer (pdma)
-r7 = increment readings pointer = 2
-*/
-@ Load registers via pointer to struct
-  ldrh r2,[r0, #12] @ offset
-  ldr  r3,[r0, #4] @ adcaccum (sum readings)
-  ldr  r4,[r0, #8] @ isumsq 
-  ldrh r5,[r0, #14] @ n
-  ldr  r6,[r0] @ pdma 
-  mov  r7,#2 @ increment
+@ Load registers via pointer (r0) to struct
+  @ Update adc2ctr in struct
+  ldr  r5, [r0, #ADC2CTR] @ Get current count
+  add  r5, #32  @ Add max count
+  sub  r5, r1   @ Subtract index
+  str  r5, [r0, #ADC2CTR] @ Update 
 
-@ Compute entry and jump
-  mov  r1, #12 @ size of one item
-  mul  r5,r5,r1 @ "n" * size of item
-  ldr  r1, #loop @ Get base address
-  add  r1,r5 @ Add base and offset
-  bx   r1 @ branch to location.
+  @ Computer jump address
+  movs r4, #(loop1-loop0) @ size one macro item
+  mul  r4, r4, r1 @ jump distance
+  ldr  r1, =loop  @ Get base address
+  add  r4, r1  @ (base + jump distance)
+  orr  r4, #1 @ bit(0) must be a 1 to be valid
+
+  @ Load regs, compute entry and jump
+  ldrd r1, r2, [r0, #SUMSQ] @ Get sum-squared
+  ldr  r3, [r0, #ADCACCUM] @ Get sum
+  ldr  r5, [r0, #OFFSET] @ Zero input ADC offset
+  ldr  r6, [r0, #PDMA]  @ Pointer to dma buffer
+
+  bx   r4    @ branch to entry point.
   
 @ Inline repetition of sum and sumsquare  
 loop:
   sumz
- 
-@ Update struct and return
-  str   r6,[r0] @ pdma pointer updated
-  str   r4,[r0, #8] @ 32b sum squares updated
-  str   r3,[r0, #4] @ sum readings summed
-  pop  {r4, r5, r6, r7, r8}
+
+@ End of pass: Update struct and return 
+  strd  r1, r2, [r0, #SUMSQ] @ Update struct 
+  str   r3,[r0, #ADCACCUM] @ readings summed
+  @ ADC2CTR was updated at beginning
+  pop  {r4, r5, r6}
   bx  lr    
  .size  fastsumming, .-fastsumming
 

@@ -28,9 +28,44 @@ extern ADC_HandleTypeDef hadc2;
 extern DMA_HandleTypeDef hdma_adc2;
 extern DMA_HandleTypeDef hdma_adc1;
 
-void sumsquareswithif(void);
+/* ADC2 fast processing collection. */
+struct SUMSQBUNDLE
+{
+	uint64_t sumsq;     // Sum of (reading - offset)^2
+	uint16_t* pdma;		// Ptr to dma buffer 
+	uint16_t* pdma_end; // Ptr to dma buffer end+1
+	uint32_t adcaccum;  // Sum of readings
+	uint32_t adc2ctr;   // Running count of readings in both sums
+	uint32_t offset;	// ADC2 offset with zero input 
+	uint16_t n;			// Number of readings to sum
+
+};
+static struct SUMSQBUNDLE sumsqbundle;
+
+/* ADC2 end of cycle grouping. */
+// Sums and counters are "running" counts, so
+//   (new - previous) is computed at end of AC cycle
+struct ADC2NUM
+{
+	uint64_t smq; // Sum square
+	uint32_t acc; // Sum
+	uint32_t ctr; // Count for above
+};
+struct ADC2NUMALL
+{
+	struct ADC2NUM prev;
+	struct ADC2NUM diff;
+};
+static struct ADC2NUMALL adc2numall;
+#define ADC2NUMSZ 8 // Circular buffer summary
+
+
+void sumsquareswithif(struct SUMSQBUNDLE* psumsqbundle);
 void sumsquaresfastest(void);
 static void exti15_10_init(void);
+void fastsumming(struct SUMSQBUNDLE* psumsqbundle, uint16_t idx);
+void cycle_end(struct SUMSQBUNDLE* psmb, struct ADC2NUMALL* pall);	
+
 
 uint32_t dbg_adcsum[ADC1DIRECTMAX];
 uint32_t dbg_adcsum2;
@@ -53,8 +88,9 @@ uint32_t debugadc2ctr;
 uint32_t debugadc2dma_pdma2;
 uint32_t debugadc2t;
 uint32_t debugadc1t;
-int32_t adc2dma_cnt;
+
 uint32_t adc2dma_flag;
+uint32_t adc2dma_cnt;
 uint32_t exti15dtw_reg;
 uint32_t exti15dtw_reg1;
 
@@ -67,50 +103,14 @@ uint32_t exti15dtw_flag;
 uint32_t exti15dtw_flag_prev;
 uint32_t exti15dtw_irqctr;
 
-static uint32_t adcaccum; // Running accumulation of ADC2 
-static uint32_t adcaccum_prev; // Previous adcaccum_save
-static uint32_t adcaccum_diff; // Difference: (save - prev)
-
-static uint32_t adc2ctr;       // Running count of ADC2 readings
-static uint32_t adc2ctr_prev;  // Previous adc2ctr saved
-static uint32_t adc2ctr_diff;  // Difference: (save - prev)
-
-static uint16_t* pdma_end;
-static uint32_t isumsq;   // 32b sum of (reading - offset)^squared
-
-uint64_t sumsq;      // Running accumulation of squares
-uint64_t sumsq_prev; // Saved sumsq (i.e. "previous")
-uint64_t sumsq_diff; // Difference: sumsqdiff = (new - previous)
 uint32_t sumsq_flag;  // Increments each time new sumsq saved
 
-uint64_t sumsq_ctr;      // Running count of readings
-uint64_t sumsq_ctr_prev; // Saved sumq_ctr (i.e. "previous")
-uint64_t sumsq_ctr_diff; // Difference: sumsqdiff = (new - previous)
 
 //I might want to make this a circular buffer
 struct ADC2COMPUTED adc2computed; // Computed results of a cycle
 
 #define OFFSET 1884
 uint16_t offset = OFFSET; // Initial = calibration offset
-
-/* Location of in DMA buffer where zero crossing took place. */
-uint16_t blkidx;    // Block (chunk) index (1 - 16)
-uint16_t blksubidx; // Within block index (0 - 31)
-
-static uint16_t* pdma;
-static 	int32_t tmp;
-
-struct SUMSQBUNDLE
-{
-	uint16_t* pdma;
-	uint32_t adcaccum;
-	uint32_t isumsq;
-	uint16_t offset;
-	uint16_t n;
-};
-
-struct SUMSQBUNDLE sumsqbundle;
-
 
 uint32_t debugdma;
 /* *************************************************************************
@@ -127,6 +127,9 @@ void StartADCTask(void *argument)
 	float ftmp;
 	struct ADCCHANNEL* pz;
 	struct ADCCHANNEL* pzend;
+	uint16_t* pdma;
+	uint16_t blkcnt;
+	uint16_t blkidx;
 	
 	/* A notification copies the internal notification word to this. */
 	uint32_t noteval = 0;    // Receives notification word upon an API notify
@@ -145,6 +148,20 @@ void StartADCTask(void *argument)
 	/* Initialize params for ADC. */
 	adcparams_init();	
 
+	/* Initialize ADC2 sums. */
+	sumsqbundle.sumsq    = 0; // Running sum squared
+	sumsqbundle.adcaccum = 0; // Running sum of readings
+	sumsqbundle.adc2ctr  = 0; // Running count of readings
+	sumsqbundle.offset   = offset; // Params: default offset
+	sumsqbundle.n        = 0xA; // For debugging
+
+// Debugging
+sumsqbundle.sumsq    = 0x100000002; // Running sum squared
+sumsqbundle.adcaccum = 0x100; // Running sum of readings
+sumsqbundle.adc2ctr  = 10; // Running count of readings
+sumsqbundle.offset   = offset; // Params: default offset
+sumsqbundle.n        = 0xA; // For debugging	
+
 	/* Initialize EXTI15_10. */
 	exti15_10_init();
 
@@ -161,22 +178,27 @@ debugadc2 = DTWTIME - debugadc1;
 			   Compute index (offset) into that half-buffer
 			   where the EXTI interrupt took place. 
 
-			   Note: adc2dma_cnt is the DMA NDTR register that 
+			   Note: sumsqbundle.adc2ctr is the DMA NDTR register that 
 			   holds the number of "items" remaining to be stored. 
 			   */
 			if ((noteval & TSK02BIT04) != 0)
 			{ // Here, dma half buffer complete notification
-				pdma = adcdmatskblk[1].pdma1;
+				sumsqbundle.pdma = adcdmatskblk[1].pdma1;
 				adc2dma_cnt = (1024 - adc2dma_cnt);
 			}
 			else
 			{ // Here, dma full buffer complete notification
-				pdma = adcdmatskblk[1].pdma2;
+				sumsqbundle.pdma = adcdmatskblk[1].pdma2;
 				adc2dma_cnt = (512 - adc2dma_cnt);
 			}
+			// Possible for dma to have stored after EXTI saved sumsqbundle.adc2ctr
+			if (adc2dma_cnt > (ADC2SEQNUM-1)) // (511)
+				adc2dma_cnt = (ADC2SEQNUM-1);// morse_trap(7111);
+			else if (adc2dma_cnt < 0)
+					adc2dma_cnt = 0;// morse_trap(7222);
 
-uint16_t* pdma_save = pdma;	// Debugging code might increment pdma
-
+			sumsqbundle.pdma_end = sumsqbundle.pdma + ADC2SEQNUM;//(32*16) DMA 1/2 buffer end address
+			pdma = sumsqbundle.pdma;	
 #if 0
 /* Save readings for output. */
 debugadc2ctr += 1;
@@ -209,63 +231,45 @@ if (debugadcsumidx < DEBUGSZ)
 debugadcsumidx += 512;			
 debugadcsum[debugadcsumidx++] = 40000 + exti15dtw_irqctr;
 }
-//debugadc2t = DTWTIME - debugadc1t;	
 #endif
-
-pdma = pdma_save; // Restore dma ptr
-
 //debugadc1t = DTWTIME;
 
-			/* Highly inlined: subtract offset, sum readings, sum squares */
-			pdma_end = pdma + ADC2SEQNUM;//(32*16) DMA 1/2 buffer end address
-			isumsq = 0; // 32b sum of squares over a 32 reading "chunk"
-
+			/* Subtract offset, sum readings, sum squares */
+			// EXTI interrupt during the DMA loading of this buffer?
 			if (adc2dma_flag != 0)
 			{ // Zero crossing interrupt occured during dma of this buff half
 				adc2dma_flag = 0; // Reset flag
-
-				// Possible for dma to have stored after EXTI saved cnt
-				if (adc2dma_cnt > (ADC2SEQNUM-1)) // (511)
-					adc2dma_cnt = (ADC2SEQNUM-1);// morse_trap(7111);
-				else if (adc2dma_cnt < 0)
-					adc2dma_cnt = 0;// morse_trap(7222);
-
-				// block/chunk where EXTI interrupt occured
-				blkidx = (adc2dma_cnt >> 5); // 32 reading chunks
-				// Index within block/chunk
-				blksubidx = (adc2dma_cnt & 0x1F);
 	debugadc1t = DTWTIME;				
-				sumsquareswithif(); // Zero crossings check
-	debugadc2t = DTWTIME - debugadc1t;				
+
+				/* Sum whole blocks up to block with EXTI interrupt */
+				blkcnt = (adc2dma_cnt >> 5);
+				blkidx  = (adc2dma_cnt & 0x1f);
+				if (blkcnt != 0)
+				{ // Here, EXTI was not in first block
+					sumsqbundle.pdma_end = (sumsqbundle.pdma + blkcnt*32);
+					fastestsumming(&sumsqbundle); // Sum whole blocks 
+				}
+				/* Sum block up to where EXTI occurred. */
+				fastsumming(&sumsqbundle,blkidx); // Zero crossings in buffer
+				cycle_end(&sumsqbundle, &adc2numall); // Save sums differences, etc.
+				/* Sum remainder of block. */
+				fastsumming(&sumsqbundle,(32 - blkidx)); 
+				/* Sum remainder of buffer (whole blocks). */
+				if (blkcnt != 15)
+				{
+					sumsqbundle.pdma_end = (sumsqbundle.pdma + (16 - blkcnt)*32);
+					fastestsumming(&sumsqbundle);
+				}
+	debugadc2t = DTWTIME - debugadc1t;
 			}
 			else
 			{ // Here, no EXTI interrupt occured during this buffer loading
-//	debugadc1t = DTWTIME;				
-				sumsquaresfastest(); // No zero crossings in buffer
+//	debugadc1t = DTWTIME;
+				// Sum the entire buffer
+				fastestsumming(&sumsqbundle); // No zero crossings
 //	debugadc2t = DTWTIME - debugadc1t;				
 			}
-
-// Something to cause comiler to include the code
-void sumsquaresgoto(void);			
-if (blkidx == 65535)
-	sumsquaresgoto();
-
-void sumsquaresasm(uint16_t* pread, uint32_t nadcaccum, uint16_t noffset, uint32_t nsumsq, uint32_t n);
-if (blkidx == 65534)
-	sumsquaresasm(pdma,adcaccum,offset,isumsq,15);
-
-//void fastsumming(uint16_t* pread, uint32_t nadcaccum, uint16_t noffset, uint32_t nsumsq, uint32_t n);
-
-sumsqbundle.pdma = pdma;
-sumsqbundle.adcaccum = adcaccum;
-sumsqbundle.isumsq = isumsq;
-sumsqbundle.offset = offset;
-sumsqbundle.n = 0xA;
-void fastsumming(struct SUMSQBUNDLE* psumsqbundle);
-if (blkidx == 65533)
-	fastsumming(&sumsqbundle);
 		}
-
 	/* ========= ADC1 notification handle here. ========= */
 		if ((noteval & TSK02BIT02) || (noteval & TSK02BIT03))
 		{ // ADC1 notification
@@ -413,7 +417,7 @@ void EXTI15_IRQHandler(void)
 //Debug: exti15dtw_reg = *(uint32_t*)((uint8_t*)(0x40026400 + 0x14 + (0x18*2)));
 
 		// Save DMA storing position: cnt is =>remaining<= count of dma items 
-		adc2dma_cnt = *(uint32_t*)(&hdma_adc2.Instance->NDTR);
+		adc2dma_cnt  = *(uint32_t*)(&hdma_adc2.Instance->NDTR);
 		adc2dma_flag = 1; // DMA task notification processing sees this flag	
 
 		exti15dtw_diff = exti15dtw - exti15dtw_prev;
@@ -436,267 +440,42 @@ void EXTI15_IRQHandler(void)
 	return;
 }
 /* *************************************************************************
- * void loop32(void);
+ * void cycle_end((struct SUMSQBUNDLE* psumsqbundle);
  * @brief	: 
  * *************************************************************************/
-void loop32(void)
+/*
+struct ADC2NUM
 {
-	for (int j = 0; j < 32; j++)
-	{
-		adc2ctr += 1; // Running total of number of ADC2 readings
-		// Sum (reading - offset)
-		uint32_t tmp = *(pdma + j); 
-
-		adcaccum += tmp; // Sum (reading)
-		tmp -= offset;
-		// Sum (reading - offset) squared
-		isumsq += tmp * tmp; 
-		// Check if EXTI interrupt occurred at this reading
-		if (blksubidx == j)
-		{ // Here EXTI interrupt occurred on this reading
-			sumsq += isumsq; // Sum to 64b accum
-			isumsq = 0;      // Reset 32b accum
-
-/* Might want to change the to have parameter for number of EXTI's between saves. */
-			// Number of readings 
-			adc2ctr_diff = adc2ctr - adc2ctr_prev;
-			adc2ctr_prev = adc2ctr;
-			// Sum of (reading - offset)
-			adcaccum_diff = adcaccum - adcaccum_prev;
-			adcaccum_prev = adcaccum;
-			// Sum of (reading - offset)^2
-			sumsq_diff = sumsq - sumsq_prev;
-			sumsq_prev = sumsq; // Duration between
-
-		// Might want to put this into a circular buffer
-			adc2computed.sumsq = sumsq_diff;
-			adc2computed.sum   = adcaccum_diff;
-			adc2computed.n     = adc2ctr_diff;
-			adc2computed.fsum  = (float)adc2computed.sum/adc2computed.n;
-			adc2computed.fsqr  = sqrtf((float)adc2computed.sumsq/adc2computed.n);
-
-			sumsq_flag += 1;
-		}
-	}
-	pdma += 32;
-	return;
-}
-/* *************************************************************************
- * void sumsquareswithif(void);
- * @brief	: Inline: subtract offset, sum readings, sum squares with"if" between chunks
- * *************************************************************************/
-void sumsquareswithif(void)
+	uint64_t smq; // Sum square
+	uint32_t acc; // Sum
+	uint32_t ctr; // Count for above
+};
+struct ADC2NUMALL
 {
-	int i = 0; // Block/chunk index
-	while (pdma != pdma_end)
-	{
-		isumsq = 0; // 32b accumulation of sum squares
-		if (blkidx == i)
-			loop32(); // EXTI occurred during this "chunk"
-		else
-		{
-		/*  1 */ tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-		/*  2 */ tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-		/*  3 */ tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-		/*  4 */ tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-		/*  5 */ tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-		/*  6 */ tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-		/*  7 */ tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-		/*  8 */ tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-		/*  9 */ tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-		/* 10 */ tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-		/* 11 */ tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-		/* 12 */ tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-		/* 13 */ tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-		/* 14 */ tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-		/* 15 */ tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-		/* 16 */ tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-		/* 17 */ tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-		/* 18 */ tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-		/* 19 */ tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-		/* 20 */ tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-		/* 21 */ tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-		/* 22 */ tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-		/* 23 */ tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-		/* 24 */ tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-		/* 25 */ tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-		/* 26 */ tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-		/* 27 */ tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-		/* 28 */ tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-		/* 29 */ tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-		/* 30 */ tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-		/* 31 */ tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-		/* 32 */ tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);	
-			adc2ctr += 32; // Running total of number of ADC2 readings	
-		}
-		sumsq += isumsq; // 64b accumulation of squares	
-		i += 1;
-	}		
-		return;
-}
+	struct ADC2NUM prev;
+	struct ADC2NUM diff;
+};
+static struct ADC2NUMALL adc2numall;
+*/
+void cycle_end(struct SUMSQBUNDLE* psmb, struct ADC2NUMALL* pall)
 
-/* *************************************************************************
- * void sumsquaresfastest(void);
- * @brief	: Inline: subtract offset, sum readings, sum squares
- * *************************************************************************/
-void sumsquaresfastest(void)
 {
-	while (pdma != pdma_end)
-	{
-		isumsq = 0; // 32b accumulation of sum squares
-	/*  1 */  tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-	/*  2 */  tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-	/*  3 */  tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-	/*  4 */  tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-	/*  5 */  tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-	/*  6 */  tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-	/*  7 */  tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-	/*  8 */  tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-	/*  9 */  tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-	/* 10 */  tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-	/* 11 */  tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-	/* 12 */  tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-	/* 13 */  tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-	/* 14 */  tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-	/* 15 */  tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-	/* 16 */  tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-	/* 17 */  tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-	/* 18 */  tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-	/* 19 */  tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-	/* 20 */  tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-	/* 21 */  tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-	/* 22 */  tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-	/* 23 */  tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-	/* 24 */  tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-	/* 25 */  tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-	/* 26 */  tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-	/* 27 */  tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-	/* 28 */  tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-	/* 29 */  tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-	/* 30 */  tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-	/* 31 */  tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-	/* 32 */  tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-		sumsq += isumsq; // 64b accumulation of squares	
-	}	
-	adc2ctr += 512; // Running total of number of ADC2 readings
-	return;
-}
-void sumsquaresasm(uint16_t* pread, uint32_t nadcaccum, uint16_t noffset, uint32_t nsumsq, uint32_t n)
-{
-	int32_t ntmp;
+	// Compute differenes between EXTI interrupts
+	// Sum of (reading - offset)^2
+	pall->diff.smq = psmb->sumsq - pall->prev.smq;
+	pall->prev.smq = psmb->sumsq;
+	// Sum of (reading - offset)
+	pall->diff.acc = psmb->adcaccum - pall->prev.acc;
+	pall->prev.acc = psmb->adcaccum;
+	// Count of readings between EXTI interrupts
+	pall->diff.ctr = psmb->adc2ctr - pall->prev.ctr;
+	pall->prev.ctr = psmb->adc2ctr;
 
- asm goto (
-        "bx r7 "  // %l == lowercase L
-        :
-        :
-        :
-        : sumstart          // specify c label(s) here
-    );	
+// Might want to put pall->diff into a circular buffer
+// Let a lower level task do things like the following--	
+//	adc2computed.fsum  = (float)pall->diff.smb/pall->diff.ctr;
+//	adc2computed.fsqr  = sqrtf((float)pall->diff.smq/pall->diff.ctr);
 
-//asm volatile(
-//    "mov lr, %1\n\t"
-//    "bx %0\n\t"
-//    : : "r" (main), "r" (sumstart)); 
-
-sumstart:	
-	ntmp = *pread++; nadcaccum += ntmp; ntmp -= noffset; nsumsq += (ntmp * ntmp);
-	ntmp = *pread++; nadcaccum += ntmp; ntmp -= noffset; nsumsq += (ntmp * ntmp);
-	ntmp = *pread++; nadcaccum += ntmp; ntmp -= noffset; nsumsq += (ntmp * ntmp);
-	ntmp = *pread++; nadcaccum += ntmp; ntmp -= noffset; nsumsq += (ntmp * ntmp);
-	ntmp = *pread++; nadcaccum += ntmp; ntmp -= noffset; nsumsq += (ntmp * ntmp);
-	ntmp = *pread++; nadcaccum += ntmp; ntmp -= noffset; nsumsq += (ntmp * ntmp);
-	ntmp = *pread++; nadcaccum += ntmp; ntmp -= noffset; nsumsq += (ntmp * ntmp);
-	ntmp = *pread++; nadcaccum += ntmp; ntmp -= noffset; nsumsq += (ntmp * ntmp);
-	ntmp = *pread++; nadcaccum += ntmp; ntmp -= noffset; nsumsq += (ntmp * ntmp);
-	ntmp = *pread++; nadcaccum += ntmp; ntmp -= noffset; nsumsq += (ntmp * ntmp);
-	ntmp = *pread++; nadcaccum += ntmp; ntmp -= noffset; nsumsq += (ntmp * ntmp);
-	ntmp = *pread++; nadcaccum += ntmp; ntmp -= noffset; nsumsq += (ntmp * ntmp);
-	ntmp = *pread++; nadcaccum += ntmp; ntmp -= noffset; nsumsq += (ntmp * ntmp);
-	ntmp = *pread++; nadcaccum += ntmp; ntmp -= noffset; nsumsq += (ntmp * ntmp);
-	ntmp = *pread++; nadcaccum += ntmp; ntmp -= noffset; nsumsq += (ntmp * ntmp);
-	ntmp = *pread++; nadcaccum += ntmp; ntmp -= noffset; nsumsq += (ntmp * ntmp);
-	ntmp = *pread++; nadcaccum += ntmp; ntmp -= noffset; nsumsq += (ntmp * ntmp);
-	ntmp = *pread++; nadcaccum += ntmp; ntmp -= noffset; nsumsq += (ntmp * ntmp);
-	ntmp = *pread++; nadcaccum += ntmp; ntmp -= noffset; nsumsq += (ntmp * ntmp);
-	ntmp = *pread++; nadcaccum += ntmp; ntmp -= noffset; nsumsq += (ntmp * ntmp);
-	ntmp = *pread++; nadcaccum += ntmp; ntmp -= noffset; nsumsq += (ntmp * ntmp);
-	ntmp = *pread++; nadcaccum += ntmp; ntmp -= noffset; nsumsq += (ntmp * ntmp);
-	ntmp = *pread++; nadcaccum += ntmp; ntmp -= noffset; nsumsq += (ntmp * ntmp);
-	ntmp = *pread++; nadcaccum += ntmp; ntmp -= noffset; nsumsq += (ntmp * ntmp);
-	ntmp = *pread++; nadcaccum += ntmp; ntmp -= noffset; nsumsq += (ntmp * ntmp);
-	ntmp = *pread++; nadcaccum += ntmp; ntmp -= noffset; nsumsq += (ntmp * ntmp);
-	ntmp = *pread++; nadcaccum += ntmp; ntmp -= noffset; nsumsq += (ntmp * ntmp);
-	ntmp = *pread++; nadcaccum += ntmp; ntmp -= noffset; nsumsq += (ntmp * ntmp);
-	ntmp = *pread++; nadcaccum += ntmp; ntmp -= noffset; nsumsq += (ntmp * ntmp);
-	ntmp = *pread++; nadcaccum += ntmp; ntmp -= noffset; nsumsq += (ntmp * ntmp);
-	ntmp = *pread++; nadcaccum += ntmp; ntmp -= noffset; nsumsq += (ntmp * ntmp);
-	ntmp = *pread++; nadcaccum += ntmp; ntmp -= noffset; nsumsq += (ntmp * ntmp);
-	adcaccum = nadcaccum;
-	isumsq += nsumsq;
-	adc2ctr += 512;
-	return;
-
-}
-
-
-void items(uint16_t* pdma, uint32_t adcaccum, uint16_t offset, uint32_t isumsq, uint32_t idx);
-
-void sumsquaresgoto(void)
-{
-	while (pdma != pdma_end)
-	{
-		if (adc2dma_flag == 0)
-		{
-			items(pdma,adcaccum,offset,isumsq,0);
-		}
-		else
-		{
-			adc2dma_flag = 0;
-			items(pdma,adcaccum,offset,isumsq,(32-blksubidx));
-			loop32();
-			items(pdma,adcaccum,offset,isumsq,(blksubidx - 1));
-		}
-		return;
-	}
-}
-
-void items(uint16_t* pdma, uint32_t adcaccum, uint16_t offset, uint32_t isumsq, uint32_t idx)
-{
-
-	switch(idx)	{
-case  1: tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-case  2: tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-case  3: tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-case  4: tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-case  5: tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-case  6: tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-case  7: tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-case  8: tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-case  9: tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-case  10: tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-case  11: tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-case  12: tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-case  13: tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-case  14: tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-case  15: tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-case  16: tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-case  17: tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-case  18: tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-case  19: tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-case  20: tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-case  21: tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-case  22: tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-case  23: tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-case  24: tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-case  25: tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-case  26: tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-case  27: tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-case  28: tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-case  29: tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-case  30: tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-case  31: tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-case  32: tmp = *pdma++; adcaccum += tmp; tmp -= offset; isumsq += (tmp * tmp);
-	}
-	sumsq += isumsq; // 64b accumulation of squares	
+	sumsq_flag += 1; // Not needed if using queue
 	return;
 }

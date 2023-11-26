@@ -123,6 +123,7 @@ ASM_SOURCES =  \
 startup_stm32f446xx.S \
 
 ASM_SOURCES += Ourtasks/fastsumming.S
+ASM_SOURCES += Ourtasks/fastestsumming.S
 
 #startup_stm32f446xx.s
 
