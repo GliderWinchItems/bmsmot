@@ -90,7 +90,7 @@ uint32_t debugadc2t;
 uint32_t debugadc1t;
 
 uint32_t adc2dma_flag;
-uint32_t adc2dma_cnt;
+ int32_t adc2dma_cnt;
 uint32_t exti15dtw_reg;
 uint32_t exti15dtw_reg1;
 
@@ -196,9 +196,6 @@ debugadc2 = DTWTIME - debugadc1;
 				adc2dma_cnt = (ADC2SEQNUM-1);// morse_trap(7111);
 			else if (adc2dma_cnt < 0)
 					adc2dma_cnt = 0;// morse_trap(7222);
-
-			sumsqbundle.pdma_end = sumsqbundle.pdma + ADC2SEQNUM;//(32*16) DMA 1/2 buffer end address
-			pdma = sumsqbundle.pdma;	
 #if 0
 /* Save readings for output. */
 debugadc2ctr += 1;
@@ -234,31 +231,40 @@ debugadcsum[debugadcsumidx++] = 40000 + exti15dtw_irqctr;
 #endif
 //debugadc1t = DTWTIME;
 
+			sumsqbundle.pdma_end = sumsqbundle.pdma + ADC2SEQNUM;//(32*16) DMA 1/2 buffer end address
 			/* Subtract offset, sum readings, sum squares */
 			// EXTI interrupt during the DMA loading of this buffer?
 			if (adc2dma_flag != 0)
 			{ // Zero crossing interrupt occured during dma of this buff half
 				adc2dma_flag = 0; // Reset flag
 	debugadc1t = DTWTIME;				
-
-				/* Sum whole blocks up to block with EXTI interrupt */
-				blkcnt = (adc2dma_cnt >> 5);
-				blkidx  = (adc2dma_cnt & 0x1f);
-				if (blkcnt != 0)
-				{ // Here, EXTI was not in first block
-					sumsqbundle.pdma_end = (sumsqbundle.pdma + blkcnt*32);
-					fastestsumming(&sumsqbundle); // Sum whole blocks 
+				/* Sum whole blocks up to block containing EXTI interrupt */
+				blkcnt = (adc2dma_cnt >> 5); // 32 reading blocks
+				blkidx  = (adc2dma_cnt & 0x1f); // Index within block
+				if (blkcnt == 0)
+				{ // Here EXTI is in first block
+					fastsumming(&sumsqbundle,blkidx); // Zero crossings in buffer
+					cycle_end(&sumsqbundle, &adc2numall); // Save sums differences, etc.
+					fastsumming(&sumsqbundle,(32 - blkidx)); // Sum remainder of block
+					fastestsumming(&sumsqbundle); // Sum remainder of whole blocks 
 				}
-				/* Sum block up to where EXTI occurred. */
-				fastsumming(&sumsqbundle,blkidx); // Zero crossings in buffer
-				cycle_end(&sumsqbundle, &adc2numall); // Save sums differences, etc.
-				/* Sum remainder of block. */
-				fastsumming(&sumsqbundle,(32 - blkidx)); 
-				/* Sum remainder of buffer (whole blocks). */
-				if (blkcnt != 15)
-				{
-					sumsqbundle.pdma_end = (sumsqbundle.pdma + (16 - blkcnt)*32);
-					fastestsumming(&sumsqbundle);
+				else if (blkcnt == 15)
+				{ // Here, EXTI is in last block
+					sumsqbundle.pdma_end = (sumsqbundle.pdma + 14*32);
+					fastestsumming(&sumsqbundle); // Sum whole blocks except last
+					fastsumming(&sumsqbundle,blkidx); // Sum up to zero crossing 
+					cycle_end(&sumsqbundle, &adc2numall); // Save sums differences, etc.
+					fastsumming(&sumsqbundle,(32 - blkidx)); // Sum remainder of block
+				}
+				else
+				{ // Here, EXTI can be in blocks 1-14
+					sumsqbundle.pdma_end = (sumsqbundle.pdma + blkcnt*32);
+					fastestsumming(&sumsqbundle); // Sum whole blocks except last
+					fastsumming(&sumsqbundle,blkidx); // Sum up to zero crossing 
+					cycle_end(&sumsqbundle, &adc2numall); // Save sums differences, etc.
+					fastsumming(&sumsqbundle,(32 - blkidx)); // Sum remainder of block
+					sumsqbundle.pdma_end = (sumsqbundle.pdma + 16*32);
+					fastestsumming(&sumsqbundle); // Sum whole blocks except last					
 				}
 	debugadc2t = DTWTIME - debugadc1t;
 			}

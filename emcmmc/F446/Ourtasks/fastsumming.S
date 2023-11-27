@@ -18,7 +18,7 @@
 
   .macro  sumz from=0, to=31
 loop\@ :
-  ldrh  r4, [r6, #\@*2]
+  ldrh  r4, [r6], #2
   add   r3, r4
   subs  r4, r4, r5
   smlal   r1, r2, r4, r4
@@ -91,8 +91,9 @@ loop:
   sumz
 
 @ End of pass: Update struct and return 
-  strd  r1, r2, [r0, #SUMSQ] @ Update struct 
-  str   r3,[r0, #ADCACCUM] @ readings summed
+  strd  r1, r2, [r0, #SUMSQ] @ update sumsq
+  str   r3,[r0, #ADCACCUM] @ update adc2sum
+  str   r6,[r0,#PDMA] @ update pdma
   @ ADC2CTR was updated at beginning
   pop  {r4, r5, r6}
   bx  lr    
