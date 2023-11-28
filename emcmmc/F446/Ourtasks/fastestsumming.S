@@ -16,14 +16,14 @@
   .section  .text
   .type  fastestsumming, %function
 
-  .macro  sumz from=0, to=31
+  .macro  sumw from=0, to=31
 loop\@ :
   ldrh  r4, [r6], #2
   add   r3, r4
   subs  r4, r4, r5
   smlal   r1, r2, r4, r4
     .if     \to-\from
-      sumz "(\from+1)",\to
+      sumw "(\from+1)",\to
     .endif
     .endm
 
@@ -83,7 +83,7 @@ fastestsumming:
 @ Inline repetition of sum and sumsquare  
 loop:
   @ Process 32 readings
-  sumz
+  sumw
 
 @ End of pass
   cmp   r6, r7

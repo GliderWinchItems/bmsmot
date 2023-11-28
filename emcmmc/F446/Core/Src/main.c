@@ -552,7 +552,7 @@ static void MX_ADC2_Init(void)
   */
   sConfig.Channel = ADC_CHANNEL_6;
   sConfig.Rank = 1;
-  sConfig.SamplingTime = ADC_SAMPLETIME_28CYCLES;
+  sConfig.SamplingTime = ADC_SAMPLETIME_144CYCLES;
   if (HAL_ADC_ConfigChannel(&hadc2, &sConfig) != HAL_OK)
   {
     Error_Handler();
@@ -1321,9 +1321,9 @@ uint32_t ctr;
   for(;;)
   {   
     HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, GPIO_PIN_RESET); // GRN ON
-        osDelay(30);
+        osDelay(25);
     HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, GPIO_PIN_SET); // GRN OFF
-      osDelay(250-30);
+      osDelay(125-25);
 
 #if 0
 #define DEBUGSZ (513*8)
@@ -1348,7 +1348,7 @@ extern uint32_t debugadc2ctr;
 #endif
 
 
-#if 1
+#if 0
 extern uint32_t exti15dtw_diff;
 extern uint32_t  exti15dtw_flag;
 extern uint32_t  exti15dtw_flag_prev;
@@ -1371,6 +1371,7 @@ extern uint32_t adc2dma_cnt;
 //      yprintf(&pbuf1," %d",exti15dtw_reg1);
 #endif
 
+#if 0
 extern uint32_t exti15dtw_accum_flag;
 extern int32_t  exti15dtw_accum_diff;
 if (exti15dtw_accum_flag != 0)
@@ -1380,7 +1381,30 @@ if (exti15dtw_accum_flag != 0)
   faccum = (faccum /180.0f);
   yprintf(&pbuf1," %7d %10.1f %10.4f%% %10.3f",(exti15dtw_accum_diff/240),faccum,100.0f*((1E6f/60.0f)/faccum - 1.0f),(1E6f/faccum));
 }
-
+#endif
+#if 0
+extern struct ADC2NUMALL adc2numall;
+float fsmq = adc2numall.diff.smq;
+  yprintf(&pbuf1,"\n\r%3d %7d %9d %12.0f",ctr++,adc2numall.diff.ctr,adc2numall.diff.acc,fsmq);
+float fctr = adc2numall.diff.ctr;
+float facc = adc2numall.diff.acc;
+  yprintf(&pbuf2," %8.2f %8.2f",(facc/fctr),sqrtf(fsmq/fctr));
+//extern uint32_t debugadc2t;
+//extern uint32_t debugadc4t;
+//  yprintf(&pbuf2," %d %d",debugadc2t,debugadc4t);
+#endif
+if (debugnum_flag != 0)  
+{
+  for (int k=0; k < DEBUGNUMSIZE; k++)
+  {
+    float f22 = debugnum[k].smq;
+    yprintf(&pbuf1,"\n\r%3d %7d %9d %12.0f",ctr++,debugnum[k].ctr,debugnum[k].acc,f22);
+  }
+  osDelay(5000);
+  debugnum_flag = 0;
+  ctr = 0;
+  yprintf(&pbuf1,"\n\r\n");
+}
 
   }
 

@@ -42,22 +42,12 @@ struct SUMSQBUNDLE
 };
 static struct SUMSQBUNDLE sumsqbundle;
 
-/* ADC2 end of cycle grouping. */
-// Sums and counters are "running" counts, so
-//   (new - previous) is computed at end of AC cycle
-struct ADC2NUM
-{
-	uint64_t smq; // Sum square
-	uint32_t acc; // Sum
-	uint32_t ctr; // Count for above
-};
-struct ADC2NUMALL
-{
-	struct ADC2NUM prev;
-	struct ADC2NUM diff;
-};
-static struct ADC2NUMALL adc2numall;
+struct ADC2NUMALL adc2numall;
 #define ADC2NUMSZ 8 // Circular buffer summary
+
+struct ADC2NUM debugnum[DEBUGNUMSIZE];
+uint16_t debugnum_idx;
+uint8_t  debugnum_flag;
 
 
 void sumsquareswithif(struct SUMSQBUNDLE* psumsqbundle);
@@ -76,7 +66,6 @@ extern osThreadId defaultTaskHandle;
 
 float fclpos;
 
-
 uint32_t debugadc1;
 uint32_t debugadc2;
 uint32_t debugadcctr;
@@ -88,13 +77,13 @@ uint32_t debugadc2ctr;
 uint32_t debugadc2dma_pdma2;
 uint32_t debugadc2t;
 uint32_t debugadc1t;
+uint32_t debugadc3t;
+uint32_t debugadc4t;
 
 uint32_t adc2dma_flag;
  int32_t adc2dma_cnt;
 uint32_t exti15dtw_reg;
 uint32_t exti15dtw_reg1;
-
-
 
 uint32_t exti15dtw;
 uint32_t exti15dtw_prev;
@@ -104,7 +93,6 @@ uint32_t exti15dtw_flag_prev;
 uint32_t exti15dtw_irqctr;
 
 uint32_t sumsq_flag;  // Increments each time new sumsq saved
-
 
 //I might want to make this a circular buffer
 struct ADC2COMPUTED adc2computed; // Computed results of a cycle
@@ -128,8 +116,6 @@ void StartADCTask(void *argument)
 	struct ADCCHANNEL* pz;
 	struct ADCCHANNEL* pzend;
 	uint16_t* pdma;
-	uint16_t blkcnt;
-	uint16_t blkidx;
 	
 	/* A notification copies the internal notification word to this. */
 	uint32_t noteval = 0;    // Receives notification word upon an API notify
@@ -231,50 +217,26 @@ debugadcsum[debugadcsumidx++] = 40000 + exti15dtw_irqctr;
 #endif
 //debugadc1t = DTWTIME;
 
+
 			sumsqbundle.pdma_end = sumsqbundle.pdma + ADC2SEQNUM;//(32*16) DMA 1/2 buffer end address
 			/* Subtract offset, sum readings, sum squares */
 			// EXTI interrupt during the DMA loading of this buffer?
 			if (adc2dma_flag != 0)
 			{ // Zero crossing interrupt occured during dma of this buff half
 				adc2dma_flag = 0; // Reset flag
-	debugadc1t = DTWTIME;				
-				/* Sum whole blocks up to block containing EXTI interrupt */
-				blkcnt = (adc2dma_cnt >> 5); // 32 reading blocks
-				blkidx  = (adc2dma_cnt & 0x1f); // Index within block
-				if (blkcnt == 0)
-				{ // Here EXTI is in first block
-					fastsumming(&sumsqbundle,blkidx); // Zero crossings in buffer
-					cycle_end(&sumsqbundle, &adc2numall); // Save sums differences, etc.
-					fastsumming(&sumsqbundle,(32 - blkidx)); // Sum remainder of block
-					fastestsumming(&sumsqbundle); // Sum remainder of whole blocks 
-				}
-				else if (blkcnt == 15)
-				{ // Here, EXTI is in last block
-					sumsqbundle.pdma_end = (sumsqbundle.pdma + 14*32);
-					fastestsumming(&sumsqbundle); // Sum whole blocks except last
-					fastsumming(&sumsqbundle,blkidx); // Sum up to zero crossing 
-					cycle_end(&sumsqbundle, &adc2numall); // Save sums differences, etc.
-					fastsumming(&sumsqbundle,(32 - blkidx)); // Sum remainder of block
-				}
-				else
-				{ // Here, EXTI can be in blocks 1-14
-					sumsqbundle.pdma_end = (sumsqbundle.pdma + blkcnt*32);
-					fastestsumming(&sumsqbundle); // Sum whole blocks except last
-					fastsumming(&sumsqbundle,blkidx); // Sum up to zero crossing 
-					cycle_end(&sumsqbundle, &adc2numall); // Save sums differences, etc.
-					fastsumming(&sumsqbundle,(32 - blkidx)); // Sum remainder of block
-					sumsqbundle.pdma_end = (sumsqbundle.pdma + 16*32);
-					fastestsumming(&sumsqbundle); // Sum whole blocks except last					
-				}
+	debugadc1t = DTWTIME;
+				fast512summing(&sumsqbundle,adc2dma_cnt); 	
+				cycle_end(&sumsqbundle, &adc2numall); // Save sums differences, etc.
+				fast512summing(&sumsqbundle,(512 - adc2dma_cnt)); 	
 	debugadc2t = DTWTIME - debugadc1t;
 			}
 			else
 			{ // Here, no EXTI interrupt occured during this buffer loading
-//	debugadc1t = DTWTIME;
-				// Sum the entire buffer
-				fastestsumming(&sumsqbundle); // No zero crossings
-//	debugadc2t = DTWTIME - debugadc1t;				
+	debugadc3t = DTWTIME;
+				fast512summing(&sumsqbundle,0);	// Sum entire buffer
+	debugadc4t = DTWTIME - debugadc3t;				
 			}
+if (sumsqbundle.pdma != sumsqbundle.pdma_end) morse_trap(7555);
 		}
 	/* ========= ADC1 notification handle here. ========= */
 		if ((noteval & TSK02BIT02) || (noteval & TSK02BIT03))
@@ -464,23 +426,33 @@ struct ADC2NUMALL
 static struct ADC2NUMALL adc2numall;
 */
 void cycle_end(struct SUMSQBUNDLE* psmb, struct ADC2NUMALL* pall)
-
 {
-	// Compute differenes between EXTI interrupts
+	// Compute differences between EXTI interrupts
 	// Sum of (reading - offset)^2
-	pall->diff.smq = psmb->sumsq - pall->prev.smq;
+	pall->diff.smq = (int64_t)(psmb->sumsq - pall->prev.smq);
 	pall->prev.smq = psmb->sumsq;
 	// Sum of (reading - offset)
-	pall->diff.acc = psmb->adcaccum - pall->prev.acc;
+	pall->diff.acc = (int32_t)(psmb->adcaccum - pall->prev.acc);
 	pall->prev.acc = psmb->adcaccum;
 	// Count of readings between EXTI interrupts
-	pall->diff.ctr = psmb->adc2ctr - pall->prev.ctr;
+	pall->diff.ctr = (int32_t)(psmb->adc2ctr - pall->prev.ctr);
 	pall->prev.ctr = psmb->adc2ctr;
 
 // Might want to put pall->diff into a circular buffer
 // Let a lower level task do things like the following--	
 //	adc2computed.fsum  = (float)pall->diff.smb/pall->diff.ctr;
 //	adc2computed.fsqr  = sqrtf((float)pall->diff.smq/pall->diff.ctr);
+
+if (debugnum_flag == 0)	
+{
+	debugnum[debugnum_idx] = pall->diff;
+	debugnum_idx += 1;
+	if (debugnum_idx >= DEBUGNUMSIZE)
+	{
+		debugnum_flag = 1;
+		debugnum_idx = 0;
+	}
+}
 
 	sumsq_flag += 1; // Not needed if using queue
 	return;

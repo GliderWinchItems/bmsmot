@@ -16,6 +16,7 @@
   .section  .text
   .type  fastsumming, %function
 
+#define SIZE
   .macro  sumz from=0, to=31
 loop\@ :
   ldrh  r4, [r6], #2
