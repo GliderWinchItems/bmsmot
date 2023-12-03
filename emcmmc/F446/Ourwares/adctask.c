@@ -44,9 +44,6 @@ struct ADCDMATSKBLK adcdmatskblk[ADCNUM];
    notebit2 notify at the end of the dma buffer
      associates with pdma + dmact * phadc->Init.NbrOfConversion
 */
-uint16_t* dbg_pdma;
-uint16_t* dbg_pdma2;
-
 struct ADCDMATSKBLK* adctask_init(ADC_HandleTypeDef* phadc,\
 	uint32_t  notebit1,\
 	uint32_t  notebit2,\
@@ -84,7 +81,6 @@ taskENTER_CRITICAL();
 	/* Get dma buffer allocated */
 	pdma = (uint16_t*)calloc(length, sizeof(uint16_t));
 	if (pdma == NULL) {taskEXIT_CRITICAL();morse_trap(63);}
-dbg_pdma = pdma;
 	/* Populate our control block */
 /* The following reproduced for convenience--
 struct ADCDMATSKBLK
@@ -109,7 +105,6 @@ struct ADCDMATSKBLK
 	pblk->pdma1    = pdma;
 	pblk->pdma2    = pdma + (adcseqnum * phadc->Init.NbrOfConversion);
 	pblk->adctaskHandle = ADCTaskHandle;
-dbg_pdma2 = pblk->pdma2;
 /**
   * @brief  Enables ADC DMA request after last transfer (Single-ADC mode) and enables ADC peripheral  
   * @param  hadc pointer to a ADC_HandleTypeDef structure that contains
@@ -136,15 +131,14 @@ taskEXIT_CRITICAL();
  * void HAL_ADC_ConvHalfCpltCallback(ADC_HandleTypeDef* hadc);
  *	@brief	: Call back from stm32f4xx_hal_adc: Halfway point of dma buffer
  * *************************************************************************/
-uint32_t dwt1,dwt2,dwtdiff;
 uint32_t debugadct1;
 uint32_t debugadct2;
+uint32_t debugadct3;
+uint32_t debugadct4;
 
 void HAL_ADC_ConvHalfCpltCallback(ADC_HandleTypeDef* hadc)
 {
 //	morse_trap(222);
-dwt1 = DTWTIME;
-
 	adcommon.dmact += 1; // Running count
 	BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 
@@ -153,7 +147,8 @@ dwt1 = DTWTIME;
 		ptmp = &adcdmatskblk[0];
 	else
 	{
-debugadct1 = DTWTIME;
+//debugadct1 = DTWTIME;
+//debugadct4 = DTWTIME - debugadct3;
 			ptmp = &adcdmatskblk[1];
 	}
 
@@ -172,8 +167,6 @@ debugadct1 = DTWTIME;
  * *************************************************************************/
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 {
-dwtdiff =  DTWTIME - dwt1;
-
 	adcommon.dmact += 1; // Running count
 	BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 
@@ -182,7 +175,8 @@ dwtdiff =  DTWTIME - dwt1;
 		ptmp = &adcdmatskblk[0];
 	else
 	{
-debugadct2 = DTWTIME - debugadct1;		
+//debugadct2 = DTWTIME - debugadct1;
+//debugadct3 = DTWTIME;	
 		ptmp = &adcdmatskblk[1];
 	}
 

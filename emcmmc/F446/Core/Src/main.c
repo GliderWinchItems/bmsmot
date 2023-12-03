@@ -411,7 +411,7 @@ static void MX_ADC1_Init(void)
   */
   sConfig.Channel = ADC_CHANNEL_10;
   sConfig.Rank = 1;
-  sConfig.SamplingTime = ADC_SAMPLETIME_28CYCLES;
+  sConfig.SamplingTime = ADC_SAMPLETIME_56CYCLES;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
   {
     Error_Handler();
@@ -552,7 +552,7 @@ static void MX_ADC2_Init(void)
   */
   sConfig.Channel = ADC_CHANNEL_6;
   sConfig.Rank = 1;
-  sConfig.SamplingTime = ADC_SAMPLETIME_144CYCLES;
+  sConfig.SamplingTime = ADC_SAMPLETIME_84CYCLES;
   if (HAL_ADC_ConfigChannel(&hadc2, &sConfig) != HAL_OK)
   {
     Error_Handler();
@@ -1321,29 +1321,34 @@ uint32_t ctr;
   for(;;)
   {   
     HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, GPIO_PIN_RESET); // GRN ON
-        osDelay(25);
+        osDelay(20);
     HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, GPIO_PIN_SET); // GRN OFF
-      osDelay(125-25);
+      osDelay(62-20);
 
 #if 0
-#define DEBUGSZ (513*8)
+#define DEBUGSZ (512*8)
 extern uint32_t debugadcsumidx;
 extern uint16_t debugadcsum[];
+extern uint16_t debugexti[];
       if (debugadcsumidx >= DEBUGSZ)
       {
         for (int j = 0; j < DEBUGSZ; j++)
         {
-          yprintf(&pbuf1,"\n\r%5d %9d",ctr++,debugadcsum[j]);
+          yprintf(&pbuf1,"\n\r%5d %9d",ctr++,debugadcsum[j], debugexti[j]);
+          if (debugexti[j] != 0)
+            yprintf(&pbuf2," %6d",debugexti[j]);
         }
 extern uint32_t debugadc2t;
 extern uint32_t debugadc2ctr;
         yprintf(&pbuf2,"\n\rTdiff: %d  %d %d\n\r",debugadc2t,debugadc2t/180,debugadc2ctr);
         HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, GPIO_PIN_SET); // GRN OFF
-        osDelay(2000000);
+        osDelay(1000*60*2);
+        debugadcsumidx = 0;
+        ctr = 0;
       }
       else
       {
-          yprintf(&pbuf1,"\n\r%5d %9d",ctr++,debugadcsumidx);
+//          yprintf(&pbuf1,"\n\r%5d %9d",ctr++,debugadcsumidx);
       }
 #endif
 
@@ -1388,28 +1393,70 @@ float fsmq = adc2numall.diff.smq;
   yprintf(&pbuf1,"\n\r%3d %7d %9d %12.0f",ctr++,adc2numall.diff.ctr,adc2numall.diff.acc,fsmq);
 float fctr = adc2numall.diff.ctr;
 float facc = adc2numall.diff.acc;
-  yprintf(&pbuf2," %8.2f %8.2f",(facc/fctr),sqrtf(fsmq/fctr));
-//extern uint32_t debugadc2t;
-//extern uint32_t debugadc4t;
-//  yprintf(&pbuf2," %d %d",debugadc2t,debugadc4t);
+  yprintf(&pbuf2," %8.2f %8.2f",(facc/fctr)  - 1884.5f,sqrtf(fsmq/fctr));
+extern uint32_t exti15dtw_diff;
+  yprintf(&pbuf1," %d",exti15dtw_diff);
+//extern uint32_t debugadct2;
+//extern uint32_t debugadct4;
+//  yprintf(&pbuf2," %d %d",debugadct2/512,debugadct4/512);
+
+extern uint32_t debug_adc2cnvrsn_ctr;
+extern uint32_t debug_dmaidx;
+  yprintf(&pbuf2," %6d %6d",debug_adc2cnvrsn_ctr,debug_dmaidx);
+
 #endif
+
+#if 0      
+
+extern uint8_t debug_pdma_flag;
+if (debug_pdma_flag)
+{
+  extern uint32_t debugdma, adc2dma_cnt;
+  yprintf(&pbuf1,"\n\rD %d %d",debugdma, adc2dma_cnt);
+  yprintf(&pbuf2,"\n\rB %d, %d",sumsqbundle.pdma,sumsqbundle.pdma_end);
+  yprintf(&pbuf1,"\n\rB %d, %d",sumsqbundle.adc2ctr,sumsqbundle.adcaccum);
+  double fer = sumsqbundle.sumsq;
+  yprintf(&pbuf2," %14.0f",fer);
+  yprintf(&pbuf1,"\n\rERROR HANG\n\r");
+  while(1==1);
+}
+#endif
+#if 1  
+float fav = 0;
+float favq = 0;
+float f10;
+float f21;
+float f22;
+float fsq;
 if (debugnum_flag != 0)  
 {
-  for (int k=0; k < DEBUGNUMSIZE; k++)
+  for (int k=3; k < DEBUGNUMSIZE; k++)
   {
-    float f22 = debugnum[k].smq;
-    yprintf(&pbuf1,"\n\r%3d %7d %9d %12.0f",ctr++,debugnum[k].ctr,debugnum[k].acc,f22);
+    f10 = (1.0/(float)debugnum[k].ctr);
+    f21 = debugnum[k].acc;
+    f22 = debugnum[k].smq;
+    fsq = sqrtf(f22*f10) * .009810806f;;
+    fav += f21;
+    favq += fsq;
+    
+    yprintf(&pbuf1,"\n\r%3d %7d %12.2f %12.3f",ctr++,debugnum[k].ctr,f21*f10,fsq);
+//    yprintf(&pbuf1,"\n\r%3d %7d %6d %4d",ctr++,debugnum[k].ctr,debugnum[k].acc,debugnum[k].idx);
   }
-  osDelay(5000);
+  yprintf(&pbuf2,"\n\n\rAVE:         %12.3f %12.4f",(f10*fav)/(ctr),(favq/ctr));
+  
   debugnum_flag = 0;
   ctr = 0;
-  yprintf(&pbuf1,"\n\r\n");
-}
 
+uint32_t adc2getsyscycle(void);
+yprintf(&pbuf1,"\n\r syscycle_per_adcconversion: %d",adc2getsyscycle());
+
+  yprintf(&pbuf2,"\n\r\n");
+  osDelay(2000);
+}
+#endif
   }
-
-  /* USER CODE END 5 */
 }
+  /* USER CODE END 5 */
 
 /**
   * @brief  Period elapsed callback in non blocking mode

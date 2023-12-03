@@ -28,19 +28,20 @@ extern ADC_HandleTypeDef hadc2;
 extern DMA_HandleTypeDef hdma_adc2;
 extern DMA_HandleTypeDef hdma_adc1;
 
-/* ADC2 fast processing collection. */
-struct SUMSQBUNDLE
-{
-	uint64_t sumsq;     // Sum of (reading - offset)^2
-	uint16_t* pdma;		// Ptr to dma buffer 
-	uint16_t* pdma_end; // Ptr to dma buffer end+1
-	uint32_t adcaccum;  // Sum of readings
-	uint32_t adc2ctr;   // Running count of readings in both sums
-	uint32_t offset;	// ADC2 offset with zero input 
-	uint16_t n;			// Number of readings to sum
+// Parameterized system cycles per ADC2 conversion
+uint32_t adc2getsyscycle(void);
+// Hand computed & selected (include 12 cycle fixed)
+//#define SYSCYCLE_PER_ADC2CONVERSION  640 // 28 sample duration
+//#define SYSCYCLE_PER_ADC2CONVERSION 1088 // 56 sample duration
+//#define SYSCYCLE_PER_ADC2CONVERSION 1536 // 84 sample duration
+//#define SYSCYCLE_PER_ADC2CONVERSION 1984 //112 sample duration
+//#define SYSCYCLE_PER_ADC2CONVERSION 2496 //144 sample duration
+//#define SYSCYCLE_PER_ADC2CONVERSION 7872 //480 sample duration
+uint32_t syscycle_per_adc2conversion;
 
-};
-static struct SUMSQBUNDLE sumsqbundle;
+struct SUMSQBUNDLE sumsqbundle;
+
+uint8_t debug_pdma_flag;
 
 struct ADC2NUMALL adc2numall;
 #define ADC2NUMSZ 8 // Circular buffer summary
@@ -49,11 +50,11 @@ struct ADC2NUM debugnum[DEBUGNUMSIZE];
 uint16_t debugnum_idx;
 uint8_t  debugnum_flag;
 
-
 void sumsquareswithif(struct SUMSQBUNDLE* psumsqbundle);
 void sumsquaresfastest(void);
 static void exti15_10_init(void);
 void fastsumming(struct SUMSQBUNDLE* psumsqbundle, uint16_t idx);
+void fast512summing(struct SUMSQBUNDLE* psumsqbundle, uint16_t idx);
 void cycle_end(struct SUMSQBUNDLE* psmb, struct ADC2NUMALL* pall);	
 
 
@@ -69,16 +70,21 @@ float fclpos;
 uint32_t debugadc1;
 uint32_t debugadc2;
 uint32_t debugadcctr;
-#define DEBUGSZ (513*8)
+#define DEBUGSZ (512*8)
 uint16_t debugadcsum[DEBUGSZ];
 uint32_t debugadcsumidx;
 uint16_t debugadcflag;
+uint16_t debugexti[DEBUGSZ];
+uint16_t debugdma_cnt2;
+
 uint32_t debugadc2ctr;
 uint32_t debugadc2dma_pdma2;
 uint32_t debugadc2t;
 uint32_t debugadc1t;
 uint32_t debugadc3t;
 uint32_t debugadc4t;
+
+uint32_t debug_adc2cnvrsn_ctr;
 
 uint32_t adc2dma_flag;
  int32_t adc2dma_cnt;
@@ -91,11 +97,11 @@ uint32_t exti15dtw_diff;
 uint32_t exti15dtw_flag;
 uint32_t exti15dtw_flag_prev;
 uint32_t exti15dtw_irqctr;
+uint32_t exti15syspercycle; // Number sys ticks beween EXTI interrupts
+int32_t adc2cnvrsn_ctr; 
+int32_t debugadc2_cnv_ctr;
 
 uint32_t sumsq_flag;  // Increments each time new sumsq saved
-
-//I might want to make this a circular buffer
-struct ADC2COMPUTED adc2computed; // Computed results of a cycle
 
 #define OFFSET 1884
 uint16_t offset = OFFSET; // Initial = calibration offset
@@ -116,9 +122,12 @@ void StartADCTask(void *argument)
 	struct ADCCHANNEL* pz;
 	struct ADCCHANNEL* pzend;
 	uint16_t* pdma;
+	int32_t dmaidx;
 	
 	/* A notification copies the internal notification word to this. */
 	uint32_t noteval = 0;    // Receives notification word upon an API notify
+
+	syscycle_per_adc2conversion = adc2getsyscycle();
 
 	/* Get buffers, "our" control block, and start ADC/DMA running. */
 	// ADC1
@@ -142,12 +151,13 @@ void StartADCTask(void *argument)
 	sumsqbundle.n        = 0xA; // For debugging
 
 // Debugging
+#if 0
 sumsqbundle.sumsq    = 0x100000002; // Running sum squared
 sumsqbundle.adcaccum = 0x100; // Running sum of readings
 sumsqbundle.adc2ctr  = 10; // Running count of readings
 sumsqbundle.offset   = offset; // Params: default offset
 sumsqbundle.n        = 0xA; // For debugging	
-
+#endif
 	/* Initialize EXTI15_10. */
 	exti15_10_init();
 
@@ -170,26 +180,21 @@ debugadc2 = DTWTIME - debugadc1;
 			if ((noteval & TSK02BIT04) != 0)
 			{ // Here, dma half buffer complete notification
 				sumsqbundle.pdma = adcdmatskblk[1].pdma1;
-				adc2dma_cnt = (1024 - adc2dma_cnt);
 			}
 			else
 			{ // Here, dma full buffer complete notification
 				sumsqbundle.pdma = adcdmatskblk[1].pdma2;
-				adc2dma_cnt = (512 - adc2dma_cnt);
 			}
-			// Possible for dma to have stored after EXTI saved sumsqbundle.adc2ctr
-			if (adc2dma_cnt > (ADC2SEQNUM-1)) // (511)
-				adc2dma_cnt = (ADC2SEQNUM-1);// morse_trap(7111);
-			else if (adc2dma_cnt < 0)
-					adc2dma_cnt = 0;// morse_trap(7222);
+			sumsqbundle.pdma_end = sumsqbundle.pdma + ADC2SEQNUM;//(32*16) DMA 1/2 buffer end address
 #if 0
 /* Save readings for output. */
 debugadc2ctr += 1;
 uint16_t* pdebug = &debugadcsum[debugadcsumidx];
 //debugadc1t = DTWTIME;
 
-if (debugadcsumidx < DEBUGSZ)			
+if ((debugadcsumidx < DEBUGSZ) && (debugadc2ctr > 1013))
 {
+	pdma = sumsqbundle.pdma;
 	for(int j = 0; j < 512/16; j++)
 	{
 		*(pdebug + 0) = *(pdma + 0);
@@ -211,32 +216,54 @@ if (debugadcsumidx < DEBUGSZ)
 		pdebug += 16;
 		pdma   += 16;
 	}
-debugadcsumidx += 512;			
-debugadcsum[debugadcsumidx++] = 40000 + exti15dtw_irqctr;
+	if (adc2dma_flag != 0)
+	{
+		debugexti[debugadcsumidx + adc2dma_cnt] = debugdma_cnt2;
+	}
+	debugadcsumidx += 512;			
 }
 #endif
-//debugadc1t = DTWTIME;
+			/* Subtract sys cycles for one 512 reading buffer. */
+			adc2cnvrsn_ctr -= (512*syscycle_per_adc2conversion);
+			if (adc2cnvrsn_ctr < 0)
+			{ // Here this block ends a AC input cycle
+debugadc1t = (511 - adc2cnvrsn_ctr); //DTWTIME;
+				adc2cnvrsn_ctr += (512*syscycle_per_adc2conversion); 
+				dmaidx = adc2cnvrsn_ctr/syscycle_per_adc2conversion; // Compute index
+if (dmaidx < 0)morse_trap(7444);
 
-
-			sumsqbundle.pdma_end = sumsqbundle.pdma + ADC2SEQNUM;//(32*16) DMA 1/2 buffer end address
-			/* Subtract offset, sum readings, sum squares */
-			// EXTI interrupt during the DMA loading of this buffer?
-			if (adc2dma_flag != 0)
-			{ // Zero crossing interrupt occured during dma of this buff half
-				adc2dma_flag = 0; // Reset flag
-	debugadc1t = DTWTIME;
-				fast512summing(&sumsqbundle,adc2dma_cnt); 	
+				fast512summing(&sumsqbundle,(512-dmaidx)); 	
 				cycle_end(&sumsqbundle, &adc2numall); // Save sums differences, etc.
-				fast512summing(&sumsqbundle,(512 - adc2dma_cnt)); 	
-	debugadc2t = DTWTIME - debugadc1t;
+				if ((512-dmaidx) > 0)
+				{ // Here, sum remainder of buffer 
+					fast512summing(&sumsqbundle,(dmaidx)); 	
+				}
+				// Set next interval
+				adc2cnvrsn_ctr = exti15syspercycle - ((512-dmaidx)*syscycle_per_adc2conversion);
+				if (adc2cnvrsn_ctr < 0)
+				{
+					adc2cnvrsn_ctr = (2*512*syscycle_per_adc2conversion);
+debugadc2_cnv_ctr += 1;					
+				}
+if (adc2cnvrsn_ctr < 0)	morse_trap(7222);
+debugadc2t = DTWTIME - debugadc1t;
 			}
 			else
-			{ // Here, no EXTI interrupt occured during this buffer loading
-	debugadc3t = DTWTIME;
+			{
+debugadc3t = DTWTIME;
 				fast512summing(&sumsqbundle,0);	// Sum entire buffer
-	debugadc4t = DTWTIME - debugadc3t;				
+debugadc4t = DTWTIME - debugadc3t;		
 			}
-if (sumsqbundle.pdma != sumsqbundle.pdma_end) morse_trap(7555);
+
+/* JIC my nifty asm et. al. isn't right. */
+if (sumsqbundle.pdma != sumsqbundle.pdma_end) 
+{
+	// ==> Save stuff for main to write here <===
+	debug_pdma_flag = 1; // Signal main to print stuff;
+	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_13, GPIO_PIN_RESET); // RED on
+	while(1==1) osDelay(1000);
+	//	morse_trap(7555);
+}	
 		}
 	/* ========= ADC1 notification handle here. ========= */
 		if ((noteval & TSK02BIT02) || (noteval & TSK02BIT03))
@@ -364,6 +391,8 @@ static void exti15_10_init(void)
 	EXTI->IMR  |=  EXTI15REG;  // Interrupt mask reg: 10:15
 //	EXTI->EMR  |=  EXTI15REG;  // Event mask reg: enable 10:15
 	EXTI->PR   |=  EXTI15REG;  // Clear any pending
+
+	exti15dtw_prev = DTWTIME;
 	return;
 }
 
@@ -383,16 +412,32 @@ void EXTI15_IRQHandler(void)
 	if ((exti15dtw - exti15dtw_prev) > 10000)
 	{
 //Debug: exti15dtw_reg = *(uint32_t*)((uint8_t*)(0x40026400 + 0x14 + (0x18*2)));
-
 		// Save DMA storing position: cnt is =>remaining<= count of dma items 
 		adc2dma_cnt  = *(uint32_t*)(&hdma_adc2.Instance->NDTR);
-		adc2dma_flag = 1; // DMA task notification processing sees this flag	
+		adc2dma_flag = 1; // DMA task notification processing sees this flag
 
+debugdma_cnt2 = adc2dma_cnt;
+
+		/* 'diff is number of syscounter ticks between interrupts. */
+		// 3E6 = 60.000Hz with sys clk 180MHz,
 		exti15dtw_diff = exti15dtw - exti15dtw_prev;
+		// Number of conversions between interrupts.
+		// sysclk: 180MHz, APB2/PCLK2: 45MHz, ADC clock: 11.5 MHz, 
+		// Sample 56 + 12 ADC clocks per conversion
+		exti15syspercycle = exti15dtw_diff;
+//exti15syspercycle = 3000000; // Assume 60.000 Hz
+
 		exti15dtw_prev = exti15dtw;
 		exti15dtw_flag += 1;
 
-// Debug: check system timer over a number of EXTI interrupts		
+		/* Take care of start up. */
+		if (exti15syspercycle > 3000000*6)
+		{ // Limit to 10 Hz; or initialization blip
+			exti15syspercycle = 3000000*6;
+		}
+
+// Debug: check system timer over a number of EXTI interrupts	
+#if 0	
 		exti15dtw_accum_ctr += 1;
 		if (exti15dtw_accum_ctr >= 240)
 		{
@@ -402,8 +447,9 @@ void EXTI15_IRQHandler(void)
 			exti15dtw_accum_ctr = 0;
 			exti15dtw_accum_flag = 1;
 		}
+#endif		
 	}
-	// If this counter is larger than exti15dtw_accum_ctr there are hysteresis interrupts.
+	// If this counter is larger than exti15dtw_flag there are hysteresis interrupts.
 	exti15dtw_irqctr += 1;
 	return;
 }
@@ -439,9 +485,6 @@ void cycle_end(struct SUMSQBUNDLE* psmb, struct ADC2NUMALL* pall)
 	pall->prev.ctr = psmb->adc2ctr;
 
 // Might want to put pall->diff into a circular buffer
-// Let a lower level task do things like the following--	
-//	adc2computed.fsum  = (float)pall->diff.smb/pall->diff.ctr;
-//	adc2computed.fsqr  = sqrtf((float)pall->diff.smq/pall->diff.ctr);
 
 if (debugnum_flag == 0)	
 {
@@ -457,3 +500,24 @@ if (debugnum_flag == 0)
 	sumsq_flag += 1; // Not needed if using queue
 	return;
 }
+/* *************************************************************************
+ * uint32_t adc2getsyscycle(void);
+ * @brief	: Compute system cycles per ADC2 conversion
+ * *************************************************************************/
+/*
+Cycles = (Sample duration + fixed) * ADC prescale divider * PCLK2 divider
+*/
+uint32_t adc2getsyscycle(void)
+{
+	uint8_t prescale[4] = {2,4,6,8}; // 2 bit field lookup
+	// Get pointer to ADC common register that holds prescale
+	uint8_t* padc_common = ((uint8_t*)hadc2.Instance + (0x300 - 0x100) +0x04);
+	uint8_t  prescalecode = ((*((uint32_t*)padc_common) > 16) & 0x3);
+	if (prescalecode > 3) morse_trap (7234); // JIC!
+  	uint8_t div = prescale[prescalecode]; // Get ADC prescale divider amount
+	uint16_t smpscode =((hadc2.Instance->SMPR2 >> 18) & 0x7);
+	// Three bit field lookup sample duration, plus fixed (i.e. 12)
+	uint16_t smps[8] = {3+12,15+12,28+12,56+12,84+12,112+12,144+12,480+12};
+	return (smps[smpscode])*div*(HAL_RCC_GetSysClockFreq()/HAL_RCC_GetPCLK2Freq());
+}
+

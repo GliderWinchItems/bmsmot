@@ -36,11 +36,25 @@ struct ADC2NUM
 	int64_t smq; // Sum square
 	int32_t acc; // Sum
 	int32_t ctr; // Count for above
+int16_t idx;		
 };
 struct ADC2NUMALL
 {
 	struct ADC2NUM prev;
 	struct ADC2NUM diff;
+};
+
+/* ADC2 fast processing collection. */
+struct SUMSQBUNDLE
+{
+	uint64_t sumsq;     // Sum of (reading - offset)^2
+	uint16_t* pdma;		// Ptr to dma buffer 
+	uint16_t* pdma_end; // Ptr to dma buffer end+1
+	uint32_t adcaccum;  // Sum of readings
+	uint32_t adc2ctr;   // Running count of readings in both sums
+	uint32_t offset;	// ADC2 offset with zero input 
+	uint16_t n;			// Number of readings to sum
+
 };
 
 /* *************************************************************************/
@@ -59,9 +73,11 @@ extern float    adcsumfilt[ADC1DIRECTMAX]; // Filtered
 extern uint8_t  adcsumidx; // Index for currently being summed
 extern struct ADC2NUMALL adc2numall;
 
+// Debugging
 #define DEBUGNUMSIZE 360
 extern struct ADC2NUM debugnum[DEBUGNUMSIZE];
 extern uint8_t  debugnum_flag;
+extern struct SUMSQBUNDLE sumsqbundle;
 
 #endif
 
