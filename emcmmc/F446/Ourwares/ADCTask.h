@@ -14,9 +14,14 @@
 #include "adcparams.h"
 #include "main.h"
 #include "adc_idx_v_struct.h"
+#include "fast512summing.h"
 
 #define ADC1SEQNUM 16 // Number of ADC1 scans in 1/2 of the DMA buffer
-#define ADC2SEQNUM (32*16) // Number of ADC2 scans in 1/2 of the DMA buffer
+/* NOTE: fast512summing.h has one #define that defines the size
+   of the ADC2 dma buffer (half). "fast512summing.S" uses this
+   for a constant and repetition count for inline code. 
+   C programs must use the same size.*/
+#define ADC2SEQNUM FAST512SUMMING_BUFFSIZE // Number of ADC2 scans in 1/2 of the DMA buffer
 
 /* Computation between EXTI interrupts. */
 struct ADC2COMPUTED
@@ -78,6 +83,8 @@ extern struct ADC2NUMALL adc2numall;
 extern struct ADC2NUM debugnum[DEBUGNUMSIZE];
 extern uint8_t  debugnum_flag;
 extern struct SUMSQBUNDLE sumsqbundle;
+
+#define BASE 512
 
 #endif
 

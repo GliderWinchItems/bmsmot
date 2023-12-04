@@ -67,8 +67,6 @@ extern osThreadId defaultTaskHandle;
 
 float fclpos;
 
-uint32_t debugadc1;
-uint32_t debugadc2;
 uint32_t debugadcctr;
 #define DEBUGSZ (512*8)
 uint16_t debugadcsum[DEBUGSZ];
@@ -79,17 +77,12 @@ uint16_t debugdma_cnt2;
 
 uint32_t debugadc2ctr;
 uint32_t debugadc2dma_pdma2;
-uint32_t debugadc2t;
-uint32_t debugadc1t;
-uint32_t debugadc3t;
-uint32_t debugadc4t;
 
 uint32_t debug_adc2cnvrsn_ctr;
 
 uint32_t adc2dma_flag;
  int32_t adc2dma_cnt;
 uint32_t exti15dtw_reg;
-uint32_t exti15dtw_reg1;
 
 uint32_t exti15dtw;
 uint32_t exti15dtw_prev;
@@ -164,10 +157,8 @@ sumsqbundle.n        = 0xA; // For debugging
   	/* Infinite loop */
   	for(;;)
   	{
-debugadc1 = DTWTIME;
 		/* Wait for DMA interrupt */
 		xTaskNotifyWait(0,0xffffffff, &noteval, portMAX_DELAY);
-debugadc2 = DTWTIME - debugadc1;
 		if ((noteval & TSK02BIT04) || (noteval & TSK02BIT05))
 		{ // ADC2 notification
 			/* Set pointer to the half-buffer just completed.
@@ -190,12 +181,11 @@ debugadc2 = DTWTIME - debugadc1;
 /* Save readings for output. */
 debugadc2ctr += 1;
 uint16_t* pdebug = &debugadcsum[debugadcsumidx];
-//debugadc1t = DTWTIME;
 
 if ((debugadcsumidx < DEBUGSZ) && (debugadc2ctr > 1013))
 {
 	pdma = sumsqbundle.pdma;
-	for(int j = 0; j < 512/16; j++)
+	for(int j = 0; j < ADC2SEQNUM/16; j++)
 	{
 		*(pdebug + 0) = *(pdma + 0);
 		*(pdebug + 1) = *(pdma + 1);
@@ -220,39 +210,35 @@ if ((debugadcsumidx < DEBUGSZ) && (debugadc2ctr > 1013))
 	{
 		debugexti[debugadcsumidx + adc2dma_cnt] = debugdma_cnt2;
 	}
-	debugadcsumidx += 512;			
+	debugadcsumidx += ADC2SEQNUM;			
 }
 #endif
-			/* Subtract sys cycles for one 512 reading buffer. */
-			adc2cnvrsn_ctr -= (512*syscycle_per_adc2conversion);
+			/* Subtract sys cycles for one ADC2SEQNUM reading buffer. */
+			adc2cnvrsn_ctr -= (ADC2SEQNUM*syscycle_per_adc2conversion);
 			if (adc2cnvrsn_ctr < 0)
 			{ // Here this block ends a AC input cycle
-debugadc1t = (511 - adc2cnvrsn_ctr); //DTWTIME;
-				adc2cnvrsn_ctr += (512*syscycle_per_adc2conversion); 
+				adc2cnvrsn_ctr += (ADC2SEQNUM*syscycle_per_adc2conversion); 
 				dmaidx = adc2cnvrsn_ctr/syscycle_per_adc2conversion; // Compute index
 if (dmaidx < 0)morse_trap(7444);
 
-				fast512summing(&sumsqbundle,(512-dmaidx)); 	
+				fast512summing(&sumsqbundle,(ADC2SEQNUM-dmaidx)); 	
 				cycle_end(&sumsqbundle, &adc2numall); // Save sums differences, etc.
-				if ((512-dmaidx) > 0)
+				if ((ADC2SEQNUM-dmaidx) > 0)
 				{ // Here, sum remainder of buffer 
 					fast512summing(&sumsqbundle,(dmaidx)); 	
 				}
 				// Set next interval
-				adc2cnvrsn_ctr = exti15syspercycle - ((512-dmaidx)*syscycle_per_adc2conversion);
+				adc2cnvrsn_ctr = exti15syspercycle - ((ADC2SEQNUM-dmaidx)*syscycle_per_adc2conversion);
 				if (adc2cnvrsn_ctr < 0)
 				{
-					adc2cnvrsn_ctr = (2*512*syscycle_per_adc2conversion);
+					adc2cnvrsn_ctr = (2*ADC2SEQNUM*syscycle_per_adc2conversion);
 debugadc2_cnv_ctr += 1;					
 				}
 if (adc2cnvrsn_ctr < 0)	morse_trap(7222);
-debugadc2t = DTWTIME - debugadc1t;
 			}
 			else
 			{
-debugadc3t = DTWTIME;
 				fast512summing(&sumsqbundle,0);	// Sum entire buffer
-debugadc4t = DTWTIME - debugadc3t;		
 			}
 
 /* JIC my nifty asm et. al. isn't right. */
