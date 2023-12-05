@@ -91,14 +91,15 @@ struct ADCCHANNEL
 /* Everything for the ADC in one struct. */
 struct ADCFUNCTION
 {
-	// ADC1 & ADC2
-	struct ADCLC lc;    // Local Copy of parameters
+	struct ADCLC lc;    // Local Copy of parameters ADC1 & ADC2
+	// ADC1
 	struct ADCCALCOMMON common; // Vref & temp stuff
 	struct ADCABS abs[ADC1DIRECTMAX]; // Absolute readings calibrated
 	struct ADCCHANNEL chan[ADC1DIRECTMAX]; //
 	uint32_t ctr; // Running count of updates.
 	uint8_t sumctr; // DMA summation counter
-
+	// ADC2
+	struct FILTERIIRF1 iir_adc2offset;	// (float) filter
 };
 
 

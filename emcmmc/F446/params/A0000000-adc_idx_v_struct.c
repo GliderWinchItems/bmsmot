@@ -147,9 +147,13 @@ int adc_idx_v_struct_hardcode_params(struct ADCLC* p)
 	}
 
 /* ############## ADC2 ########################## */
-	p->offset = 1884; // Initial ADC2 zero input offset
-
-
+	/* ADC2 offset calibration. */
+	p->offset = 1885; // Initial ADC2 zero input offset
+	/* IIR filtering of ongoing offset computation. */
+	p->iir_adc2offset.coef     = 0.99;// Filter time constant
+	p->iir_adc2offset.skipctr  = 4;	// Initial skip
+	p->iir_adc2offset.onemcoef = 1 - p->iir_adc2offset.coef;
+	p->adc2offset_scale    = .009810806f;	// Filter scale
 
 	return 0;	
 }

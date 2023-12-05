@@ -46,6 +46,7 @@
 #include "EMCLTask.h"
 #include "RyTask.h"
 #include "emcl_idx_v_struct.h"
+#include "iir_f1.h"
 
 #include "FreeRTOS.h"
 #include "semphr.h"
@@ -1309,10 +1310,10 @@ void StartDefaultTask(void const * argument)
 //if (pbuf3 == NULL) morse_trap(125);
 //struct SERIALSENDTASKBCB* pbuf4 = getserialbuf(&HUARTMON,128);
 //if (pbuf4 == NULL) morse_trap(125);
-//HAL_GPIO_WritePin(GPIOB, GPIO_PIN_13, GPIO_PIN_RESET); // RED ON
-//osDelay(20);
+HAL_GPIO_WritePin(GPIOB, GPIO_PIN_13, GPIO_PIN_RESET); // RED ON
+osDelay(20);
   yprintf(&pbuf1,"\n\n\rPROGRAM STARTS");
-//HAL_GPIO_WritePin(GPIOB, GPIO_PIN_13, GPIO_PIN_SET); // RED OFF
+HAL_GPIO_WritePin(GPIOB, GPIO_PIN_13, GPIO_PIN_SET); // RED OFF
   
 //    qret=xQueueSendToBack(RyTaskReadReqQHandle, &rytest[j].preq, portMAX_DELAY);
 //    if (qret == errQUEUE_FULL) morse_trap(123);  
@@ -1320,10 +1321,59 @@ uint32_t ctr;
   /* Infinite loop */
   for(;;)
   {   
+#if 0    
     HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, GPIO_PIN_RESET); // GRN ON
         osDelay(20);
     HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, GPIO_PIN_SET); // GRN OFF
       osDelay(62-20);
+#endif
+
+float fnum;
+float facc;
+float fsmq;
+float frecip;
+float filtoffset;
+struct ADC2NUM* pnum = get_adc2num();
+/* Setup pbuf1 while pbuf2 sends */
+if (pnum == NULL)
+{
+  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, GPIO_PIN_RESET); // GRN ON 
+}
+else
+{
+  fnum = pnum->ctr;
+  facc = pnum->acc;
+  fsmq = pnum->smq;
+  frecip = 1.0/fnum;
+  facc = facc * frecip;
+  fsmq = sqrtf(fsmq * frecip) * adc1.lc.adc2offset_scale;
+  filtoffset = iir_f1_f(&adc1.lc.iir_adc2offset, facc);
+  yprintf(&pbuf2,"\n\r%2d %8.2f  %8.2f %8.3f",ctr, facc,filtoffset,fsmq);
+  ctr += 1; if (ctr >= 60) ctr = 0;
+  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, GPIO_PIN_SET); // GRN OFF
+}
+/* Setup pbuf2 while pbuf1 sends */
+pnum = get_adc2num();
+if (pnum == NULL)
+{
+  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, GPIO_PIN_RESET); // GRN ON 
+}
+else
+{
+  fnum = pnum->ctr;
+  facc = pnum->acc;
+  fsmq = pnum->smq;
+  frecip = 1.0/fnum;
+  facc = facc * frecip;
+  fsmq = sqrtf(fsmq * frecip) * adc1.lc.adc2offset_scale;
+  filtoffset = iir_f1_f(&adc1.lc.iir_adc2offset, facc);
+  yprintf(&pbuf2,"\n\r%2d %8.2f  %8.2f %8.3f",ctr, facc,filtoffset,fsmq);
+  ctr += 1; if (ctr >= 60) ctr = 0;
+  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, GPIO_PIN_SET); // GRN OFF
+}
+osDelay(20); // Do not hog all the time.
+
+
 
 #if 0
 #define DEBUGSZ (512*8)
@@ -1421,7 +1471,7 @@ if (debug_pdma_flag)
   while(1==1);
 }
 #endif
-#if 1  
+#if 0 
 float fav = 0;
 float favq = 0;
 float f10;
@@ -1435,7 +1485,7 @@ if (debugnum_flag != 0)
     f10 = (1.0/(float)debugnum[k].ctr);
     f21 = debugnum[k].acc;
     f22 = debugnum[k].smq;
-    fsq = sqrtf(f22*f10) * .009810806f;;
+    fsq = sqrtf(f22*f10) * .009810806f;
     fav += f21;
     favq += fsq;
     

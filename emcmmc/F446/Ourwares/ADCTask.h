@@ -68,6 +68,12 @@ osThreadId xADCTaskCreate(uint32_t taskpriority);
  * @param	: taskpriority = Task priority (just as it says!)
  * @return	: ADCTaskHandle
  * *************************************************************************/
+ struct ADC2NUM* get_adc2num(void);
+ /* @brief	: Circular buffer cycle-end differences
+ * @return  : pointer to struct; NULL = buffer emtpy; 
+ * NOTE: no buffer overrun protection.
+ * *************************************************************************/
+
 /* #######################################################################
    Pin 15 interrupt (AC opto-isolator) */
    void EXTI15_IRQHandler(void);

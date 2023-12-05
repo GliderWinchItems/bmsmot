@@ -73,6 +73,8 @@ struct ADCCALABS
 	float powergone; // Begin ending sequence when DC-DC converter voltage drops below this
 
 	uint16_t offset; // Initial ADC2 zero input offset
+	struct FILTERIIRF1 iir_adc2offset;
+	float adc2offset_scale;
  };
 
 /* **************************************************************************************/

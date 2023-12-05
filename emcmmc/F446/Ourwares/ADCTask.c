@@ -44,7 +44,12 @@ struct SUMSQBUNDLE sumsqbundle;
 uint8_t debug_pdma_flag;
 
 struct ADC2NUMALL adc2numall;
-#define ADC2NUMSZ 8 // Circular buffer summary
+#define ADC2NUMSZ 30 // Circular buffer summary
+struct ADC2NUM adc2numbuff[ADC2NUMSZ];
+struct ADC2NUM* padc2numbuffadd;
+struct ADC2NUM* padc2numbufftake;
+struct ADC2NUM* padc2numbuff_end;
+
 
 struct ADC2NUM debugnum[DEBUGNUMSIZE];
 uint16_t debugnum_idx;
@@ -121,6 +126,10 @@ void StartADCTask(void *argument)
 	uint32_t noteval = 0;    // Receives notification word upon an API notify
 
 	syscycle_per_adc2conversion = adc2getsyscycle();
+
+	padc2numbuffadd  = &adc2numbuff[0];
+	padc2numbufftake = &adc2numbuff[0];
+	padc2numbuff_end = &adc2numbuff[ADC2NUMSZ];;
 
 	/* Get buffers, "our" control block, and start ADC/DMA running. */
 	// ADC1
@@ -470,8 +479,14 @@ void cycle_end(struct SUMSQBUNDLE* psmb, struct ADC2NUMALL* pall)
 	pall->diff.ctr = (int32_t)(psmb->adc2ctr - pall->prev.ctr);
 	pall->prev.ctr = psmb->adc2ctr;
 
-// Might want to put pall->diff into a circular buffer
+// Put pall->diff into a circular buffer...for someone
+	*padc2numbuffadd  = pall->diff; // Add latest differences
+	padc2numbuffadd += 1;
+	if (padc2numbuffadd >= &adc2numbuff[ADC2NUMSZ])
+		padc2numbuffadd = &adc2numbuff[0];
 
+// For cycle-by-cycle check
+// Fill a buffer and stop while 'main' outputs it
 if (debugnum_flag == 0)	
 {
 	debugnum[debugnum_idx] = pall->diff;
@@ -485,6 +500,23 @@ if (debugnum_flag == 0)
 
 	sumsq_flag += 1; // Not needed if using queue
 	return;
+}
+/* *************************************************************************
+ * struct ADC2NUMALL* get_adc2num(void);
+ * @brief	: Circular buffer cycle-end differences
+ * @return  : pointer to struct; NULL = buffer emtpy; 
+ * NOTE: no buffer overrun protection.
+ * *************************************************************************/
+struct ADC2NUM* get_adc2num(void)
+{
+	struct ADC2NUM* ptmp;
+	if (padc2numbuffadd == padc2numbufftake)
+		return NULL;
+	ptmp = padc2numbufftake;
+	padc2numbufftake += 1;
+	if (padc2numbufftake >= &adc2numbuff[ADC2NUMSZ])
+		padc2numbufftake = &adc2numbuff[0];
+	return ptmp;
 }
 /* *************************************************************************
  * uint32_t adc2getsyscycle(void);
