@@ -130,6 +130,7 @@ DMA_HandleTypeDef hdma_usart2_rx;
 DMA_HandleTypeDef hdma_usart3_rx;
 DMA_HandleTypeDef hdma_usart3_tx;
 
+DMA_HandleTypeDef hdma_memtomem_dma2_stream1;
 osThreadId defaultTaskHandle;
 /* USER CODE BEGIN PV */
 uint16_t errorcode;
@@ -412,7 +413,7 @@ static void MX_ADC1_Init(void)
   */
   sConfig.Channel = ADC_CHANNEL_10;
   sConfig.Rank = 1;
-  sConfig.SamplingTime = ADC_SAMPLETIME_56CYCLES;
+  sConfig.SamplingTime = ADC_SAMPLETIME_28CYCLES;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
   {
     Error_Handler();
@@ -1176,6 +1177,8 @@ static void MX_USART3_UART_Init(void)
 
 /**
   * Enable DMA controller clock
+  * Configure DMA for memory to memory transfers
+  *   hdma_memtomem_dma2_stream1
   */
 static void MX_DMA_Init(void)
 {
@@ -1183,6 +1186,25 @@ static void MX_DMA_Init(void)
   /* DMA controller clock enable */
   __HAL_RCC_DMA1_CLK_ENABLE();
   __HAL_RCC_DMA2_CLK_ENABLE();
+
+  /* Configure DMA request hdma_memtomem_dma2_stream1 on DMA2_Stream1 */
+  hdma_memtomem_dma2_stream1.Instance = DMA2_Stream1;
+  hdma_memtomem_dma2_stream1.Init.Channel = DMA_CHANNEL_0;
+  hdma_memtomem_dma2_stream1.Init.Direction = DMA_MEMORY_TO_MEMORY;
+  hdma_memtomem_dma2_stream1.Init.PeriphInc = DMA_PINC_ENABLE;
+  hdma_memtomem_dma2_stream1.Init.MemInc = DMA_MINC_ENABLE;
+  hdma_memtomem_dma2_stream1.Init.PeriphDataAlignment = DMA_PDATAALIGN_WORD;
+  hdma_memtomem_dma2_stream1.Init.MemDataAlignment = DMA_MDATAALIGN_WORD;
+  hdma_memtomem_dma2_stream1.Init.Mode = DMA_NORMAL;
+  hdma_memtomem_dma2_stream1.Init.Priority = DMA_PRIORITY_LOW;
+  hdma_memtomem_dma2_stream1.Init.FIFOMode = DMA_FIFOMODE_ENABLE;
+  hdma_memtomem_dma2_stream1.Init.FIFOThreshold = DMA_FIFO_THRESHOLD_FULL;
+  hdma_memtomem_dma2_stream1.Init.MemBurst = DMA_MBURST_SINGLE;
+  hdma_memtomem_dma2_stream1.Init.PeriphBurst = DMA_PBURST_SINGLE;
+  if (HAL_DMA_Init(&hdma_memtomem_dma2_stream1) != HAL_OK)
+  {
+    Error_Handler( );
+  }
 
   /* DMA interrupt init */
   /* DMA1_Stream0_IRQn interrupt configuration */
@@ -1203,6 +1225,9 @@ static void MX_DMA_Init(void)
   /* DMA2_Stream0_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA2_Stream0_IRQn, 5, 0);
   HAL_NVIC_EnableIRQ(DMA2_Stream0_IRQn);
+  /* DMA2_Stream1_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA2_Stream1_IRQn, 5, 0);
+  HAL_NVIC_EnableIRQ(DMA2_Stream1_IRQn);
   /* DMA2_Stream2_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA2_Stream2_IRQn, 5, 0);
   HAL_NVIC_EnableIRQ(DMA2_Stream2_IRQn);
@@ -1317,7 +1342,7 @@ HAL_GPIO_WritePin(GPIOB, GPIO_PIN_13, GPIO_PIN_SET); // RED OFF
   
 //    qret=xQueueSendToBack(RyTaskReadReqQHandle, &rytest[j].preq, portMAX_DELAY);
 //    if (qret == errQUEUE_FULL) morse_trap(123);  
-uint32_t ctr;
+uint32_t ctr =0;
   /* Infinite loop */
   for(;;)
   {   
@@ -1375,24 +1400,26 @@ osDelay(20); // Do not hog all the time.
 
 
 
-#if 0
-#define DEBUGSZ (512*8)
+
+#if 1
+#define DEBUGSZ (ADC2SEQNUM*32)
 extern uint32_t debugadcsumidx;
 extern uint16_t debugadcsum[];
 extern uint16_t debugexti[];
       if (debugadcsumidx >= DEBUGSZ)
       {
+        ctr = 0;
         for (int j = 0; j < DEBUGSZ; j++)
         {
           yprintf(&pbuf1,"\n\r%5d %9d",ctr++,debugadcsum[j], debugexti[j]);
           if (debugexti[j] != 0)
             yprintf(&pbuf2," %6d",debugexti[j]);
         }
-extern uint32_t debugadc2t;
-extern uint32_t debugadc2ctr;
-        yprintf(&pbuf2,"\n\rTdiff: %d  %d %d\n\r",debugadc2t,debugadc2t/180,debugadc2ctr);
         HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, GPIO_PIN_SET); // GRN OFF
-        osDelay(1000*60*2);
+extern uint32_t debugdmamm2;
+extern uint32_t debugdmakk2;
+yprintf(&pbuf1,"\n\rm-m: %d inline: %d\n\r",debugdmamm2,debugdmakk2);
+        osDelay(1000*6);
         debugadcsumidx = 0;
         ctr = 0;
       }
@@ -1437,6 +1464,7 @@ if (exti15dtw_accum_flag != 0)
   yprintf(&pbuf1," %7d %10.1f %10.4f%% %10.3f",(exti15dtw_accum_diff/240),faccum,100.0f*((1E6f/60.0f)/faccum - 1.0f),(1E6f/faccum));
 }
 #endif
+
 #if 0
 extern struct ADC2NUMALL adc2numall;
 float fsmq = adc2numall.diff.smq;
@@ -1471,6 +1499,7 @@ if (debug_pdma_flag)
   while(1==1);
 }
 #endif
+
 #if 0 
 float fav = 0;
 float favq = 0;
@@ -1503,10 +1532,18 @@ yprintf(&pbuf1,"\n\r syscycle_per_adcconversion: %d",adc2getsyscycle());
   yprintf(&pbuf2,"\n\r\n");
   osDelay(2000);
 }
-#endif
+
   }
 }
+#endif
+
+
+
+
+
+  }
   /* USER CODE END 5 */
+}
 
 /**
   * @brief  Period elapsed callback in non blocking mode

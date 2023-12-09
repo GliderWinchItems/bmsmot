@@ -27,6 +27,7 @@ extern ADC_HandleTypeDef hadc1;
 extern ADC_HandleTypeDef hadc2;
 extern DMA_HandleTypeDef hdma_adc2;
 extern DMA_HandleTypeDef hdma_adc1;
+extern DMA_HandleTypeDef hdma_memtomem_dma2_stream1;
 
 // Parameterized system cycles per ADC2 conversion
 uint32_t adc2getsyscycle(void);
@@ -73,12 +74,16 @@ extern osThreadId defaultTaskHandle;
 float fclpos;
 
 uint32_t debugadcctr;
-#define DEBUGSZ (512*8)
+#define DEBUGSZ (ADC2SEQNUM*32)
 uint16_t debugadcsum[DEBUGSZ];
 uint32_t debugadcsumidx;
 uint16_t debugadcflag;
 uint16_t debugexti[DEBUGSZ];
 uint16_t debugdma_cnt2;
+uint32_t debugdmamm1;
+uint32_t debugdmamm2;
+uint32_t debugdmakk1;
+uint32_t debugdmakk2;
 
 uint32_t debugadc2ctr;
 uint32_t debugadc2dma_pdma2;
@@ -101,8 +106,7 @@ int32_t debugadc2_cnv_ctr;
 
 uint32_t sumsq_flag;  // Increments each time new sumsq saved
 
-#define OFFSET 1884
-uint16_t offset = OFFSET; // Initial = calibration offset
+//uint16_t offset; // Initial = calibration offset
 
 uint32_t debugdma;
 /* *************************************************************************
@@ -149,7 +153,7 @@ void StartADCTask(void *argument)
 	sumsqbundle.sumsq    = 0; // Running sum squared
 	sumsqbundle.adcaccum = 0; // Running sum of readings
 	sumsqbundle.adc2ctr  = 0; // Running count of readings
-	sumsqbundle.offset   = offset; // Params: default offset
+	sumsqbundle.offset   = adc1.lc.offset; // Params: default offset
 	sumsqbundle.n        = 0xA; // For debugging
 
 // Debugging
@@ -186,40 +190,55 @@ sumsqbundle.n        = 0xA; // For debugging
 				sumsqbundle.pdma = adcdmatskblk[1].pdma2;
 			}
 			sumsqbundle.pdma_end = sumsqbundle.pdma + ADC2SEQNUM;//(32*16) DMA 1/2 buffer end address
+
+/* Save readings for output. */
+#if 1
+	if (debugadcsumidx < DEBUGSZ)
+	{
+		HAL_DMA_Abort_IT(&hdma_memtomem_dma2_stream1);
+// HAL_StatusTypeDef HAL_DMA_Start(DMA_HandleTypeDef *hdma, uint32_t SrcAddress, uint32_t DstAddress, uint32_t DataLength
+		HAL_DMA_Start_IT(&hdma_memtomem_dma2_stream1,(uint32_t)sumsqbundle.pdma,(uint32_t)&debugadcsum[debugadcsumidx],ADC2SEQNUM/2);
+debugdmamm1 = DTWTIME;		
+		debugadcsumidx += ADC2SEQNUM;
+	}
+#endif
+
 #if 0
 /* Save readings for output. */
 debugadc2ctr += 1;
-uint16_t* pdebug = &debugadcsum[debugadcsumidx];
-
+uint32_t* pdebug = &debugadcsum[debugadcsumidx];
+uint32_t* pword = (uint32_t*)sumsqbundle.pdma;
+debugdmamm1 = DTWTIME;		
 if ((debugadcsumidx < DEBUGSZ) && (debugadc2ctr > 1013))
 {
-	pdma = sumsqbundle.pdma;
-	for(int j = 0; j < ADC2SEQNUM/16; j++)
+	for(int j = 0; j < ADC2SEQNUM/32; j++)
 	{
-		*(pdebug + 0) = *(pdma + 0);
-		*(pdebug + 1) = *(pdma + 1);
-		*(pdebug + 2) = *(pdma + 2);
-		*(pdebug + 3) = *(pdma + 3);
-		*(pdebug + 4) = *(pdma + 4);
-		*(pdebug + 5) = *(pdma + 5);
-		*(pdebug + 6) = *(pdma + 6);
-		*(pdebug + 7) = *(pdma + 7);
-		*(pdebug + 8) = *(pdma + 8);
-		*(pdebug + 9) = *(pdma + 9);
-		*(pdebug +10) = *(pdma +10);
-		*(pdebug +11) = *(pdma +11);
-		*(pdebug +12) = *(pdma +12);
-		*(pdebug +13) = *(pdma +13);
-		*(pdebug +14) = *(pdma +14);
-		*(pdebug +15) = *(pdma +15);
+		*(pdebug + 0) = *(pword + 0);
+		*(pdebug + 1) = *(pword + 1);
+		*(pdebug + 2) = *(pword + 2);
+		*(pdebug + 3) = *(pword + 3);
+		*(pdebug + 4) = *(pword + 4);
+		*(pdebug + 5) = *(pword + 5);
+		*(pdebug + 6) = *(pword + 6);
+		*(pdebug + 7) = *(pword + 7);
+		*(pdebug + 8) = *(pword + 8);
+		*(pdebug + 9) = *(pword + 9);
+		*(pdebug +10) = *(pword +10);
+		*(pdebug +11) = *(pword +11);
+		*(pdebug +12) = *(pword +12);
+		*(pdebug +13) = *(pword +13);
+		*(pdebug +14) = *(pword +14);
+		*(pdebug +15) = *(pword +15);
 		pdebug += 16;
-		pdma   += 16;
+		pword  += 16;
 	}
 	if (adc2dma_flag != 0)
 	{
 		debugexti[debugadcsumidx + adc2dma_cnt] = debugdma_cnt2;
 	}
-	debugadcsumidx += ADC2SEQNUM;			
+	debugadcsumidx += ADC2SEQNUM;
+debugdmamm2 = DTWTIME - debugdmamm1;
+	
 }
 #endif
 			/* Subtract sys cycles for one ADC2SEQNUM reading buffer. */
@@ -247,7 +266,9 @@ if (adc2cnvrsn_ctr < 0)	morse_trap(7222);
 			}
 			else
 			{
+debugdmakk1 = DTWTIME;				
 				fast512summing(&sumsqbundle,0);	// Sum entire buffer
+debugdmakk2 = DTWTIME - debugdmakk1;				
 			}
 
 /* JIC my nifty asm et. al. isn't right. */
@@ -539,3 +560,7 @@ uint32_t adc2getsyscycle(void)
 	return (smps[smpscode])*div*(HAL_RCC_GetSysClockFreq()/HAL_RCC_GetPCLK2Freq());
 }
 
+void DEBUG_XferCpltCallback(DMA_HandleTypeDef hdma_memtomem_dma2_stream1)
+{
+	debugdmamm2 = DTWTIME - debugdmamm1;
+}
