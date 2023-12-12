@@ -30,9 +30,9 @@ int adc_idx_v_struct_hardcode_params(struct ADCLC* p)
 	p->calintern.iiradctemp.scale = 4;
 
 	// Internal voltage ref: ADC1IDX_INTERNALVREF // IN18     - Internal voltage reference
-	p->calintern.fvdd   = 3.298f;  // Vdd for following Vref ADC reading
-	p->calintern.adcvdd = 27093;   //(16*1495.5) ADC reading (DMA sum) for above Vdd
-	p->calintern.fvref  = 1.223f;  // reference voltage
+	p->calintern.fvdd   = 3.302f;  // Vdd for following Vref ADC reading
+	p->calintern.adcvdd = 24000;   //(16*1495.5) ADC reading (DMA sum) for above Vdd
+	p->calintern.fvref  = 1.210f;  // reference voltage
 
 	// Internal temperature: ADC1IDX_INTERNALTEMP // IN17     - Internal temperature sensor
 	p->calintern.adcrmtmp  = 17838; // Room temp ADC (DMA sum) reading
@@ -64,80 +64,80 @@ int adc_idx_v_struct_hardcode_params(struct ADCLC* p)
 #define ADC1IDX_INTERNALVBAT 10 // IN18       VBAT
 #define ADC1IDX_INTERNALVREF 11 // IN17       VREF
 */
-#define THRMOFF 61.0f
-#define THRMSCALE -8.423E-4f;
+#define THRMOFF 86.0f
+#define THRMSCALE -1.873E-3f;
 #define THRMTC 0.990f
 // ADC1IDX_THERMISTOR1   0	// PC0 IN10   JP9  Thermistor: JP9
 	p->cabs[ADC1IDX_THERMISTOR1].iir_f1.coef     = THRMTC; // Filter time constant
 	p->cabs[ADC1IDX_THERMISTOR1].iir_f1.skipctr  = SKIPCT;  // Initial skip
-	p->cabs[ADC1IDX_THERMISTOR1].scale     = THRMSCALE; // 
-	p->cabs[ADC1IDX_THERMISTOR1].offset    = THRMOFF;  // Offset before scale
+	p->cabs[ADC1IDX_THERMISTOR1].coef[1]     = THRMSCALE; // 
+	p->cabs[ADC1IDX_THERMISTOR1].coef[0]    = THRMOFF;  // 
 
 // ADC1IDX_THERMISTOR2	  1 // PC1 IN11   JP8  Thermistor: JP8
 	p->cabs[ADC1IDX_THERMISTOR2].iir_f1.coef     = THRMTC; // Filter time constant
 	p->cabs[ADC1IDX_THERMISTOR2].iir_f1.skipctr  = SKIPCT;  // Initial skip
-	p->cabs[ADC1IDX_THERMISTOR2].scale     = THRMSCALE; // 
-	p->cabs[ADC1IDX_THERMISTOR2].offset    = THRMOFF;  // Offset before scale
+	p->cabs[ADC1IDX_THERMISTOR2].coef[1]     = THRMSCALE; // 
+	p->cabs[ADC1IDX_THERMISTOR2].coef[0]    = THRMOFF;  // 
 
 // ADC1IDX_THERMISTOR3   2 // PC2 IN12   JP10 Thermistor: JP10
 	p->cabs[ADC1IDX_THERMISTOR3].iir_f1.coef     = THRMTC; // Filter time constant
 	p->cabs[ADC1IDX_THERMISTOR3].iir_f1.skipctr  = SKIPCT;  // Initial skip
-	p->cabs[ADC1IDX_THERMISTOR3].scale     = THRMSCALE; // 
-	p->cabs[ADC1IDX_THERMISTOR3].offset    = THRMOFF;  // Offset before scale
+	p->cabs[ADC1IDX_THERMISTOR3].coef[1]     = THRMSCALE; // 
+	p->cabs[ADC1IDX_THERMISTOR3].coef[0]    = THRMOFF;  // 
 
 // ADC1IDX_THERMISTOR4   3	// PC3 IN13   JP11 Thermistor: JP11
 	p->cabs[ADC1IDX_THERMISTOR4].iir_f1.coef     = THRMTC; // Filter time constant
 	p->cabs[ADC1IDX_THERMISTOR4].iir_f1.skipctr  = SKIPCT;  // Initial skip
-	p->cabs[ADC1IDX_THERMISTOR4].scale     = THRMSCALE;//5.424129E-04f; // Apply calibration below 
-	p->cabs[ADC1IDX_THERMISTOR4].offset    = THRMOFF;  // Offset before scale
+	p->cabs[ADC1IDX_THERMISTOR4].coef[1]     = THRMSCALE;//5.424129E-04f; // Apply calibration below 
+	p->cabs[ADC1IDX_THERMISTOR4].coef[0]    = THRMOFF;  // 
 
 // ADC1IDX_DIVIDEDSPARE  4	// PC4 IN14   10k|10k divider
 	p->cabs[ADC1IDX_DIVIDEDSPARE].iir_f1.coef     = CELLTC; // Filter time constant
 	p->cabs[ADC1IDX_DIVIDEDSPARE].iir_f1.skipctr  = SKIPCT;  // Initial skip
-	p->cabs[ADC1IDX_DIVIDEDSPARE].scale     = 2.520833E-05f; // Apply calibration below 
+	p->cabs[ADC1IDX_DIVIDEDSPARE].coef[1]     = 2.520833E-05f; // Apply calibration below 
 	p->cabs[ADC1IDX_DIVIDEDSPARE].ioffset    = 0;  // Offset before scale
 
 // ADC1IDX_PRESS_SENSE   5	// PC5 IN15   JP24 Pressure sensor JP24
 	p->cabs[ADC1IDX_PRESS_SENSE].iir_f1.coef     = CELLTC; // Filter time constant
 	p->cabs[ADC1IDX_PRESS_SENSE].iir_f1.skipctr  = SKIPCT;  // Initial skip
-	p->cabs[ADC1IDX_PRESS_SENSE].scale     = 2.520833E-05f; // Apply calibration below 
+	p->cabs[ADC1IDX_PRESS_SENSE].coef[1]     = 2.520833E-05f; // Apply calibration below 
 	p->cabs[ADC1IDX_PRESS_SENSE].ioffset    = 0;  // Offset before scale
 
 // ADC1IDX_12V_POWR      6	// PA7 IN7    12v Power supply
 	p->cabs[ADC1IDX_12V_POWR].iir_f1.coef     = 0.99f; // Filter time constant
 	p->cabs[ADC1IDX_12V_POWR].iir_f1.skipctr  = SKIPCT;  // Initial skip
-	p->cabs[ADC1IDX_12V_POWR].scale     = 2.4363E-4f; // Apply calibration below 
+	p->cabs[ADC1IDX_12V_POWR].coef[1]     = 2.4363E-4f; // Apply calibration below 
 	p->cabs[ADC1IDX_12V_POWR].ioffset    = 0;  // Offset before scale
 
-// ADC1IDX_BATTLEAK_P    7	// PB0 IN8    Battery string plus leakage
+// ADC1IDX_BATTLEAK_P    7	// PB0 IN8    Battery string minus leakage
 	p->cabs[ADC1IDX_BATTLEAK_P].iir_f1.coef     = 0.99f; // Filter time constant
 	p->cabs[ADC1IDX_BATTLEAK_P].iir_f1.skipctr  = SKIPCT;  // Initial skip
-	p->cabs[ADC1IDX_BATTLEAK_P].scale     = 0.03125; //  1/32 scale factor
+	p->cabs[ADC1IDX_BATTLEAK_P].coef[1]     = 0.03125; //  1/32 scale factor
 	p->cabs[ADC1IDX_BATTLEAK_P].ioffset    = 0;  // Offset before scale
 
-// ADC1IDX_BATTLEAK_M    8	// PB1 IN9    Battery string minus leakage
+// ADC1IDX_BATTLEAK_M    8	// PB1 IN9    Battery string plus leakage
 	p->cabs[ADC1IDX_BATTLEAK_M].iir_f1.coef     = CELLTC; // Filter time constant
 	p->cabs[ADC1IDX_BATTLEAK_M].iir_f1.skipctr  = SKIPCT;  // Initial skip
-	p->cabs[ADC1IDX_BATTLEAK_M].scale     = 1.478422E-04f;
+	p->cabs[ADC1IDX_BATTLEAK_M].coef[1]     = 1.478422E-04f;
 	p->cabs[ADC1IDX_BATTLEAK_M].ioffset    = 0;  // Offset before scale
 
-// ADC1IDX_INTERNALVREF  9 // IN17   Internal voltage reference
-	p->cabs[ADC1IDX_INTERNALVREF].iir_f1.coef     = CELLTC; // Filter time constant
-	p->cabs[ADC1IDX_INTERNALVREF].iir_f1.skipctr  = SKIPCT;  // Initial skip
-	p->cabs[ADC1IDX_INTERNALVREF].scale     = 1.478422E-04f;
-	p->cabs[ADC1IDX_INTERNALVREF].ioffset    = 0;  // Offset before scale
+// ADC1IDX_12V_POWR_DUP  9 // / PA7 IN7    12v Power supply (duplicate)
+	p->cabs[ADC1IDX_12V_POWR_DUP].iir_f1.coef     = 0.99f; // Filter time constant
+	p->cabs[ADC1IDX_12V_POWR_DUP].iir_f1.skipctr  = SKIPCT;  // Initial skip
+	p->cabs[ADC1IDX_12V_POWR_DUP].coef[1]    = 2.4363E-4f; // Apply calibration below 
+	p->cabs[ADC1IDX_12V_POWR_DUP].ioffset  = 0;  // Offset before scale
 
 // ADC1IDX_INTERNALVBAT 10 // IN18   Internal temperature or VBAT
 	p->cabs[ADC1IDX_INTERNALVBAT].iir_f1.coef     = CELLTC; // Filter time constant
 	p->cabs[ADC1IDX_INTERNALVBAT].iir_f1.skipctr  = SKIPCT;  // Initial skip
-	p->cabs[ADC1IDX_INTERNALVBAT].scale     = 1.478422E-04f;
+	p->cabs[ADC1IDX_INTERNALVBAT].coef[1]     = (4*0.52176483E-04f); // VBAT is divided by 4
 	p->cabs[ADC1IDX_INTERNALVBAT].ioffset    = 0;  // Offset before scale
 
-// ADC1IDX_ACTRANSFRMR  11 // PA6 IN6    AC transformer w offset
-	p->cabs[ADC1IDX_ACTRANSFRMR].iir_f1.coef     = CELLTC; // Filter time constant
-	p->cabs[ADC1IDX_ACTRANSFRMR].iir_f1.skipctr  = SKIPCT;  // Initial skip
-	p->cabs[ADC1IDX_ACTRANSFRMR].scale     = 1.478422E-04f;
-	p->cabs[ADC1IDX_ACTRANSFRMR].ioffset    = 0;  // Offset before scale	
+// ADC1IDX_INTERNALVREF  11 // IN17   Internal voltage reference 
+	p->cabs[ADC1IDX_INTERNALVREF].iir_f1.coef     = CELLTC; // Filter time constant
+	p->cabs[ADC1IDX_INTERNALVREF].iir_f1.skipctr  = SKIPCT;  // Initial skip
+	p->cabs[ADC1IDX_INTERNALVREF].coef[1]     = 0.5039682E-04f;
+	p->cabs[ADC1IDX_INTERNALVREF].ioffset    = 0;  // Offset before scale	
 
 
 	/* Initialize iir filter. */
@@ -147,6 +147,8 @@ int adc_idx_v_struct_hardcode_params(struct ADCLC* p)
 	}
 
 /* ############## ADC2 ########################## */
+	// PA6 IN6    AC transformer w offset
+
 	/* ADC2 offset calibration. */
 	p->offset = 1885; // Initial ADC2 zero input offset
 	/* IIR filtering of ongoing offset computation. */

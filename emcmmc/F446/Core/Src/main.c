@@ -488,6 +488,7 @@ static void MX_ADC1_Init(void)
   */
   sConfig.Channel = ADC_CHANNEL_7;
   sConfig.Rank = 10;
+  sConfig.SamplingTime = ADC_SAMPLETIME_144CYCLES;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
   {
     Error_Handler();
@@ -496,7 +497,6 @@ static void MX_ADC1_Init(void)
   */
   sConfig.Channel = ADC_CHANNEL_VBAT;
   sConfig.Rank = 11;
-  sConfig.SamplingTime = ADC_SAMPLETIME_144CYCLES;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
   {
     Error_Handler();
@@ -1346,13 +1346,75 @@ uint32_t ctr =0;
   /* Infinite loop */
   for(;;)
   {   
-#if 0    
+#if 1
     HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, GPIO_PIN_RESET); // GRN ON
-        osDelay(20);
+        osDelay(5);
     HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, GPIO_PIN_SET); // GRN OFF
-      osDelay(62-20);
+      osDelay(500-5);
 #endif
 
+#if 1
+if (ctr == 0)
+{
+  yprintf(&pbuf1,"ADC1IDX_THERMISTOR1   0 PC0 IN10   JP9  Thermistor\n\r");
+  yprintf(&pbuf1,"ADC1IDX_THERMISTOR2   1 PC1 IN11   JP8  Thermistor\n\r");
+  yprintf(&pbuf1,"ADC1IDX_THERMISTOR3   2 PC2 IN12   JP10 Thermistor\n\r");
+  yprintf(&pbuf1,"ADC1IDX_THERMISTOR4   3 PC3 IN13   JP11 Thermistor\n\r");
+  yprintf(&pbuf1,"ADC1IDX_DIVIDEDSPARE  4 PC4 IN14   JP17 Spare: 10k|10k divider\n\r");
+  yprintf(&pbuf1,"ADC1IDX_PRESS_SENSE   5 PC5 IN15   JP24 Pressure sensor\n\r");
+  yprintf(&pbuf1,"ADC1IDX_12V_POWR      6 PA7 IN7    12v Power supply\n\r");
+  yprintf(&pbuf1,"ADC1IDX_BATTLEAK_P    7 PB0 IN8    Battery string plus leakage\n\r");
+  yprintf(&pbuf1,"ADC1IDX_BATTLEAK_M    8 PB1 IN9    Battery string minus leakage\n\r");
+  yprintf(&pbuf1,"ADC1IDX_12V_POWR_DUP  6 PA7 IN7    12v Power supply (duplicate)\n\r");
+  yprintf(&pbuf1,"ADC1IDX_INTERNALVBAT 10 IN18       VBAT\n\r");
+  yprintf(&pbuf1,"ADC1IDX_INTERNALVREF 11 IN17       VREF\n\r");
+  for(int j = 0; j < ADC1DIRECTMAX; j++)
+    yprintf(&pbuf2,"        %2d",j);
+  yprintf(&pbuf1,"\n\r");
+}
+ctr += 1;
+if (ctr >= 32) ctr = 0;
+{
+ #if 1 // List calibrated & filtered.
+  for(int j = 0; j < ADC1DIRECTMAX; j++)
+  {
+    yprintf(&pbuf2," %9.3f",adc1.abs[j].filt);
+  }
+  yprintf(&pbuf1,"\n\r");
+ #endif
+
+ #if 0 // List ADC sum (use for calibration)
+ extern uint32_t dbg_adcsum[ADC1DIRECTMAX];
+ static struct FILTERIIRF1 iiradcsum[ADC1DIRECTMAX]; // iir_f1 (float) filter
+ static float fsumsum;
+ static uint8_t dbgflag;
+ if (dbgflag == 0)
+ {
+  // OTO initilization
+  for(int j = 0; j < ADC1DIRECTMAX; j++)
+  {
+    iiradcsum[j].skipctr  = 4;
+    iiradcsum[j].coef     = 0.95f;
+    iiradcsum[j].onemcoef = 1 - iiradcsum[j].coef;  
+  }
+  dbgflag = 1;
+ }
+  for(int j = 0; j < ADC1DIRECTMAX; j++)
+  {
+    float ftmp = dbg_adcsum[j];
+    fsumsum = iir_f1_f(&iiradcsum[j], ftmp);
+    yprintf(&pbuf2," %9.1f",fsumsum);
+//    yprintf(&pbuf2," %9d",dbg_adcsum[j]);
+  }
+  yprintf(&pbuf1,"\n\r");
+ #endif
+}
+#endif
+
+
+
+
+#if 0 // 60 Hz output ac measurement
 float fnum;
 float facc;
 float fsmq;
@@ -1397,11 +1459,11 @@ else
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, GPIO_PIN_SET); // GRN OFF
 }
 osDelay(20); // Do not hog all the time.
+#endif
 
 
-
-
-#if 1
+#if 0 // Display (large) buffer of raw ADC2 readings
+#ifdef MEMTOMEMCOPY // Uncomment in ADCTask.h
 #define DEBUGSZ (ADC2SEQNUM*32)
 extern uint32_t debugadcsumidx;
 extern uint16_t debugadcsum[];
@@ -1428,9 +1490,10 @@ yprintf(&pbuf1,"\n\rm-m: %d inline: %d\n\r",debugdmamm2,debugdmakk2);
 //          yprintf(&pbuf1,"\n\r%5d %9d",ctr++,debugadcsumidx);
       }
 #endif
+#endif
 
 
-#if 0
+#if 0 // Display time between EXTI interrupts (60 Hz)
 extern uint32_t exti15dtw_diff;
 extern uint32_t  exti15dtw_flag;
 extern uint32_t  exti15dtw_flag_prev;

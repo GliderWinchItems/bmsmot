@@ -28,7 +28,7 @@
 #define ADC1IDX_12V_POWR      6	// PA7 IN7    12v Power supply
 #define ADC1IDX_BATTLEAK_P    7	// PB0 IN8    Battery string plus leakage
 #define ADC1IDX_BATTLEAK_M    8	// PB1 IN9    Battery string minus leakage
-#define ADC1IDX_ACTRANSFRMR   9 // PA6 IN6    JP34 AC Transformer
+#define ADC1IDX_12V_POWR_DUP  9	// PA7 IN7    12v Power supply (duplicate)
 #define ADC1IDX_INTERNALVBAT 10 // IN18       VBAT
 #define ADC1IDX_INTERNALVREF 11 // IN17       VREF
 

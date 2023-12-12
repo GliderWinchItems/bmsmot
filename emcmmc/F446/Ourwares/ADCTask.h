@@ -48,6 +48,12 @@ struct ADC2NUMALL
 	struct ADC2NUM prev;
 	struct ADC2NUM diff;
 };
+struct ACnOFFSET
+{
+	float rms; // lastest sqrt(fsmq)
+	float offset; // Filtered offset
+};
+
 
 /* ADC2 fast processing collection. */
 struct SUMSQBUNDLE
@@ -84,13 +90,29 @@ extern float    adcsumfilt[ADC1DIRECTMAX]; // Filtered
 extern uint8_t  adcsumidx; // Index for currently being summed
 extern struct ADC2NUMALL adc2numall;
 
-// Debugging
+extern struct SUMSQBUNDLE sumsqbundle;
+
+extern struct ACnOFFSET acnoffset;
+
+#define BASE 512
+
+// Debugging: raw ADC2 readings buffering
+//#define MEMTOMEMCOPY
+#ifdef MEMTOMEMCOPY
+#define DEBUGSZ (ADC2SEQNUM*32)
+#define MEMTOMEMDMA // Comment out to use inline code version
+#endif
+
+// Debugging: End of cycle summary buffering
+//#define DEBUGNUMFILL
+#ifdef DEBUGNUMFILL
 #define DEBUGNUMSIZE 360
 extern struct ADC2NUM debugnum[DEBUGNUMSIZE];
 extern uint8_t  debugnum_flag;
-extern struct SUMSQBUNDLE sumsqbundle;
+#endif
 
-#define BASE 512
+// Debugging: Save sum of ADC1 readings
+#define ADC1SUMSAVE
 
 #endif
 

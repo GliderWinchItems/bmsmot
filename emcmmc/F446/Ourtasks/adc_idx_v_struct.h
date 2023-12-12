@@ -56,8 +56,6 @@ struct ADCCALABS
 	struct FILTERIIRF1 iir_f1; // Filter: Time constant, integer scaling
 	float coef[3]; // coefficients for: x^0 x^1 x^2
 	float  f;
-	float scale;
-	float offset;
 	int32_t  ioffset; // Offset before float conversion
 };
 

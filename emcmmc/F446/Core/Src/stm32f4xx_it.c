@@ -26,6 +26,8 @@
 #include "RyTask.h"
 #include "morse.h"
 #include "ADCTask.h"
+// ADCTask.c debugging memory-memory save of ADC2 readings
+void DEBUG_XferCpltCallback(DMA_HandleTypeDef* hdma_memtomem_dma2_stream1);
 
 /* USER CODE END Includes */
 

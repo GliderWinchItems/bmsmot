@@ -51,10 +51,11 @@ struct ADC2NUM* padc2numbuffadd;
 struct ADC2NUM* padc2numbufftake;
 struct ADC2NUM* padc2numbuff_end;
 
-
+#ifdef DEBUGNUMFILL
 struct ADC2NUM debugnum[DEBUGNUMSIZE];
 uint16_t debugnum_idx;
 uint8_t  debugnum_flag;
+#endif
 
 void sumsquareswithif(struct SUMSQBUNDLE* psumsqbundle);
 void sumsquaresfastest(void);
@@ -74,11 +75,14 @@ extern osThreadId defaultTaskHandle;
 float fclpos;
 
 uint32_t debugadcctr;
-#define DEBUGSZ (ADC2SEQNUM*32)
+
+#ifdef MEMTOMEMCOPY
 uint16_t debugadcsum[DEBUGSZ];
 uint32_t debugadcsumidx;
 uint16_t debugadcflag;
 uint16_t debugexti[DEBUGSZ];
+#endif
+
 uint16_t debugdma_cnt2;
 uint32_t debugdmamm1;
 uint32_t debugdmamm2;
@@ -191,8 +195,9 @@ sumsqbundle.n        = 0xA; // For debugging
 			}
 			sumsqbundle.pdma_end = sumsqbundle.pdma + ADC2SEQNUM;//(32*16) DMA 1/2 buffer end address
 
-/* Save readings for output. */
-#if 1
+/* Save readings for output using DMA. */
+#ifdef MEMTOMEMCOPY
+  #ifdef MEMTOMEMDMA
 	if (debugadcsumidx < DEBUGSZ)
 	{
 		HAL_DMA_Abort_IT(&hdma_memtomem_dma2_stream1);
@@ -201,10 +206,9 @@ sumsqbundle.n        = 0xA; // For debugging
 debugdmamm1 = DTWTIME;		
 		debugadcsumidx += ADC2SEQNUM;
 	}
-#endif
+  #else
 
-#if 0
-/* Save readings for output. */
+/* Save readings for output inline copy loop. */
 debugadc2ctr += 1;
 uint32_t* pdebug = &debugadcsum[debugadcsumidx];
 uint32_t* pword = (uint32_t*)sumsqbundle.pdma;
@@ -240,6 +244,7 @@ if ((debugadcsumidx < DEBUGSZ) && (debugadc2ctr > 1013))
 debugdmamm2 = DTWTIME - debugdmamm1;
 	
 }
+  #endif
 #endif
 			/* Subtract sys cycles for one ADC2SEQNUM reading buffer. */
 			adc2cnvrsn_ctr -= (ADC2SEQNUM*syscycle_per_adc2conversion);
@@ -314,11 +319,12 @@ if (sumsqbundle.pdma != sumsqbundle.pdma_end)
 				 pdma += 1;
 				 pz += 1;
 			}		 
+			adc1.ctr += 1; // Update count
+			pz = &adc1.chan[0];
 
-// Save output for main, debugging and whatever...
-	pz = &adc1.chan[0];
+#ifdef ADC1SUMSAVE
+// Save output for main, debugging and whatever...	
 /* WOW. Optimizer does the following with one cycle per statement! */
-// NB: could use a memory-memory dma here?
 	dbg_adcsum[0]  = (pz +  0)->sum;
 	dbg_adcsum[1]  = (pz +  1)->sum;		
 	dbg_adcsum[2]  = (pz +  2)->sum;		
@@ -331,16 +337,14 @@ if (sumsqbundle.pdma != sumsqbundle.pdma_end)
 	dbg_adcsum[9]  = (pz +  9)->sum;	
 	dbg_adcsum[10] = (pz + 10)->sum;	
 	dbg_adcsum[11] = (pz + 11)->sum;	
-
-			adc1.ctr += 1; // Update count
 	debugadcctr = adc1.ctr;	
-
+#endif
 			// Calibrate and Pass sum through IIR filter
 			for (int i = 0; i < ADC1DIRECTMAX; i++)
 			{ // Calibrate and filter sums
 				ftmp = pz->sum; // Convert to float
 				// y = a + b * x;
-				adc1.abs[i].f = adc1.lc.cabs[i].offset + adc1.lc.cabs[i].scale * ftmp;
+				adc1.abs[i].f = adc1.lc.cabs[i].coef[0] + adc1.lc.cabs[i].coef[1] * ftmp;
 				adc1.abs[i].filt = iir_f1_f(&adc1.lc.cabs[i].iir_f1, adc1.abs[i].f);
 				pz->sum = 0; // Zero sum in prep for next cycle.
 				pz += 1;
@@ -392,26 +396,22 @@ osThreadId xADCTaskCreate(uint32_t taskpriority)
 	vTaskPrioritySet( ADCTaskHandle, taskpriority );
 	return ADCTaskHandle;
 #endif
-
 }
-#define EXTI15REG 0x8000;
 /* *************************************************************************
  * static void exti15_10_init(void);
  * @brief	: Init gpio input interrupt
  * *************************************************************************/
+#define EXTI15REG 0x8000;
 static void exti15_10_init(void)
-{
-	
+{	
 	EXTI->RTSR |=  EXTI15REG;  // Trigger on rising edge
 //	EXTI->FTSR |=  EXTI15REG;  // Trigger on falling edge
 	EXTI->IMR  |=  EXTI15REG;  // Interrupt mask reg: 10:15
 //	EXTI->EMR  |=  EXTI15REG;  // Event mask reg: enable 10:15
 	EXTI->PR   |=  EXTI15REG;  // Clear any pending
-
 	exti15dtw_prev = DTWTIME;
 	return;
 }
-
 /* #######################################################################
    Pin 15 interrupt (AC opto-isolator)
    ####################################################################### */
@@ -473,20 +473,6 @@ debugdma_cnt2 = adc2dma_cnt;
  * void cycle_end((struct SUMSQBUNDLE* psumsqbundle);
  * @brief	: 
  * *************************************************************************/
-/*
-struct ADC2NUM
-{
-	uint64_t smq; // Sum square
-	uint32_t acc; // Sum
-	uint32_t ctr; // Count for above
-};
-struct ADC2NUMALL
-{
-	struct ADC2NUM prev;
-	struct ADC2NUM diff;
-};
-static struct ADC2NUMALL adc2numall;
-*/
 void cycle_end(struct SUMSQBUNDLE* psmb, struct ADC2NUMALL* pall)
 {
 	// Compute differences between EXTI interrupts
@@ -506,8 +492,9 @@ void cycle_end(struct SUMSQBUNDLE* psmb, struct ADC2NUMALL* pall)
 	if (padc2numbuffadd >= &adc2numbuff[ADC2NUMSZ])
 		padc2numbuffadd = &adc2numbuff[0];
 
-// For cycle-by-cycle check
+// Debugging cycle-by-cycle check
 // Fill a buffer and stop while 'main' outputs it
+#ifdef DEBUGNUMFILL
 if (debugnum_flag == 0)	
 {
 	debugnum[debugnum_idx] = pall->diff;
@@ -518,6 +505,7 @@ if (debugnum_flag == 0)
 		debugnum_idx = 0;
 	}
 }
+#endif
 
 	sumsq_flag += 1; // Not needed if using queue
 	return;
@@ -559,8 +547,34 @@ uint32_t adc2getsyscycle(void)
 	uint16_t smps[8] = {3+12,15+12,28+12,56+12,84+12,112+12,144+12,480+12};
 	return (smps[smpscode])*div*(HAL_RCC_GetSysClockFreq()/HAL_RCC_GetPCLK2Freq());
 }
-
-void DEBUG_XferCpltCallback(DMA_HandleTypeDef hdma_memtomem_dma2_stream1)
+/* ####################################################################### 
+void DEBUG_XferCpltCallback(DMA_HandleTypeDef* hdma_memtomem_dma2_stream1);
+ * @brief   : Memory-memory dma complete interrupt
+########################################################################## */
+void DEBUG_XferCpltCallback(DMA_HandleTypeDef* hdma_memtomem_dma2_stream1)
 {
-	debugdmamm2 = DTWTIME - debugdmamm1;
+	debugdmamm2 = DTWTIME - debugdmamm1; // Save time of interrupt
+}
+
+/* *************************************************************************
+ * struct ACnOFFSET* adc2getACandOffset(void);
+ * @brief	: Compute system cycles per ADC2 conversion
+ * *************************************************************************/
+/*
+This struct might be put into a circular buffer, but for now, just one instance.
+*/
+struct ACnOFFSET acnoffset;
+
+struct ACnOFFSET* adc2getACandOffset(void)
+{
+	struct ADC2NUM* pnum = get_adc2num();
+	float frecip;
+	while ((pnum = get_adc2num()) != NULL)
+	{
+	  frecip = 1.0/pnum->ctr;
+	  acnoffset.rms    = sqrtf(pnum->smq * frecip) * adc1.lc.adc2offset_scale;
+	  acnoffset.offset = iir_f1_f(&adc1.lc.iir_adc2offset, (pnum->acc * frecip));
+	}
+	return &acnoffset;
+
 }
