@@ -222,13 +222,17 @@ void ry_init(void)
 {
 	/* capture/compare enable register makes output active high. */
 	/*                        CH1   CH2  CH3  CH4 */
-	TIM1->CCER  = 0x1111; //  oc3   oc1  oc4  oc2
+	//TIM1->CCER  = 0x1111; //  oc3   oc1  oc4  oc2
 	TIM2->CCER  = 0x1110; // acdet jp21  oa1  oa3
 	TIM3->CCER  = 0x1111; //  ob3   ob1  ob2  ob4
 	TIM12->CCER = 0x0011; //  oa4   oa2
 
 	/* Timers: configuration should have been done with 'MX initialization. */
-	TIM1->CR1  |= 0x81; // Start PWM timer
+//	TIM1->CR1  |= 0x81; // Start PWM timer
+ HAL_TIM_PWM_Start(&htim1,TIM_CHANNEL_1);
+ HAL_TIM_PWM_Start(&htim1,TIM_CHANNEL_2);
+ HAL_TIM_PWM_Start(&htim1,TIM_CHANNEL_3);
+ HAL_TIM_PWM_Start(&htim1,TIM_CHANNEL_4);
 	TIM2->CR1  |= 0x81; // Start PWM timer
 	TIM3->CR1  |= 0x81; // Start PWM timer
 	TIM12->CR1 |= 0x81; // Start PWM timer
@@ -359,7 +363,6 @@ void StartRyTask(void* argument)
 			{ // Here, no pull-in delay involved (e.g. pump motor, or fan)
 				relaywv[pssb->idx].pwm_wv = pwmtim; // Update working pwm
 				ry_setpwm(pssb->pwm,pssb->idx); // Update FET pwm drive
-morse_trap(111);
 				continue; // Onward!
 			}
 
