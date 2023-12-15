@@ -1,0 +1,49 @@
+Photoplotter Info File: /mnt/home/deh/GliderWinchItems/bmsmot/hw/eagle/sub-pwrfet/pwrfet.gpi
+
+ Date              :  5/16/2023 21:04:20 
+ Plotfile          : /mnt/home/deh/GliderWinchItems/bmsmot/hw/eagle/sub-pwrfet/pwrfet.sts
+ Apertures         : generated: 
+ Device            : Gerber photoplotter with RS-274-X aperture generation
+
+Parameter settings:
+
+ Emulate Apertures : no
+ Emulate Thermal   : no
+ Emulate Annulus   : no
+ Tolerance Draw  + :  0.00 %
+ Tolerance Draw  - :  0.00 %
+ Tolerance Flash + :  0.00 %
+ Tolerance Flash - :  0.00 %
+ Rotate            : no
+ Mirror            : yes
+ Optimize          : yes
+ Auto fit          : yes
+ OffsetX           : 0inch
+ OffsetY           : 0inch
+
+Plotfile Info:
+
+ Coordinate Format : 2.4
+ Coordinate Units  : Inch
+ Data Mode         : Absolute
+ Zero Suppression  : None
+ End Of Block      : *
+
+Apertures used:
+
+ Code     Shape     Size                  used
+
+ D10      draw      0.0000inch              15
+ D11      round     0.1497inch               4
+ D12      round     0.1458inch               4
+ D13      round     0.0710inch               3
+ D14      square    0.0907inch               8
+ D15      rectangle 0.1330inch x 0.0480inch     6
+ D16      square    0.4080inch               1
+ D17      rectangle 0.0474inch x 0.0513inch     2
+ D18      round     0.0730inch               2
+ D19      oval      0.0674inch x 0.1267inch     3
+ D20      round     0.0966inch               4
+ D21      round     0.1261inch               4
+ D22      round     0.0555inch               6
+

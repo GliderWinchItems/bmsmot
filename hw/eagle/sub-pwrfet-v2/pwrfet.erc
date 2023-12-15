@@ -1,0 +1,12 @@
+EAGLE Version 4.13 Copyright (c) 1988-2004 CadSoft
+
+Electrical Rule Check for /mnt/home/deh/GliderWinchItems/bmsmot/hw/eagle/sub-pwrfet/pwrfet.sch at  5/15/2023 23:23:02 
+
+WARNING: Sheet 1/2: POWER Pin ISOGATEDRV-FET1 VLOWSIDE connected to +PWR
+WARNING: Sheet 1/2: POWER Pin ISOGATEDRV-FET1 VLOGIC connected to +PWR
+WARNING: Sheet 1/2: POWER Pin ISOGATEDRV-FET1 VSS connected to GNDA
+
+Board and schematic are consistent
+
+    0 errors
+    3 warnings

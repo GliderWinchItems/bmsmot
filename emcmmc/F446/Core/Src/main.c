@@ -1365,7 +1365,7 @@ if (ryreqinit == 0)
 if (ryrequpdn == 0)
 {
   ryreq_q1.pwm += 5;
-  if (ryreq_q1.pwm >= 100)
+  if (ryreq_q1.pwm >= 50)
   {
     ryrequpdn = 1;
   }
