@@ -1,6 +1,6 @@
 Configuration	F446
 STM32CubeMX 	6.3.0
-Date	12/13/2023
+Date	12/16/2023
 MCU	STM32F446RETx
 
 

@@ -668,7 +668,7 @@ static void MX_TIM1_Init(void)
   htim1.Instance = TIM1;
   htim1.Init.Prescaler = 0;
   htim1.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim1.Init.Period = 36000;
+  htim1.Init.Period = 18000;
   htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim1.Init.RepetitionCounter = 0;
   htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
@@ -754,7 +754,7 @@ static void MX_TIM2_Init(void)
   htim2.Instance = TIM2;
   htim2.Init.Prescaler = 2;
   htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim2.Init.Period = 36000;
+  htim2.Init.Period = 18000;
   htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
@@ -822,7 +822,7 @@ static void MX_TIM3_Init(void)
   htim3.Instance = TIM3;
   htim3.Init.Prescaler = 0;
   htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim3.Init.Period = 36000;
+  htim3.Init.Period = 18000;
   htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim3) != HAL_OK)
@@ -992,7 +992,7 @@ static void MX_TIM12_Init(void)
   htim12.Instance = TIM12;
   htim12.Init.Prescaler = 0;
   htim12.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim12.Init.Period = 36000;
+  htim12.Init.Period = 18000;
   htim12.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim12.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim12) != HAL_OK)
@@ -1356,24 +1356,28 @@ static uint8_t ryreqinit;
 static uint8_t ryrequpdn;
 if (ryreqinit == 0)
 {
+  #define PWMSTEP 0 // If zero no remains at initial
+  #define PWMMIN 30
+  #define PWMMAX 50
   ryreqinit = 1;
   ryreq_q1.idx = 10; 
-  ryreq_q1.pwm = 0; //0;
+  ryreq_q1.pwm = PWMMIN; // Initial PWM
   ryreq_q1.cancel  = 0;
   pryreqpssb = &ryreq_q1;
+
 }
 if (ryrequpdn == 0)
-{
-  ryreq_q1.pwm += 5;
-  if (ryreq_q1.pwm >= 50)
+{ // Here, Increase PWM
+  ryreq_q1.pwm += PWMSTEP;
+  if (ryreq_q1.pwm >= PWMMAX)
   {
     ryrequpdn = 1;
   }
 }
 else
-{
-  ryreq_q1.pwm -= 5;
-  if ((int8_t)ryreq_q1.pwm <= 0)
+{ // Here Decrease PWM
+  ryreq_q1.pwm -= PWMSTEP;
+  if ((int8_t)ryreq_q1.pwm <= PWMMIN)
   {
     ryrequpdn = 0;
   }

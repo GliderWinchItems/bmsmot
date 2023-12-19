@@ -52,8 +52,9 @@ static void ry_setpwm(uint32_t pwm, uint8_t idx);
 
 TaskHandle_t RyTaskHandle = NULL;
 
-/* MX sets timers: 1,2,3,12 to 36000 ARR with 90 MHz timer clocking */
-#define PWMPCTtoTICK 360 // Number of timer ticks per percent PWM
+/* MX sets timers: 1,2,3,12 to 18000 ARR with 90 MHz timer clocking
+     giving a 5KHz pwm frame rate. */
+#define PWMPCTtoTICK 180 // Number of timer ticks per percent PWM
 
 /* Queue */
 #define QUEUESIZE 16	// Total size of relay queue
