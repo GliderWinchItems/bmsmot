@@ -1,6 +1,6 @@
 Photoplotter Info File: /mnt/home/deh/GliderWinchItems/bmsmot/hw/eagle/sub-pwrfet-v2/pwrfet.gpi
 
- Date              : 12/20/2023 12:25:35 
+ Date              : 12/20/2023 21:08:40 
  Plotfile          : /mnt/home/deh/GliderWinchItems/bmsmot/hw/eagle/sub-pwrfet-v2/pwrfet.sts
  Apertures         : generated: 
  Device            : Gerber photoplotter with RS-274-X aperture generation
@@ -38,7 +38,7 @@ Apertures used:
  D12      round     0.1458inch               4
  D13      round     0.0710inch               3
  D14      square    0.0907inch               8
- D15      rectangle 0.0513inch x 0.0474inch     8
+ D15      rectangle 0.0513inch x 0.0474inch    10
  D16      oval      0.0674inch x 0.1267inch     3
  D17      oval      0.1280inch x 0.0680inch     6
  D18      octagon   0.0630inch               2

@@ -1,0 +1,47 @@
+Drill Station Info File: /mnt/home/deh/GliderWinchItems/bmsmot/hw/eagle/sub-pwrfet-v3/pwrfet.dri
+
+ Date              : 12/20/2023 21:02:45 
+ Drills            : generated
+ Device            : Excellon drill station
+
+Parameter settings:
+
+ Tolerance Drill + :  2.50 %
+ Tolerance Drill - :  2.50 %
+ Rotate            : no
+ Mirror            : no
+ Optimize          : yes
+ Auto fit          : yes
+ OffsetX           : 0inch
+ OffsetY           : 0inch
+ Layers            : Drills Holes
+
+Drill File Info:
+
+ Data Mode         : Absolute
+ Units             : 1/1000 Inch
+
+Drills used:
+
+ Code  Size       used
+
+ T01   0.1417inch     4
+ T02   0.1378inch     4
+ T03   0.0630inch     3
+ T04   0.0551inch     8
+ T05   0.0394inch     5
+ T06   0.0400inch     8
+ T07   0.0350inch     4
+ T08   0.0320inch     3
+ T09   0.0315inch     4
+ T10   0.0591inch     4
+ T11   0.0787inch     4
+ T12   0.0236inch    27
+ T13   0.0709inch     2
+ T14   0.0472inch     1
+
+Total number of drills: 81
+
+Plotfiles:
+
+ /mnt/home/deh/GliderWinchItems/bmsmot/hw/eagle/sub-pwrfet-v3/pwrfet.drd
