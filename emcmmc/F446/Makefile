@@ -114,6 +114,7 @@ C_SOURCES += Ourtasks/iir_filter_lx.c
 C_SOURCES += Ourtasks/rtcregs.c
 C_SOURCES += Ourtasks/RyTask.c
 C_SOURCES += Ourtasks/EMCLTask.c
+C_SOURCES += Ourtasks/CoolingTask.c
 
 # /* USER CODE END */ 
 

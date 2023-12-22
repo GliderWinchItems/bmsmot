@@ -47,6 +47,7 @@
 #include "RyTask.h"
 #include "emcl_idx_v_struct.h"
 #include "iir_f1.h"
+#include "CoolingTask.h"
 
 #include "FreeRTOS.h"
 #include "semphr.h"
@@ -306,6 +307,11 @@ int main(void)
   if (Thrdret == NULL) morse_trap(108);
 
   emcl_idx_v_struct_hardcode_params(&emclfunction.lc);
+
+/* Create CoolingTask */
+  Thrdret = xCoolingTaskCreate(osPriorityNormal);
+  if (Thrdret == NULL) morse_trap(108);
+
 
   /* USER CODE END RTOS_THREADS */
 
@@ -1338,7 +1344,7 @@ HAL_GPIO_WritePin(GPIOB, GPIO_PIN_13, GPIO_PIN_SET); // RED OFF
   
 //    qret=xQueueSendToBack(RyTaskReadReqQHandle, &rytest[j].preq, portMAX_DELAY);
 //    if (qret == errQUEUE_FULL) morse_trap(123);  
-uint32_t ctr =0;
+//uint32_t ctr =0;
   /* Infinite loop */
   for(;;)
   {   

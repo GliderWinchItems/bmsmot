@@ -1,11 +1,11 @@
 /******************************************************************************
-* File Name          : EMCLTask.h
-* Date First Issued  : 10/29/2023
-* Description        : Energy Management Control Local task
+* File Name          : CoolingTask.c
+* Date First Issued  : 12/21/2023
+* Description        : Coolant and fan control
 *******************************************************************************/
 
-#ifndef __EMCLTASK
-#define __EMCLTASK
+#ifndef __COOLINGTASK
+#define __COOLINGTASK
 
 #include <stdint.h>
 #include "FreeRTOS.h"
@@ -15,14 +15,10 @@
 #include "CanTask.h"
 #include "adc_idx_v_struct.h"
 
-struct EMCREQ_Q
-{
-	int placeholder;
-};
 
 
 /* Working struct for EMC local function. */
-struct EMCLFUNCTION
+struct COOLINGFUNCTION
 {
    // Parameter loaded either by high-flash copy, or hard-coded subroutine
 	struct EMCLLC lc; // Fixed parameters, (lc = Local Copy)
@@ -47,9 +43,6 @@ struct EMCLFUNCTION
 	uint8_t hbseq; // heartbeat CAN msg sequence number
 	uint32_t HBstatus_ctr; // Count RTOS ticks for hearbeat timing: status msg
 
-
-
-
 	/* Pointers to incoming CAN msg mailboxes. */
 	struct MAILBOXCAN* pmbx_cid_cmd_bms_cellvq_emc;// CANID_CMD_BMS_CELLVQ: BMSV1 U8: EMC requests to BMS to send cellv, cmd code
 	struct MAILBOXCAN* pmbx_cid_cmd_bms_miscq_emc; // CANID_CMD_BMS_MISCQ: BMSV1 U8: EMC requests to BMS to value for given cmd code
@@ -67,16 +60,13 @@ struct EMCLFUNCTION
 	struct CANTXQMSG canmsg;
 };
 /* *************************************************************************/
-osThreadId xEMCLTaskCreate(uint32_t taskpriority);
+osThreadId xCoolingTaskCreate(uint32_t taskpriority);
 /* @brief	: Create task; task handle created is global for all to enjoy!
  * @param	: taskpriority = Task priority (just as it says!)
- * @return	: EMCLTaskHandle
+ * @return	: CoolingTaskHandle
  * *************************************************************************/
 
- extern TaskHandle_t EMCLTaskHandle;
- extern struct EMCLFUNCTION emclfunction;
-
-
+ extern TaskHandle_t CoolingTaskHandle;
 
 #endif
 

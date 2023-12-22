@@ -10,6 +10,7 @@
 #include "emcl_idx_v_struct.h"
 #include "SerialTaskReceive.h"
 #include "morse.h"
+#include "adcparams.h"
 #include "../../../../GliderWinchCommons/embed/svn_common/trunk/db/gen_db.h"
 
 static uint8_t initsw = 0;
@@ -64,9 +65,30 @@ void emcl_idx_v_struct_hardcode_params(struct EMCLLC* p)
       p->relay[i].pwm       =  100; // These (normally) are full on/off
    }
 
+/* CoolingTask: */
+   // Temperature sensing thermistors: map function to header
+   p->tx_pmpo = ADC1IDX_THERMISTOR1; // ADC index: JP9  coolant pump outlet thermistor
+   p->tx_moto = ADC1IDX_THERMISTOR2; // ADC index: JP8  motor outlet thermistor
+   p->tx_hexo = ADC1IDX_THERMISTOR3; // ADC index: JP10 heat exchange outlet thermistor
+   p->tx_amb  = ADC1IDX_THERMISTOR4; // ADC index: JP11 ambient air temperature thermistor
+   p->tx_jic  = ADC1IDX_DIVIDEDSPARE;// ADC index: JP17 provision if 5th thermistor added to ADC sequence
+
+   // Motor drive: PWM header mapping: map function to header
+      // C group: no delay, 74VHCT125 drive buffer to sub-board
+   p->pwm_mot =  8; // Ry index: OC1: Pump motor 
+   p->pwm_blo =  9; // Ry index: OC2: Heat exchanger blower motor
+   p->pwm_dmc = 10; // Ry index: OC3: DMOC fans
+   p->pwm_jic = 11; // Ry index: OC4: just in case spare
+
 // List of CAN ID's for suscribing to incoming msgs
+
    p->cid_cmd_emcmmcx_pc  = CANID_CMD_EMCMMC1_PC; // 'A1600000','PC SENDS');
    p->cid_cmd_emcmmcx_emc = CANID_CMD_EMCMMC1_EMC;// 'A1800000', EMC SENDS'); 
+
+// Cooling task
+  p->cid_dmoc_actualtorq = CANID_DMOC_ACTUALTORQ; //47400000','DMOC',1,1,'I16','DMOC: Actual Torque: payload-30000'
+  p->cid_dmoc_hv_temps = CANID_DMOC_HV_TEMPS; //'CA200000','DMOC',1,1,'U8_U8_U8''DMOC: Temperature:rotor,invert,stator'
+  p->cid_mc_state = CANID_MC_STATE; //'26000000','MC',1,5,'U8_U8','MC: Launch state msg'
 
 // CAN ids EMCMMC sends, others receive
    p->cid_unit_emcmmcx = I_AM_CANID; // A0000000
