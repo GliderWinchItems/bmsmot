@@ -65,20 +65,40 @@ void emcl_idx_v_struct_hardcode_params(struct EMCLLC* p)
       p->relay[i].pwm       =  100; // These (normally) are full on/off
    }
 
-/* CoolingTask: */
+/* ============== CoolingTask: =============== */
    // Temperature sensing thermistors: map function to header
-   p->tx_pmpo = ADC1IDX_THERMISTOR1; // ADC index: JP9  coolant pump outlet thermistor
-   p->tx_moto = ADC1IDX_THERMISTOR2; // ADC index: JP8  motor outlet thermistor
-   p->tx_hexo = ADC1IDX_THERMISTOR3; // ADC index: JP10 heat exchange outlet thermistor
-   p->tx_amb  = ADC1IDX_THERMISTOR4; // ADC index: JP11 ambient air temperature thermistor
-   p->tx_jic  = ADC1IDX_DIVIDEDSPARE;// ADC index: JP17 provision if 5th thermistor added to ADC sequence
+   p->lccool.tx_pmpo = ADC1IDX_THERMISTOR1; // ADC index: JP9  coolant pump outlet thermistor
+   p->lccool.tx_moto = ADC1IDX_THERMISTOR2; // ADC index: JP8  motor outlet thermistor
+   p->lccool.tx_hexo = ADC1IDX_THERMISTOR3; // ADC index: JP10 heat exchange outlet thermistor
+   p->lccool.tx_amb  = ADC1IDX_THERMISTOR4; // ADC index: JP11 ambient air temperature thermistor
+   p->lccool.tx_jic  = ADC1IDX_DIVIDEDSPARE;// ADC index: JP17 provision if 5th thermistor added to ADC sequence
 
    // Motor drive: PWM header mapping: map function to header
       // C group: no delay, 74VHCT125 drive buffer to sub-board
-   p->pwm_mot =  8; // Ry index: OC1: Pump motor 
-   p->pwm_blo =  9; // Ry index: OC2: Heat exchanger blower motor
-   p->pwm_dmc = 10; // Ry index: OC3: DMOC fans
-   p->pwm_jic = 11; // Ry index: OC4: just in case spare
+   p->lccool.coolx[COOLX_PUMP].idx_ry    =  8; // Ry index: OC1: Pump motor 
+   p->lccool.coolx[COOLX_BLOWER].idx_ry  =  9; // Ry index: OC2: Heat exchanger blower motor
+   p->lccool.coolx[COOLX_DMOCFAN].idx_ry = 10; // Ry index: OC3: DMOC fans
+   p->lccool.coolx[COOLX_JIC].idx_ry     = 11; // Ry index: OC4: just in case spare
+
+   // Ramp up rate (% pwm per 100 mx tick)
+   p->lccool.coolx[COOLX_PUMP].pwm_ramp    =   5; // Pump motor 
+   p->lccool.coolx[COOLX_BLOWER].pwm_ramp  =   5; // Heat exchanger blower motor
+   p->lccool.coolx[COOLX_DMOCFAN].pwm_ramp =  10; // DMOC fans
+   p->lccool.coolx[COOLX_JIC].pwm_ramp     =   1; // just in case spare
+
+   // PWM when in idle state (minimum run pwm)
+   p->lccool.coolx[COOLX_PUMP].pwm_idle    =  30; // Pump motor 
+   p->lccool.coolx[COOLX_BLOWER].pwm_idle  =  30; // Heat exchanger blower motor
+   p->lccool.coolx[COOLX_DMOCFAN].pwm_idle =  30; // DMOC fans
+   p->lccool.coolx[COOLX_JIC].pwm_idle     =   0; // just in case spare
+
+   // Timeout (100 ms ticks) for missing CAN msgs of cooling interest
+   p->lccool.timeout_CANdmoc     = (100*10); // 10 secs
+   p->lccool.timeout_mcstate     = (100*10); // 10 secs
+   p->lccool.timeout_CANdmoc_ctr = (100*10); // 10 secs
+   p->lccool.timeout_mcstate_ctr = (100*10); // 10 secs
+
+   p->lccool.status_cool = 0;
 
 // List of CAN ID's for suscribing to incoming msgs
 
@@ -86,9 +106,9 @@ void emcl_idx_v_struct_hardcode_params(struct EMCLLC* p)
    p->cid_cmd_emcmmcx_emc = CANID_CMD_EMCMMC1_EMC;// 'A1800000', EMC SENDS'); 
 
 // Cooling task
-  p->cid_dmoc_actualtorq = CANID_DMOC_ACTUALTORQ; //47400000','DMOC',1,1,'I16','DMOC: Actual Torque: payload-30000'
-  p->cid_dmoc_hv_temps = CANID_DMOC_HV_TEMPS; //'CA200000','DMOC',1,1,'U8_U8_U8''DMOC: Temperature:rotor,invert,stator'
-  p->cid_mc_state = CANID_MC_STATE; //'26000000','MC',1,5,'U8_U8','MC: Launch state msg'
+  p->lccool.cid_dmoc_actualtorq = CANID_DMOC_ACTUALTORQ; //47400000','DMOC',1,1,'I16','DMOC: Actual Torque: payload-30000'
+  p->lccool.cid_dmoc_hv_temps = CANID_DMOC_HV_TEMPS; //'CA200000','DMOC',1,1,'U8_U8_U8''DMOC: Temperature:rotor,invert,stator'
+  p->lccool.cid_mc_state = CANID_MC_STATE; //'26000000','MC',1,5,'U8_U8','MC: Launch state msg'
 
 // CAN ids EMCMMC sends, others receive
    p->cid_unit_emcmmcx = I_AM_CANID; // A0000000

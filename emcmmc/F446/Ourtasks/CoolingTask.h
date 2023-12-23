@@ -1,5 +1,5 @@
 /******************************************************************************
-* File Name          : CoolingTask.c
+* File Name          : CoolingTask.h
 * Date First Issued  : 12/21/2023
 * Description        : Coolant and fan control
 *******************************************************************************/
@@ -11,53 +11,57 @@
 #include "FreeRTOS.h"
 #include "cmsis_os.h"
 //#include "stm32l4xx_hal.h"
-#include "emcl_idx_v_struct.h"
 #include "CanTask.h"
+#include "MailboxTask.h"
 #include "adc_idx_v_struct.h"
 
+#define COOLXNUM 4 // Number of cooling sub-board/headers
+#define COOLX_PUMP    0
+#define COOLX_BLOWER  1
+#define COOLX_DMOCFAN 2
+#define COOLX_JIC     3
 
+
+struct COOLX
+{
+	uint8_t idx_ry;    // Map PWM device to board header
+	int8_t status;     // 0 = idle; -1 = ramping up; 1 = run
+	uint8_t pwm_idle;  // Low limit pwm;
+	uint8_t pwm_ramp;  // % pwm per 100 ms tick
+	uint32_t to_ctr;   // Timeout
+	// The following are computed
+	uint8_t pwm;       // Target pwm;
+	uint32_t to_wkctr; // Timeout working counter
+};
 
 /* Working struct for EMC local function. */
 struct COOLINGFUNCTION
 {
-   // Parameter loaded either by high-flash copy, or hard-coded subroutine
-	struct EMCLLC lc; // Fixed parameters, (lc = Local Copy)
+	struct COOLX coolx[COOLXNUM];	
+	
+	// Temperature sensing thermistors
+	uint8_t tx_pmpo; // ADC index: coolant pump outlet thermistor
+	uint8_t tx_moto; // ADC index: motor outlet thermistor
+	uint8_t tx_hexo; // ADC index: heat exchange outlet thermistor
+	uint8_t tx_amb;  // ADC index: ambient air temperature thermistor
+	uint8_t tx_jic;  // ADC index: provision if 5th thermistor added to ADC sequence
 
-//	struct ADCFUNCTION* padc; // Pointer to ADC working struct
+	uint8_t status_cool; // 0 = no cooling; 1 = cooling in progress
 
-	/* Timings in milliseconds. Converted later to timer ticks. */
-	uint32_t hbct_k;      // Heartbeat ct: ticks between sending
+	int32_t timeout_CANdmoc; // Time out limit (100 ms ticks)
+	int32_t timeout_mcstate; // Time out limit (100 ms ticks)
+	int32_t timeout_CANdmoc_ctr; // Timeout counter: count down
+	int32_t timeout_mcstate_ctr; // Timeout counter: count down
 
-	uint8_t ident_string; // Packed: string
-	uint8_t ident_onlyus; // Packed: string and module numbers
-	/*  payload [0-1] U16 – Payload Identification
-  [15:14] Winch (0 - 3)(winch #1 - #4)
-  [13:12] Battery string (0 – 3) (string #1 - #4)
-  [11:8] Module (0 – 15) (module #1 - #16)
-  [7:3] Cell (0 - 31) (cell #1 - #32)
-  [2:0] Group sequence number (0 - 7) */
-	uint32_t morse_err; // Error code retrieved from backup SRAM registers
-	uint8_t err;
-	uint16_t warning;   // Error code that is a warning
-
-	uint8_t hbseq; // heartbeat CAN msg sequence number
-	uint32_t HBstatus_ctr; // Count RTOS ticks for hearbeat timing: status msg
+	uint32_t cid_dmoc_actualtorq;// CANID_DMOC_ACTUALTORQ','47400000','DMOC',1,1,'I16','DMOC: Actual Torque: payload-30000'
+	uint32_t cid_dmoc_hv_temps;  // CANID_DMOC_HV_TEMPS',  'CA200000','DMOC',1,1,'U8_U8_U8''DMOC: Temperature:rotor,invert,stator'
+	uint32_t cid_mc_state;       // CANID_MC_STATE','26000000','MC',1,5,'U8_U8','MC: Launch state msg'
 
 	/* Pointers to incoming CAN msg mailboxes. */
-	struct MAILBOXCAN* pmbx_cid_cmd_bms_cellvq_emc;// CANID_CMD_BMS_CELLVQ: BMSV1 U8: EMC requests to BMS to send cellv, cmd code
-	struct MAILBOXCAN* pmbx_cid_cmd_bms_miscq_emc; // CANID_CMD_BMS_MISCQ: BMSV1 U8: EMC requests to BMS to value for given cmd code
-	struct MAILBOXCAN* pmbx_cid_uni_bms_emc_i;     // CANID_UNI_BMS_I  B0000000 UNIversal BMS Incoming msg to BMS: X4=target CANID
+	struct MAILBOXCAN* pmbx_cid_dmoc_actualtorq; //47400000','DMOC',1,1,'I16','DMOC: Actual Torque: payload-30000'
+	struct MAILBOXCAN* pmbx_cid_dmoc_hv_temps;   //'CA200000','DMOC',1,1,'U8_U8_U8''DMOC: Temperature:rotor,invert,stator'
+	struct MAILBOXCAN* pmbx_cid_mc_state;        //'26000000','MC',1,5,'U8_U8','MC: Launch state msg'
 
-	struct MAILBOXCAN* pmbx_cid_cmd_bms_cellvq_pc;// CANID_CMD_BMS_CELLVQ: BMSV1 U8: EMC requests to BMS to send cellv, cmd code
-	struct MAILBOXCAN* pmbx_cid_cmd_bms_miscq_pc; // CANID_CMD_BMS_MISCQ: BMSV1 U8: EMC requests to BMS to value for given cmd code
-	struct MAILBOXCAN* pmbx_cid_uni_bms_pc_i;     // CANID_UNI_BMS_I  B0000000 UNIversal BMS Incoming msg to BMS: X4=target CANID
-
-	uint8_t state;      // main state
-	uint8_t substateA;  // 
-	uint8_t substateB;  // spare substate 
-
-	/* CAN msgs */
-	struct CANTXQMSG canmsg;
 };
 /* *************************************************************************/
 osThreadId xCoolingTaskCreate(uint32_t taskpriority);
@@ -67,6 +71,7 @@ osThreadId xCoolingTaskCreate(uint32_t taskpriority);
  * *************************************************************************/
 
  extern TaskHandle_t CoolingTaskHandle;
+
 
 #endif
 

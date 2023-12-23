@@ -10,6 +10,7 @@
 //#include "iir_filter_lx.h"
 #include "iir_f1.h"
 #include "RyTask.h"
+#include "CoolingTask.h"
 
 #ifndef __EMCL_IDX_V_STRUCT
 #define __EMCL_IDX_V_STRUCT
@@ -57,17 +58,7 @@ struct EMCLLC
 
 
 /* CoolingTask: */
-   // Temperature sensing thermistors
-   uint8_t tx_pmpo; // ADC index: coolant pump outlet thermistor
-   uint8_t tx_moto; // ADC index: motor outlet thermistor
-   uint8_t tx_hexo; // ADC index: heat exchange outlet thermistor
-   uint8_t tx_amb;  // ADC index: ambient air temperature thermistor
-   uint8_t tx_jic;  // ADC index: provision if 5th thermistor added to ADC sequence
-   // PWM header mapping:
-   uint8_t pwm_mot; // Ry index: Pump motor 
-   uint8_t pwm_blo; // Ry index: Heat exchanger blower motor
-   uint8_t pwm_dmc; // Ry index: DMOC fans
-   uint8_t pwm_jic; // Ry index: just in case spare
+  struct COOLINGFUNCTION lccool;
 
  // CAN ids ...........................................................................
    //                                  CANID_NAME            CANID       PAYLOAD FORMAT
@@ -77,11 +68,6 @@ struct EMCLLC
  // List of CAN ID's for setting up hw filter for incoming msgs
   uint32_t cid_cmd_emcmmcx_pc;  //'CANID_CMD_EMCMMC1_PC' ,'A1600000','PC SENDS');
   uint32_t cid_cmd_emcmmcx_emc; //'CANID_CMD_EMCMMC1_EMC','A1800000', EMC SENDS'); 
-
-  /* Cooling task */
-  uint32_t cid_dmoc_actualtorq;// CANID_DMOC_ACTUALTORQ','47400000','DMOC',1,1,'I16','DMOC: Actual Torque: payload-30000'
-  uint32_t cid_dmoc_hv_temps;// CANID_DMOC_HV_TEMPS',  'CA200000','DMOC',1,1,'U8_U8_U8''DMOC: Temperature:rotor,invert,stator'
-  uint32_t cid_mc_state;// CANID_MC_STATE','26000000','MC',1,5,'U8_U8','MC: Launch state msg'
 
   uint8_t hbseq; // heartbeat CAN msg sequence number
  };

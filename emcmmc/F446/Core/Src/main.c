@@ -42,12 +42,12 @@
 #include "ADCTask.h"
 #include "MailboxTask.h"
 //#include "CanCommTask.h"
+#include "CoolingTask.h"
 #include "rtcregs.h"
 #include "EMCLTask.h"
 #include "RyTask.h"
 #include "emcl_idx_v_struct.h"
 #include "iir_f1.h"
-#include "CoolingTask.h"
 
 #include "FreeRTOS.h"
 #include "semphr.h"
@@ -1348,6 +1348,9 @@ HAL_GPIO_WritePin(GPIOB, GPIO_PIN_13, GPIO_PIN_SET); // RED OFF
   /* Infinite loop */
   for(;;)
   {   
+  extern uint32_t dbgcool1;
+    yprintf(&pbuf1,"%5d\n\r", dbgcool1);
+
 #if 1
     HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, GPIO_PIN_RESET); // GRN ON
         osDelay(5);

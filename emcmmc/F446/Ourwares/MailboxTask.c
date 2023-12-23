@@ -220,7 +220,7 @@ taskEXIT_CRITICAL();
  * @param	: canid = CAN ID
  * @param	: tskhandle = Task handle; NULL to use current task; 
  * @param	: notebit = notification bit; NULL = no notification
- * @paran	: noteskip = notify = 0; skip notification = 1;
+ * @param	: noteskip = notify = 0; skip notification = 1;
  * @param	: paytype = payload type code (see 'PAYLOAD_TYPE_INSERT.sql' in 'GliderWinchCommons/embed/svn_common/db')
  * @return	: Pointer to mailbox; NULL = failed
  * *************************************************************************/
