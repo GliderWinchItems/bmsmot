@@ -57,6 +57,12 @@ struct COOLINGFUNCTION
 	uint32_t cid_dmoc_hv_temps;  // CANID_DMOC_HV_TEMPS',  'CA200000','DMOC',1,1,'U8_U8_U8''DMOC: Temperature:rotor,invert,stator'
 	uint32_t cid_mc_state;       // CANID_MC_STATE','26000000','MC',1,5,'U8_U8','MC: Launch state msg'
 
+	// Extracted readings from DMOC CAN msg: cid_dmoc_hv_temps
+	uint8_t rotortemp;  // (pcan->cd.uc[0] - 40);//*10;
+	uint8_t invtemp;    // (pcan->cd.uc[1] - 40);//*10;
+	uint8_t statortemp; // (pcan->cd.uc[2] - 40);//*10;
+	uint8_t wcmottemp;  // worse-case motor temp (max of rotor & stator)	
+
 	/* Pointers to incoming CAN msg mailboxes. */
 	struct MAILBOXCAN* pmbx_cid_dmoc_actualtorq; //47400000','DMOC',1,1,'I16','DMOC: Actual Torque: payload-30000'
 	struct MAILBOXCAN* pmbx_cid_dmoc_hv_temps;   //'CA200000','DMOC',1,1,'U8_U8_U8''DMOC: Temperature:rotor,invert,stator'

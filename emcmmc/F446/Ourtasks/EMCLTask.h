@@ -47,9 +47,6 @@ struct EMCLFUNCTION
 	uint8_t hbseq; // heartbeat CAN msg sequence number
 	uint32_t HBstatus_ctr; // Count RTOS ticks for hearbeat timing: status msg
 
-
-
-
 	/* Pointers to incoming CAN msg mailboxes. */
 	struct MAILBOXCAN* pmbx_cid_cmd_bms_cellvq_emc;// CANID_CMD_BMS_CELLVQ: BMSV1 U8: EMC requests to BMS to send cellv, cmd code
 	struct MAILBOXCAN* pmbx_cid_cmd_bms_miscq_emc; // CANID_CMD_BMS_MISCQ: BMSV1 U8: EMC requests to BMS to value for given cmd code

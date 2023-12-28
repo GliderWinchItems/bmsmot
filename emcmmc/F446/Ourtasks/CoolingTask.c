@@ -25,6 +25,8 @@
 #define COOLCANBIT02 (1<<3) // CAN msg: temperatures 
 #define COOLCANBIT03 (1<<4) // CAN msg: launch state
 
+void extract_dmoc_hv_temps(struct COOLINGFUNCTION* p, struct CANRCVBUF* pcan);
+
 extern struct CAN_CTLBLOCK* pctl0; // Pointer to CAN1 control block
 extern CAN_HandleTypeDef hcan1;
 
@@ -107,6 +109,7 @@ void StartCoolingTask(void* argument)
 		{ //     
 			p->timeout_CANdmoc_ctr = p->timeout_CANdmoc; // Reset timeout ctr
 			pcan = &p->pmbx_cid_dmoc_hv_temps->ncan.can;
+			extract_dmoc_hv_temps(p,pcan);
 		}
 		if ((noteval & COOLCANBIT03) != 0) // CAN msg: launch state
 		{ //     
@@ -134,3 +137,81 @@ TaskHandle_t xCoolingTaskCreate(uint32_t taskpriority)
 	if (ret != pdPASS) return NULL;
 	return CoolingTaskHandle;
 }
+#if 0
+/* ***********************************************************************************************************
+ * void dmoc_control_GEVCUBIT14(struct DMOCCTL* pdmocctl, struct CANRCVBUF* pcan);
+ * @brief	: CAN msg received: cid_dmoc_actualtorq
+ * @param	: pdmocctl = pointer to struct with "everything" for this DMOC unit
+ * @param	: pcan = pointer to CAN msg struct
+ ************************************************************************************************************* */
+void dmoc_control_GEVCUBIT14(struct DMOCCTL* pdmocctl, struct CANRCVBUF* pcan)
+{
+/*cid_dmoc_hv_temps,  NULL,GEVCUBIT14,0,U8_U8_U8); */
+/* 0x651 CANID_DMOC_HV_TEMPS:  U8_U8_U8,  'DMOC: Temperature:rotor,invert,stator */
+
+/*       RotorTemp = frame->data.bytes[0];
+        invTemp = frame->data.bytes[1];
+        StatorTemp = frame->data.bytes[2];
+        temperatureInverter = (invTemp-40) *10;
+        //now pick highest of motor temps and report it
+        if (RotorTemp > StatorTemp) {
+            temperatureMotor = (RotorTemp - 40) * 10;
+        }
+        else {
+            temperatureMotor = (StatorTemp - 40) * 10;
+        }
+        activityCount++; */
+
+	pdmocctl->rotortemp   = pcan->cd.uc[0];
+	pdmocctl->invtemp     = pcan->cd.uc[1];
+	pdmocctl->statortemp  = pcan->cd.uc[2];
+	pdmocctl->invtempcalc = (pdmocctl->invtemp - 40) * 10;
+	if (pdmocctl->rotortemp > pdmocctl->statortemp)
+	{
+		pdmocctl->motortemp = (pdmocctl->rotortemp - 40) * 10;
+	}
+	else
+	{
+		pdmocctl->motortemp = (pdmocctl->statortemp - 40) * 10;
+	}
+	pdmocctl->activityctr += 1;
+	return;
+}
+/* ***********************************************************************************************************
+ * void dmoc_control_GEVCUBIT08(struct DMOCCTL* pdmocctl, struct CANRCVBUF* pcan);
+ * @brief	: CAN msg received: cid_dmoc_actualtorq
+ * @param	: pdmocctl = pointer to struct with "everything" for this DMOC unit
+ * @param	: pcan = pointer to CAN msg struct
+ ************************************************************************************************************* */
+void dmoc_control_GEVCUBIT08(struct DMOCCTL* pdmocctl, struct CANRCVBUF* pcan)
+{
+/* 0x23A CANID_DMOC_ACTUALTORQ:I16,   DMOC: Actual Torque: payload-30000 */
+	/* Extract reported torque and update latest reading. */
+//				torqueActual = ((frame->data.bytes[0] * 256) + frame->data.bytes[1]) - 30000;
+	pdmocctl->torqueact = ((pcan->cd.uc[0] << 8) + (pcan->cd.uc[1])) - pdmocctl->torqueoffset;
+	return;
+}
+#endif
+/* ***********************************************************************************************************
+ * void extract_dmoc_hv_temps(struct COOLINGFUNCTION* p, struct CANRCVBUF* pcan);
+ * @brief	: CAN msg received: cid_dmoc_hv_temps
+ * @param	: pcan = pointer to CAN msg struct
+ ************************************************************************************************************* */
+void extract_dmoc_hv_temps(struct COOLINGFUNCTION* p, struct CANRCVBUF* pcan)
+{
+	/* Check that unit8_t doesn't try to go negative */
+	if (pcan->cd.uc[0] < 40) pcan->cd.uc[0] = 0;
+	if (pcan->cd.uc[1] < 40) pcan->cd.uc[1] = 0;
+	if (pcan->cd.uc[2] < 40) pcan->cd.uc[2] = 0;
+	/* Convert CAN payload to deg C */
+	p->rotortemp   = (pcan->cd.uc[0] - 40);//*10;
+	p->invtemp     = (pcan->cd.uc[1] - 40);//*10;
+	p->statortemp  = (pcan->cd.uc[2] - 40);//*10;
+	// Pick the higher of the two motor temp readings
+	if (p->rotortemp > p->statortemp)
+		p->wcmottemp = p->rotortemp;
+	else
+		p->wcmottemp = p->statortemp; // Worse-case motor temp
+	return;	
+}
+
