@@ -1,0 +1,13 @@
+EAGLE Version 4.13 Copyright (c) 1988-2004 CadSoft
+
+Electrical Rule Check for /mnt/home/deh/GliderWinchItems/bmsmot/hw/eagle/sub-pwrfet-v4/pwrfet.sch at 12/29/2023 12:54:00 
+
+WARNING: Sheet 1/2: POWER Pin IC2P GND connected to GNDA
+WARNING: Sheet 1/2: POWER Pin IC2P VCC connected to +5V
+WARNING: Sheet 1/2: POWER Pin U$1 V+ connected to +5V
+WARNING: Sheet 1/2: POWER Pin U$1 V- connected to GNDA
+
+Board and schematic are consistent
+
+    0 errors
+    4 warnings
