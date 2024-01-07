@@ -1,6 +1,6 @@
 Drill Station Info File: /mnt/home/deh/GliderWinchItems/bmsmot/hw/eagle/sub-pwrfet-v3/pwrfet.dri
 
- Date              : 12/20/2023 21:02:45 
+ Date              :  1/06/2024 15:59:30 
  Drills            : generated
  Device            : Excellon drill station
 
@@ -36,11 +36,11 @@ Drills used:
  T09   0.0315inch     4
  T10   0.0591inch     4
  T11   0.0787inch     4
- T12   0.0236inch    27
+ T12   0.0236inch    28
  T13   0.0709inch     2
  T14   0.0472inch     1
 
-Total number of drills: 81
+Total number of drills: 82
 
 Plotfiles:
 
