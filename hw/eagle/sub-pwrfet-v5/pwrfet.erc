@@ -1,0 +1,12 @@
+EAGLE Version 4.13 Copyright (c) 1988-2004 CadSoft
+
+Electrical Rule Check for /mnt/home/deh/GliderWinchItems/bmsmot/hw/eagle/sub-pwrfet-v5/pwrfet.sch at  1/18/2024 12:37:47 
+
+WARNING: No Pins on net N$2
+WARNING: Sheet 1/2, Net +5V: missing Junction at (1.6 4.775)
+WARNING: Sheet 1/2: pins overlap at (3.6 3.6125)
+
+Board and schematic are consistent
+
+    0 errors
+    3 warnings

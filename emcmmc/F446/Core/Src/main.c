@@ -1366,8 +1366,8 @@ static uint8_t ryrequpdn;
 if (ryreqinit == 0)
 {
   #define PWMSTEP 0 // If zero no remains at initial
-  #define PWMMIN 30
-  #define PWMMAX 50
+  #define PWMMIN 30 // Initial and slewing low limit
+  #define PWMMAX 50 // Slewing high limit
   ryreqinit = 1;
   ryreq_q1.idx = 10; 
   ryreq_q1.pwm = PWMMIN; // Initial PWM
