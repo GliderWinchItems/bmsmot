@@ -310,8 +310,7 @@ int main(void)
 
 /* Create CoolingTask */
   Thrdret = xCoolingTaskCreate(osPriorityNormal);
-  if (Thrdret == NULL) morse_trap(108);
-
+  if (Thrdret == NULL) morse_trap(110);
 
   /* USER CODE END RTOS_THREADS */
 
@@ -1365,9 +1364,9 @@ static uint8_t ryreqinit;
 static uint8_t ryrequpdn;
 if (ryreqinit == 0)
 {
-  #define PWMSTEP 0 // If zero no remains at initial
-  #define PWMMIN 30 // Initial and slewing low limit
-  #define PWMMAX 50 // Slewing high limit
+  #define PWMSTEP 30 // If zero no remains at initial
+  #define PWMMIN 10 // Initial and slewing low limit
+  #define PWMMAX 60 // Slewing high limit
   ryreqinit = 1;
   ryreq_q1.idx = 10; 
   ryreq_q1.pwm = PWMMIN; // Initial PWM

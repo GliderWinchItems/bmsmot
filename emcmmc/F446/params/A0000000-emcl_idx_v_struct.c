@@ -11,6 +11,7 @@
 #include "SerialTaskReceive.h"
 #include "morse.h"
 #include "adcparams.h"
+#include "RyTask.h"
 #include "../../../../GliderWinchCommons/embed/svn_common/trunk/db/gen_db.h"
 
 static uint8_t initsw = 0;
@@ -109,6 +110,36 @@ void emcl_idx_v_struct_hardcode_params(struct EMCLLC* p)
   p->lccool.cid_dmoc_actualtorq = CANID_DMOC_ACTUALTORQ; //47400000','DMOC',1,1,'I16','DMOC: Actual Torque: payload-30000'
   p->lccool.cid_dmoc_hv_temps = CANID_DMOC_HV_TEMPS; //'CA200000','DMOC',1,1,'U8_U8_U8''DMOC: Temperature:rotor,invert,stator'
   p->lccool.cid_mc_state = CANID_MC_STATE; //'26000000','MC',1,5,'U8_U8','MC: Launch state msg'
+
+// Cooling motor control
+  p->lccool.motorrampparam[COOLX_PUMP].idle        = 15;    // Pct for idle speed
+  p->lccool.motorrampparam[COOLX_PUMP].minstart    = 30;    // Pct for minimum start
+  p->lccool.motorrampparam[COOLX_PUMP].shutoffwait = 2000;  // Wait after turn off for turn on (ms)
+  p->lccool.motorrampparam[COOLX_PUMP].rampuprate  = 20;    // Pct*10 per sec ramping up 
+  p->lccool.motorrampparam[COOLX_PUMP].rampdnrate  = 30;    // Pct*10 per sec ramping down
+  p->lccool.motorrampparam[COOLX_PUMP].hdrnum      = HDR_OC1;// Header (Relay number) to this motor
+
+  p->lccool.motorrampparam[COOLX_BLOWER].idle        = 15;    // Pct for idle speed
+  p->lccool.motorrampparam[COOLX_BLOWER].minstart    = 30;    // Pct for minimum start
+  p->lccool.motorrampparam[COOLX_BLOWER].shutoffwait = 3000;  // Wait after turn off for turn on (ms)
+  p->lccool.motorrampparam[COOLX_BLOWER].rampuprate  = 20;    // Pct*10 per sec ramping up 
+  p->lccool.motorrampparam[COOLX_BLOWER].rampdnrate  = 30;    // Pct*10 per sec ramping down
+  p->lccool.motorrampparam[COOLX_BLOWER].hdrnum      = HDR_OC2;// Header (Relay number) to this motor
+
+  p->lccool.motorrampparam[COOLX_DMOCFAN].idle        = 20;    // Pct for idle speed
+  p->lccool.motorrampparam[COOLX_DMOCFAN].minstart    = 60;    // Pct for minimum start
+  p->lccool.motorrampparam[COOLX_DMOCFAN].shutoffwait = 1500;  // Wait after turn off for turn on (ms)
+  p->lccool.motorrampparam[COOLX_DMOCFAN].rampuprate  = 20;    // Pct*10 per sec ramping up 
+  p->lccool.motorrampparam[COOLX_DMOCFAN].rampdnrate  = 30;    // Pct*10 per sec ramping down
+  p->lccool.motorrampparam[COOLX_DMOCFAN].hdrnum      = HDR_OC3;// Header (Relay number) to this motor
+
+  p->lccool.motorrampparam[COOLX_JIC].idle        = 15;    // Pct for idle speed
+  p->lccool.motorrampparam[COOLX_JIC].minstart    = 30;    // Pct for minimum start
+  p->lccool.motorrampparam[COOLX_JIC].shutoffwait = 3000;  // Wait after turn off for turn on (ms)
+  p->lccool.motorrampparam[COOLX_JIC].rampuprate  = 20;    // Pct*10 per sec ramping up 
+  p->lccool.motorrampparam[COOLX_JIC].rampdnrate  = 30;    // Pct*10 per sec ramping down
+  p->lccool.motorrampparam[COOLX_JIC].hdrnum      = HDR_OC4;// Header (Relay number) to this motor
+
 
 // CAN ids EMCMMC sends, others receive
    p->cid_unit_emcmmcx = I_AM_CANID; // A0000000

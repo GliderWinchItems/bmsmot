@@ -12,6 +12,20 @@
 #include "stm32f4xx_hal.h"
 //#include "EMCTask.h"
 
+// Relay header versus RyTask.c coding
+#define HDR_OA1 0  // Group A
+#define HDR_OA2 1  // Group A
+#define HDR_OA3 2  // Group A
+#define HDR_OA4 3  // Group A
+#define HDR_OB1 4  // Group B
+#define HDR_OB2 5  // Group B
+#define HDR_OB3 6  // Group B
+#define HDR_OB4 7  // Group B
+#define HDR_OC1 8  // Group C
+#define HDR_OC2 9  // Group C
+#define HDR_OC3 10 // Group C
+#define HDR_OC4 11 // Group C
+
 /* Keep-Alive timer (TIM5) OC interrupt rate */
 // Prescalar = 9000; Sysclock = 180 MHz
 #define KPUPDATEDUR 100 // 10 ms = 100 * 0.1ms
