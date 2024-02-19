@@ -13,6 +13,7 @@
 #include "main.h"
 
 extern CAN_HandleTypeDef hcan1;
+extern CAN_HandleTypeDef hcan2;
 
 //osThreadId CanTxTaskHandle;
 TaskHandle_t CanTxTaskHandle;
@@ -58,7 +59,20 @@ void StartCanTxTask(void* argument)
 	struct CANTXQMSG txq;
 	int ret;
 
-	HAL_CAN_Start(&hcan1); // CAN1
+	/* Select interrupts for CAN1 */
+	HAL_CAN_ActivateNotification(&hcan1, \
+		CAN_IT_TX_MAILBOX_EMPTY     |  \
+		CAN_IT_RX_FIFO0_MSG_PENDING |  \
+		CAN_IT_RX_FIFO1_MSG_PENDING    );
+
+	/* Select interrupts for CAN2 */
+	HAL_CAN_ActivateNotification(&hcan2, \
+		CAN_IT_TX_MAILBOX_EMPTY     |  \
+		CAN_IT_RX_FIFO0_MSG_PENDING |  \
+		CAN_IT_RX_FIFO1_MSG_PENDING    );
+
+	HAL_StatusTypeDef  ret1 = HAL_CAN_Start(&hcan1); // CAN1
+	if (ret1 != HAL_OK) morse_trap (94);
 
 	CANTaskreadyflag = 1;
 
@@ -67,15 +81,15 @@ void StartCanTxTask(void* argument)
   {
 //HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_14); // 14-RED, 13-ORANGE
 		Qret = xQueueReceive(CanTxQHandle,&txq,portMAX_DELAY);
-		if (Qret == pdPASS) // Break loop if not empty
+		if (Qret == pdPASS) // 
 		{
-dbgCanTask1 += 1;			
+dbgCanTask1 += 1;	
 			ret = can_driver_put(txq.pctl, &txq.can, txq.maxretryct, txq.bits);
 /* ===> Trap errors
  *				: -1 = Buffer overrun (no free slots for the new msg)
  *				: -2 = Bogus CAN id rejected
  *				: -3 = control block pointer NULL */
-//?			if (ret == -1) morse_trap(91);
+			if (ret == -1) morse_trap(91);
 			if (ret == -2) morse_trap(92);
 			if (ret == -3) morse_trap(93);
 		}

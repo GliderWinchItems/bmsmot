@@ -278,6 +278,16 @@ int main(void)
   if (pctl1->ret < 0) morse_trap(88);  
 #endif
 
+  /* Setup CAN hardware filters to default to accept all ids. */
+  HAL_StatusTypeDef Cret;
+  Cret = canfilter_setup_first(0, &hcan1, 15); // CAN1
+  if (Cret == HAL_ERROR) morse_trap(219);
+
+#ifdef CONFIGCAN2
+  Cret = canfilter_setup_first(1, &hcan2, 15); // CAN2
+  if (Cret == HAL_ERROR) morse_trap(217);
+#endif  
+
    /* definition and creation of CanTxTask - CAN driver TX interface. */
   QueueHandle_t QHret = xCanTxTaskCreate(osPriorityNormal+1, 48); // CanTask priority, Number of msgs in queue
   if (QHret == NULL) morse_trap(120); // Panic LED flashing
@@ -587,10 +597,10 @@ static void MX_CAN1_Init(void)
 
   /* USER CODE END CAN1_Init 1 */
   hcan1.Instance = CAN1;
-  hcan1.Init.Prescaler = 10;
+  hcan1.Init.Prescaler = 9;
   hcan1.Init.Mode = CAN_MODE_NORMAL;
   hcan1.Init.SyncJumpWidth = CAN_SJW_1TQ;
-  hcan1.Init.TimeSeg1 = CAN_BS1_6TQ;
+  hcan1.Init.TimeSeg1 = CAN_BS1_7TQ;
   hcan1.Init.TimeSeg2 = CAN_BS2_2TQ;
   hcan1.Init.TimeTriggeredMode = DISABLE;
   hcan1.Init.AutoBusOff = DISABLE;
@@ -1357,16 +1367,17 @@ HAL_GPIO_WritePin(GPIOB, GPIO_PIN_13, GPIO_PIN_SET); // RED OFF
       osDelay(500-5);
 #endif
 
-#if 1
+#if 1 // pwm testing
 static struct RYREQ_Q ryreq_q1;
 static struct RYREQ_Q* pryreqpssb;
 static uint8_t ryreqinit;
 static uint8_t ryrequpdn;
 if (ryreqinit == 0)
 {
-  #define PWMSTEP 30 // If zero no remains at initial
-  #define PWMMIN 10 // Initial and slewing low limit
-  #define PWMMAX 60 // Slewing high limit
+  #define PWMSTEPUP 2 // If zero no remains at initial
+  #define PWMSTEPDN 1 // 
+  #define PWMMIN 5// Initial and slewing low limit
+  #define PWMMAX 70 // Slewing high limit
   ryreqinit = 1;
   ryreq_q1.idx = 10; 
   ryreq_q1.pwm = PWMMIN; // Initial PWM
@@ -1376,15 +1387,17 @@ if (ryreqinit == 0)
 }
 if (ryrequpdn == 0)
 { // Here, Increase PWM
-  ryreq_q1.pwm += PWMSTEP;
+  ryreq_q1.pwm += PWMSTEPUP;
   if (ryreq_q1.pwm >= PWMMAX)
   {
     ryrequpdn = 1;
+    ryreq_q1.pwm = PWMMAX;
   }
 }
 else
 { // Here Decrease PWM
-  ryreq_q1.pwm -= PWMSTEP;
+  ryreq_q1.pwm -= PWMSTEPDN;
+
   if ((int8_t)ryreq_q1.pwm <= PWMMIN)
   {
     ryrequpdn = 0;
@@ -1395,7 +1408,8 @@ yprintf(&pbuf1,"PWM: %4d\n\r",ryreq_q1.pwm);
 
 #endif      
 
-#if 0
+#if 1
+static uint32_t ctr;      
 if (ctr == 0)
 {
   yprintf(&pbuf1,"ADC1IDX_THERMISTOR1   0 PC0 IN10   JP9  Thermistor\n\r");
@@ -1424,6 +1438,14 @@ if (ctr >= 32) ctr = 0;
   }
   yprintf(&pbuf1,"\n\r");
  #endif
+
+extern struct CANRCVBUF cooltest; 
+extern uint8_t cooltest1;
+  if (cooltest1 != 0)
+  {
+    cooltest1 = 0;
+    yprintf(&pbuf1,"\n\r 0x%08X",cooltest.id);
+  }
 
  #if 0 // List ADC sum (use for calibration)
  extern uint32_t dbg_adcsum[ADC1DIRECTMAX];

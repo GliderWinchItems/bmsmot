@@ -16,6 +16,14 @@
 #include "adc_idx_v_struct.h"
 #include "RyTask.h"
 
+#define COOLX_TEMPS_NUM 6 // Number of temperatures managed
+// 0 = cabs[ADC1IDX_THERMISTOR1]
+// 1 = cabs[ADC1IDX_THERMISTOR2]
+// 2 = cabs[ADC1IDX_THERMISTOR3]
+// 3 = cabs[ADC1IDX_THERMISTOR4]
+// 4 = cabs[ADC1IDX_DIVIDEDSPARE]
+// 5 = DMOC CAN msg
+
 #define COOLXNUM 4 // Number of cooling sub-board/headers
 #define COOLX_PUMP    0 //OC1 Header
 #define COOLX_BLOWER  1 //OC2 Header
@@ -29,7 +37,6 @@
 #define MOTSTATE_MINSTAT  1
 #define MOTSTATE_RAMPING  2
 #define MOTSTATE_MINSTART 3
-
 
 struct COOLX
 {
@@ -77,15 +84,29 @@ struct MOTORCONTROL
 
 struct TEMPERATUREPARAM
 {
-	float runaa;    // Run Above Ambient
+	float tdel;     // Run Above Ambient
 	float toohi;    // Temperature too high to run--Alert
 	float coef[2];  // pwm = coef[0]+coef[1]*Temperature
+};
+struct TEMPERATUREWORK
+{
+	float fpwm;   // Computed pwm for a given temperature
+	uint8_t ipwm; // converted from fpwm
+	uint8_t pcpwm;  // pwm commanded from PC
+	uint8_t emcpwm; // pwm commanded from EMC
+	uint8_t contactor; // 0 = off; not 0 = engaged
+	uint32_t contactor_timeout; // CAN msg timeout counter
 };
 
 /* Working struct for EMC local function. */
 struct COOLINGFUNCTION
 {
 	struct COOLX coolx[COOLXNUM];	
+
+	uint32_t hbct_t;   // Duration between coolingfunction heartbeats(ms)
+	uint32_t hbct_tic; // Loop tick count between coolingfunction heartbeats
+	int32_t hbct_ctr;  // Heartbeat time count-down
+
 	
 	// Temperature sensing thermistors
 	uint8_t tx_pmpo; // ADC index: coolant pump outlet thermistor
@@ -96,14 +117,31 @@ struct COOLINGFUNCTION
 
 	uint8_t status_cool; // 0 = no cooling; 1 = cooling in progress
 
-	int32_t timeout_CANdmoc; // Time out limit (100 ms ticks)
-	int32_t timeout_mcstate; // Time out limit (100 ms ticks)
-	int32_t timeout_CANdmoc_ctr; // Timeout counter: count down
-	int32_t timeout_mcstate_ctr; // Timeout counter: count down
+	// Incoming CAN msg missing timeout
+	int32_t timeout_CANdmoc;   // Time out limit (100 ms ticks)
+//	int32_t timeout_mcstate;   // Time out limit (100 ms ticks)
+	int32_t timeout_cntctrkar; // Time out limit (100 ms ticks)
+	int32_t timeout_cmd_emcmmcx_pc; // Time out limit (100 ms ticks)
+	int32_t timeout_cmd_emcmmcx_emc; // Time out limit (100 ms ticks)
+
+	int32_t timeout_CANdmoc_ctr;   // Timeout counter: count down
+//	int32_t timeout_mcstate_ctr;   // Timeout counter: count down
+	int32_t timeout_cntctrkar_ctr; // Timeout counter: count down
+	int32_t timeout_cmd_emcmmcx_pc_ctr; // Timeout counter: count down
+	int32_t timeout_cmd_emcmmcx_emc_ctr; // Timeout counter: count down
+
+	struct CANTXQMSG cancool1; // CAN1 msg for tx
+	struct CANTXQMSG cancool2; // CAN2 msg for tx
 
 	uint32_t cid_dmoc_actualtorq;// CANID_DMOC_ACTUALTORQ','47400000','DMOC',1,1,'I16','DMOC: Actual Torque: payload-30000'
 	uint32_t cid_dmoc_hv_temps;  // CANID_DMOC_HV_TEMPS',  'CA200000','DMOC',1,1,'U8_U8_U8''DMOC: Temperature:rotor,invert,stator'
 	uint32_t cid_mc_state;       // CANID_MC_STATE','26000000','MC',1,5,'U8_U8','MC: Launch state msg'
+	uint32_t cid_cntctrkar;      // CANID_CMD_CNTCTRKAR'E3C00000','CNTCTR',1,6,'U8_U8_U8','Contactor1: R KeepAlive response'
+	uint32_t cid_cmd_emcmmcx_pc; // CANID_CMD_EMCMMC1_PC' ,'A1600000','UNIT_ECM1PC' , 1,1,'U8_U8_U8_X4','bmsmot 1 PC SENDS'
+	uint32_t cid_cmd_emcmmcx_emc;// CANID_CMD_EMCMMC1_EMC','A1800000','UNIT_ECM1PC' , 1,1,'U8_U8_U8_X4','bmsmot 1 PC SENDS'
+
+	uint32_t cid_test;// TEST 
+
 
 	// Extracted readings from DMOC CAN msg: cid_dmoc_hv_temps
 	uint8_t rotortemp;  // (pcan->cd.uc[0] - 40);//*10;
@@ -115,10 +153,20 @@ struct COOLINGFUNCTION
 	struct MOTORRAMPPARAM motorrampparam[MOTORNUM]; // Fixed parameters
 	struct MOTORRAMP motorramp[MOTORNUM]; // Working values
 
+	/* Temperature parameters: motors plus DMOC motor */
+	struct TEMPERATUREPARAM	temperatureparm[MOTORNUM+1];
+
 	/* Pointers to incoming CAN msg mailboxes. */
-	struct MAILBOXCAN* pmbx_cid_dmoc_actualtorq; //47400000','DMOC',1,1,'I16','DMOC: Actual Torque: payload-30000'
+	struct MAILBOXCAN* pmbx_cid_dmoc_actualtorq; //'47400000','DMOC',1,1,'I16','DMOC: Actual Torque: payload-30000'
 	struct MAILBOXCAN* pmbx_cid_dmoc_hv_temps;   //'CA200000','DMOC',1,1,'U8_U8_U8''DMOC: Temperature:rotor,invert,stator'
 	struct MAILBOXCAN* pmbx_cid_mc_state;        //'26000000','MC',1,5,'U8_U8','MC: Launch state msg'
+	struct MAILBOXCAN* pmbx_cid_cntctrkar;       //'E3C00000','CNTCTR',1,6,'U8_U8_U8','Contactor1: R KeepAlive response'
+
+	struct MAILBOXCAN* pmbx_cid_cmd_emcmmcx_pc;   //'A1600000','UNIT_ECM1PC' , 1,1,'U8_U8_U8_X4','bmsmot 1 PC SENDS');
+	struct MAILBOXCAN* pmbx_cid_cmd_emcmmcx_emc; //'A1800000','UNIT_ECM1EMC', 1,1,'U8_U8_U8_X4','bmsmot 1 EMC SENDS');
+
+	struct MAILBOXCAN* pmbx_cid_test; // TEST
+
 
 };
 /* *************************************************************************/

@@ -70,31 +70,33 @@ int adc_idx_v_struct_hardcode_params(struct ADCLC* p)
 // ADC1IDX_THERMISTOR1   0	// PC0 IN10   JP9  Thermistor: JP9
 	p->cabs[ADC1IDX_THERMISTOR1].iir_f1.coef     = THRMTC; // Filter time constant
 	p->cabs[ADC1IDX_THERMISTOR1].iir_f1.skipctr  = SKIPCT;  // Initial skip
-	p->cabs[ADC1IDX_THERMISTOR1].coef[1]     = THRMSCALE; // 
+	p->cabs[ADC1IDX_THERMISTOR1].coef[1]    = THRMSCALE; // 
 	p->cabs[ADC1IDX_THERMISTOR1].coef[0]    = THRMOFF;  // 
 
 // ADC1IDX_THERMISTOR2	  1 // PC1 IN11   JP8  Thermistor: JP8
 	p->cabs[ADC1IDX_THERMISTOR2].iir_f1.coef     = THRMTC; // Filter time constant
 	p->cabs[ADC1IDX_THERMISTOR2].iir_f1.skipctr  = SKIPCT;  // Initial skip
-	p->cabs[ADC1IDX_THERMISTOR2].coef[1]     = THRMSCALE; // 
+	p->cabs[ADC1IDX_THERMISTOR2].coef[1]    = THRMSCALE; // 
 	p->cabs[ADC1IDX_THERMISTOR2].coef[0]    = THRMOFF;  // 
 
 // ADC1IDX_THERMISTOR3   2 // PC2 IN12   JP10 Thermistor: JP10
 	p->cabs[ADC1IDX_THERMISTOR3].iir_f1.coef     = THRMTC; // Filter time constant
 	p->cabs[ADC1IDX_THERMISTOR3].iir_f1.skipctr  = SKIPCT;  // Initial skip
-	p->cabs[ADC1IDX_THERMISTOR3].coef[1]     = THRMSCALE; // 
+	p->cabs[ADC1IDX_THERMISTOR3].coef[1]    = THRMSCALE; // 
 	p->cabs[ADC1IDX_THERMISTOR3].coef[0]    = THRMOFF;  // 
 
 // ADC1IDX_THERMISTOR4   3	// PC3 IN13   JP11 Thermistor: JP11
 	p->cabs[ADC1IDX_THERMISTOR4].iir_f1.coef     = THRMTC; // Filter time constant
 	p->cabs[ADC1IDX_THERMISTOR4].iir_f1.skipctr  = SKIPCT;  // Initial skip
-	p->cabs[ADC1IDX_THERMISTOR4].coef[1]     = THRMSCALE;//5.424129E-04f; // Apply calibration below 
+	p->cabs[ADC1IDX_THERMISTOR4].coef[1]    = THRMSCALE;//5.424129E-04f; // Apply calibration below 
 	p->cabs[ADC1IDX_THERMISTOR4].coef[0]    = THRMOFF;  // 
 
 // ADC1IDX_DIVIDEDSPARE  4	// PC4 IN14   10k|10k divider
 	p->cabs[ADC1IDX_DIVIDEDSPARE].iir_f1.coef     = CELLTC; // Filter time constant
 	p->cabs[ADC1IDX_DIVIDEDSPARE].iir_f1.skipctr  = SKIPCT;  // Initial skip
-	p->cabs[ADC1IDX_DIVIDEDSPARE].coef[1]     = 2.520833E-05f; // Apply calibration below 
+	p->cabs[ADC1IDX_DIVIDEDSPARE].coef[1]    = THRMSCALE;//
+	p->cabs[ADC1IDX_DIVIDEDSPARE].coef[0]    = THRMOFF;  // 
+
 	p->cabs[ADC1IDX_DIVIDEDSPARE].ioffset    = 0;  // Offset before scale
 
 // ADC1IDX_PRESS_SENSE   5	// PC5 IN15   JP24 Pressure sensor JP24

@@ -46,11 +46,6 @@ struct ADC1CALINTERNAL
 };
 
 //* Absolute (non-ratiometric) sensor calibration. */
-/*
-The calibrated results are adjusted for Vdd variations by using the
-internal voltage reference, and the internal voltage reference is
-adjusted for temperature by using the internal temperature reference.
-*/
 struct ADCCALABS
 {
 	struct FILTERIIRF1 iir_f1; // Filter: Time constant, integer scaling

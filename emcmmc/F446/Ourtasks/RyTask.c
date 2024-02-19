@@ -269,6 +269,13 @@ void ry_init(void)
  * *************************************************************************/
 static void ry_setpwm(uint32_t pwmx, uint8_t idx)
 {
+	/* Limit pwm pct as directed by parameters. */
+	if ((emclfunction.lc.relay[idx].trans != 0) &&
+		(pwmx > emclfunction.lc.relay[idx].trans))
+	{ // Here, limit pwm to parameter (expect less than 100%)
+		pwmx = emclfunction.lc.relay[idx].pwmx;
+	}
+	// Convert percent to timer ticks
 	uint16_t pwm = pwmx * PWMPCTtoTICK;
 	/* Set timer pwm for this relay. */
 	switch(idx)

@@ -35,7 +35,7 @@ void emcl_idx_v_struct_hardcode_params(struct EMCLLC* p)
    p->hbct         =   64; // Number of swctr ticks between heartbeats
 //   p->adc_hb       = 64;     // Number of ticks for heartbeat ADC readout
 
-   p->CanComm_hb = 1000; // CanCommTask 'wait' RTOS ticks per heartbeat sending
+//  p->CanComm_hb = 1000; // CanCommTask 'wait' RTOS ticks per heartbeat sending
 
    int i;
    /* Default for all relays. */
@@ -48,6 +48,8 @@ void emcl_idx_v_struct_hardcode_params(struct EMCLLC* p)
       p->relay[i].kp        = KYTODEFAULT; //((KYTODEFAULT*10) /(12*KPUPDATEDUR)); // Timeout duration between requests
       p->relay[i].pulldelay = PULLINDEFAULT; // Pull-in delay (TIM9: 0.1 ms)
       p->relay[i].pwm       = HOLDPWM; // After pull-in pwm (0 - 100%)
+      p->relay[i].trans     =    0; // Default: no translation 
+      p->relay[i].pwmx      =   96; // Default translation pwm
    }
    /* Override defaults. */
    p->relay[ 0].pulldelay =  500; //
@@ -65,6 +67,12 @@ void emcl_idx_v_struct_hardcode_params(struct EMCLLC* p)
       p->relay[i].pulldelay =    0; // These (normally) don't have a delay
       p->relay[i].pwm       =  100; // These (normally) are full on/off
    }
+   // NOTE: sub-board pwm for 'v6 must not be 100%
+   // Set the appropiate index and trans = 1;
+   // Uncomment, e/g/--
+//     p->relay[8].trans     =    0; // Default: no translation 
+//     p->relay[8].PWMX      =   90; // Max pwm at 90%.
+ 
 
 /* ============== CoolingTask: =============== */
    // Temperature sensing thermistors: map function to header
@@ -93,23 +101,31 @@ void emcl_idx_v_struct_hardcode_params(struct EMCLLC* p)
    p->lccool.coolx[COOLX_DMOCFAN].pwm_idle =  30; // DMOC fans
    p->lccool.coolx[COOLX_JIC].pwm_idle     =   0; // just in case spare
 
-   // Timeout (100 ms ticks) for missing CAN msgs of cooling interest
+   // Timeout (100 ms ticks) for missing CAN msgs
    p->lccool.timeout_CANdmoc     = (100*10); // 10 secs
-   p->lccool.timeout_mcstate     = (100*10); // 10 secs
+ //  p->lccool.timeout_mcstate     = (100*10); // 10 secs
    p->lccool.timeout_CANdmoc_ctr = (100*10); // 10 secs
-   p->lccool.timeout_mcstate_ctr = (100*10); // 10 secs
+ //  p->lccool.timeout_mcstate_ctr = (100*10); // 10 secs
+   p->lccool.timeout_cntctrkar_ctr = (100*10); // 10 secs
 
    p->lccool.status_cool = 0;
 
+   p->lccool.cid_test = 0xB2200000; // Cooling function test of CAN
+
 // List of CAN ID's for suscribing to incoming msgs
+  p->cid_cmd_emcmmcx_pc  = CANID_CMD_EMCMMC1_PC; // 'A1600000','PC SENDS');
+  p->cid_cmd_emcmmcx_emc = CANID_CMD_EMCMMC1_EMC;// 'A1800000', EMC SENDS'); 
 
-   p->cid_cmd_emcmmcx_pc  = CANID_CMD_EMCMMC1_PC; // 'A1600000','PC SENDS');
-   p->cid_cmd_emcmmcx_emc = CANID_CMD_EMCMMC1_EMC;// 'A1800000', EMC SENDS'); 
+/* Cooling task function */
 
-// Cooling task
-  p->lccool.cid_dmoc_actualtorq = CANID_DMOC_ACTUALTORQ; //47400000','DMOC',1,1,'I16','DMOC: Actual Torque: payload-30000'
+  p->lccool.hbct_t = 2000; // Duration between cooling function status heartbeats (ms)
+
+//  p->lccool.cid_dmoc_actualtorq = CANID_DMOC_ACTUALTORQ; //47400000','DMOC',1,1,'I16','DMOC: Actual Torque: payload-30000'
   p->lccool.cid_dmoc_hv_temps = CANID_DMOC_HV_TEMPS; //'CA200000','DMOC',1,1,'U8_U8_U8''DMOC: Temperature:rotor,invert,stator'
-  p->lccool.cid_mc_state = CANID_MC_STATE; //'26000000','MC',1,5,'U8_U8','MC: Launch state msg'
+//  p->lccool.cid_mc_state = CANID_MC_STATE; //'26000000','MC',1,5,'U8_U8','MC: Launch state msg'
+  p->lccool.cid_cntctrkar = CANID_CMD_CNTCTRKAR;//'E3C00000','CNTCTR',1,6,'U8_U8_U8','Contactor1: R KeepAlive response'
+  p->lccool.cid_cmd_emcmmcx_pc  = CANID_CMD_EMCMMC1_PC; // 'A1600000','PC SENDS');
+  p->lccool.cid_cmd_emcmmcx_emc = CANID_CMD_EMCMMC1_EMC;// 'A1800000', EMC SENDS'); 
 
 // Cooling motor control
   p->lccool.motorrampparam[COOLX_PUMP].idle        = 15;    // Pct for idle speed

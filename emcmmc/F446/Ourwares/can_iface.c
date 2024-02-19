@@ -391,7 +391,8 @@ static void loadmbx2(struct CAN_CTLBLOCK* pctl)
 	uidata[0]   = p->can.cd.ui[0];
 	uidata[1]   = p->can.cd.ui[1];
 	pctl->mbx0  = p->can.id;	// Shadow MBX0 ID
-   HAL_CAN_AddTxMessage(pctl->phcan, &halmsg, (uint8_t*)uidata, &TxMailbox);
+   HAL_StatusTypeDef reta = HAL_CAN_AddTxMessage(pctl->phcan, &halmsg, (uint8_t*)uidata, &TxMailbox);
+   if (reta != HAL_OK) morse_trap(97);
 #endif
 	return;
 }

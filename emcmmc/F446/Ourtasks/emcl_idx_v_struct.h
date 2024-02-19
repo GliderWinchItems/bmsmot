@@ -32,6 +32,11 @@ struct RELAY
                           //  0 = no delay (e.g. external fet drive for fans)
    uint8_t pwm;   // PWM percent when energized: (0 - 100)
                      //   100 = full ON; 20-40 = normal range, relay dependent
+// The following is used to prevent pwm requests of 100% locking out the
+// sub-board over-current logic tripping the latch and turning the FET continous
+// OFF. The substituted pwm, i.e. pwmx, might be 95 (95 percent) more or less.
+   uint8_t trans; // 0 = use pwm; not 0 = test for transation.
+   uint8_t pwmx;  // If trans != 0, then pwm > than pwmx, use pmx.   
 };
 
 /* Parameters levelwind instance (LC = Local Copy) */
@@ -46,16 +51,12 @@ struct EMCLLC
    uint8_t  winchnum;  // Winch number (1-4)
    uint8_t  stringnum; // Battery string number (1 - 4)
 
-
 	/* Timings in milliseconds. Converted later to 'swtim1' ticks. */
 	uint32_t hbct_t;     // Heartbeat ct: ms between sending 
-   uint32_t hbct;       // Number of ticks between hb msgs
-
-   uint32_t CanComm_hb; // CanCommTask 'wait' RTOS ticks per heartbeat sending
+   uint32_t hbct;      // Number of ticks between hb msgs
 
 /* RelayTask: Relay/Controls */
    struct RELAY relay[NRELAY]; // Relay status & control
-
 
 /* CoolingTask: */
   struct COOLINGFUNCTION lccool;
