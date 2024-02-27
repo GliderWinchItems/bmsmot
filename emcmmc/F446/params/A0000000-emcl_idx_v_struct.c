@@ -14,6 +14,8 @@
 #include "RyTask.h"
 #include "../../../../GliderWinchCommons/embed/svn_common/trunk/db/gen_db.h"
 
+#define DMOC_CANMSG_TEMP_IDX 5 // Index for temperature reading array
+
 static uint8_t initsw = 0;
 /* *************************************************************************
  * void emcl_idx_v_struct_hardcode_params(struct EMCLC* p);
@@ -81,6 +83,20 @@ void emcl_idx_v_struct_hardcode_params(struct EMCLLC* p)
    p->lccool.tx_hexo = ADC1IDX_THERMISTOR3; // ADC index: JP10 heat exchange outlet thermistor
    p->lccool.tx_amb  = ADC1IDX_THERMISTOR4; // ADC index: JP11 ambient air temperature thermistor
    p->lccool.tx_jic  = ADC1IDX_DIVIDEDSPARE;// ADC index: JP17 provision if 5th thermistor added to ADC sequence
+   p->lccool.tx_dmoc = DMOC_CANMSG_TEMP_IDX;// DMOC motor temperature CAN msg report
+
+   for (i = 0; i < COOLARRAYSZ; i++)
+      p->lccool.temperatureparm[i].not_installed = 0;
+   p->lccool.temperatureparm[p->lccool.tx_dmoc].not_installed = 1;
+
+   // Temperature is too high threshold: set alert
+   p->lccool.temperatureparm[p->lccool.tx_pmpo].toohi = 60;
+   p->lccool.temperatureparm[p->lccool.tx_moto].toohi = 60;
+   p->lccool.temperatureparm[p->lccool.tx_hexo].toohi = 60;
+   p->lccool.temperatureparm[p->lccool.tx_amb ].toohi = 44;
+   p->lccool.temperatureparm[p->lccool.tx_jic ].toohi = 255; // Not installed
+   p->lccool.temperatureparm[p->lccool.tx_dmoc].toohi = 50;
+
 
    // Motor drive: PWM header mapping: map function to header
       // C group: no delay, 74VHCT125 drive buffer to sub-board

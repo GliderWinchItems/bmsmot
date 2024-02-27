@@ -206,7 +206,6 @@ void StartCoolingTask(void* argument)
 			p->timeout_cmd_emcmmcx_pc_ctr = p->timeout_cmd_emcmmcx_pc; // Reset timeout ctr
 			pcan = &p->pmbx_cid_cmd_emcmmcx_pc->ncan.can;
 			do_pcCAN(pcan);
-
 		}		
 
 		if ((noteval & COOLCANBIT06) != 0) // CAN msg: EMChost 
@@ -521,25 +520,52 @@ static void do_pcCAN(struct CANRCVBUF* pcan)
  * @brief  : Send heartbeat status CAN msg on CAN1
  * @param  : p = pointer to function struct
  ************************************************************************************************************* */
-
-/*
-yprintf(&pbuf1,"ADC1IDX_THERMISTOR1   0 PC0 IN10   JP9  Thermistor\n\r");
-  yprintf(&pbuf1,"ADC1IDX_THERMISTOR2   1 PC1 IN11   JP8  Thermistor\n\r");
-  yprintf(&pbuf1,"ADC1IDX_THERMISTOR3   2 PC2 IN12   JP10 Thermistor\n\r");
-  yprintf(&pbuf1,"ADC1IDX_THERMISTOR4   3 PC3 IN13   JP11 Thermistor\n\r");
-  yprintf(&pbuf1,"ADC1IDX_DIVIDEDSPARE  4 PC4 IN14   JP17 Spare: 10k|10k divider\n\r");
+/* Payload layout
+[0] EMCL_COOLING_STATUS1; // Code for payload
+[1] Alert status: 0 = NO ALERTS; otherwise bits set--
+    7: 
+    6:
+    5: DMOC motor greater than over-temperature parameter
+    4: Greater than over-temperature parameter: pump outlet
+    3: Greater than over-temperature parameter: winch motor
+    2: Greater than over-temperature parameter: heat exchanger
+    1: Greater than over-temperature parameter: ambient
+    0: Greater than over-temperature parameter: jic
+    // Readings: deg C; 255 = not installed; less than 0 deg C = 0;
+[2] adc1.abs[p->tx_pmpo]: pump outlet
+[3] adc1.abs[p->tx_moto]: winch motor
+[4] adc1.abs[p->tx_hexo]: heat exchanger
+[5] adc1.abs[p->tx_amb ]: ambient
+[6] adc1.abs[p->tx_jic ]: JIC
+[7] Reserve for DMOC report of motor temperature 
 */
-
+static uint8_t set_alert_temperature(struct COOLINGFUNCTION* p)
+{
+	uint8_t ret = 0;
+	if (adc1.abs[p->tx_pmpo].filt > p->temperatureparm[p->tx_pmpo].toohi)
+		ret  = (1<<0);
+	if (adc1.abs[p->tx_moto].filt > p->temperatureparm[p->tx_moto].toohi)
+		ret |= (1<<1);
+   	if (adc1.abs[p->tx_hexo].filt > p->temperatureparm[p->tx_hexo].toohi)
+   		ret |= (1<<2);
+   	if (adc1.abs[p->tx_amb ].filt > p->temperatureparm[p->tx_amb ].toohi)
+   		ret |= (1<<3);
+   	if (adc1.abs[p->tx_jic ].filt > p->temperatureparm[p->tx_jic ].toohi)
+   		ret |= (1<<4);
+   	if (adc1.abs[p->tx_dmoc].filt > p->temperatureparm[p->tx_dmoc].toohi)
+   		ret |= (1<<5);
+	return ret;
+}
 static void send_hbstatus1(struct COOLINGFUNCTION* p)
 {
 	struct CANRCVBUF* pcan = &p->cancool1.can;
-	pcan->cd.uc[0] = EMCL_COOLING_STATUS1;
-	pcan->cd.uc[1] = 0; // Alert status
-	pcan->cd.uc[2] = adc1.abs[ADC1IDX_THERMISTOR1].filt;
-	pcan->cd.uc[3] = adc1.abs[ADC1IDX_THERMISTOR2].filt;
-	pcan->cd.uc[4] = adc1.abs[ADC1IDX_THERMISTOR3].filt;
-	pcan->cd.uc[5] = adc1.abs[ADC1IDX_THERMISTOR4].filt;
-	pcan->cd.uc[6] = adc1.abs[ADC1IDX_DIVIDEDSPARE].filt;
+	pcan->cd.uc[0] = EMCL_COOLING_STATUS1; // See: EMCLTaskCmd.h
+	pcan->cd.uc[1] = set_alert_temperature(p);
+	pcan->cd.uc[2] = adc1.abs[p->tx_pmpo].filt;
+	pcan->cd.uc[3] = adc1.abs[p->tx_moto].filt;
+	pcan->cd.uc[4] = adc1.abs[p->tx_hexo].filt;
+	pcan->cd.uc[5] = adc1.abs[p->tx_amb ].filt;
+	pcan->cd.uc[6] = adc1.abs[p->tx_jic ].filt;
 	pcan->cd.uc[7] = 0xA5; // Dummy for now
 
 	// Place CAN msg on CanTask queue

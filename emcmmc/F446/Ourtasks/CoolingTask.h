@@ -32,11 +32,17 @@
 
 #define COOLTIMERMS 50 // Number ms per timer callback
 #define MOTORNUM 4	//Number of motors controlled
+#define COOLARRAYSZ 6 // Number of temperatures 
 
 #define MOTSTATE_SPINDWN  0
 #define MOTSTATE_MINSTAT  1
 #define MOTSTATE_RAMPING  2
 #define MOTSTATE_MINSTART 3
+
+/* Command codes. */
+#define MISCQ_COOL_TEMPS 1  // Send temperatures
+
+
 
 struct COOLX
 {
@@ -85,8 +91,9 @@ struct MOTORCONTROL
 struct TEMPERATUREPARAM
 {
 	float tdel;     // Run Above Ambient
-	float toohi;    // Temperature too high to run--Alert
 	float coef[2];  // pwm = coef[0]+coef[1]*Temperature
+	uint8_t toohi;    // Temperature too high to run--Alert
+	uint8_t not_installed;	
 };
 struct TEMPERATUREWORK
 {
@@ -114,6 +121,7 @@ struct COOLINGFUNCTION
 	uint8_t tx_hexo; // ADC index: heat exchange outlet thermistor
 	uint8_t tx_amb;  // ADC index: ambient air temperature thermistor
 	uint8_t tx_jic;  // ADC index: provision if 5th thermistor added to ADC sequence
+	uint8_t tx_dmoc; // index: provision for DMOC CAN msg temperature report
 
 	uint8_t status_cool; // 0 = no cooling; 1 = cooling in progress
 
@@ -154,12 +162,12 @@ struct COOLINGFUNCTION
 	struct MOTORRAMP motorramp[MOTORNUM]; // Working values
 
 	/* Temperature parameters: motors plus DMOC motor */
-	struct TEMPERATUREPARAM	temperatureparm[MOTORNUM+1];
+	struct TEMPERATUREPARAM	temperatureparm[COOLARRAYSZ];
 
 	/* Pointers to incoming CAN msg mailboxes. */
-	struct MAILBOXCAN* pmbx_cid_dmoc_actualtorq; //'47400000','DMOC',1,1,'I16','DMOC: Actual Torque: payload-30000'
+	//struct MAILBOXCAN* pmbx_cid_dmoc_actualtorq; //'47400000','DMOC',1,1,'I16','DMOC: Actual Torque: payload-30000'
 	struct MAILBOXCAN* pmbx_cid_dmoc_hv_temps;   //'CA200000','DMOC',1,1,'U8_U8_U8''DMOC: Temperature:rotor,invert,stator'
-	struct MAILBOXCAN* pmbx_cid_mc_state;        //'26000000','MC',1,5,'U8_U8','MC: Launch state msg'
+	//struct MAILBOXCAN* pmbx_cid_mc_state;        //'26000000','MC',1,5,'U8_U8','MC: Launch state msg'
 	struct MAILBOXCAN* pmbx_cid_cntctrkar;       //'E3C00000','CNTCTR',1,6,'U8_U8_U8','Contactor1: R KeepAlive response'
 
 	struct MAILBOXCAN* pmbx_cid_cmd_emcmmcx_pc;   //'A1600000','UNIT_ECM1PC' , 1,1,'U8_U8_U8_X4','bmsmot 1 PC SENDS');
