@@ -10,6 +10,7 @@
 #include "FreeRTOS.h"
 #include "cmsis_os.h"
 #include "stm32f4xx_hal.h"
+#include "common_can.h"
 //#include "EMCTask.h"
 
 // Relay header versus RyTask.c coding
@@ -46,6 +47,10 @@ struct RYREQ_Q
  * *************************************************************************/
  void ry_init(void);
 /*	@brief	: init 
+ * *************************************************************************/
+void RyTask_CANpayload(struct CANRCVBUF* pcan);
+/*	@brief	: Fill CAN payload with relay status and info
+ *  @param  : pointer to CAN msg
  * *************************************************************************/
 
  /* ############################################################################# */

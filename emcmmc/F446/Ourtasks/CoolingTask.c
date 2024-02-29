@@ -18,6 +18,7 @@
 #include "../../../../GliderWinchCommons/embed/svn_common/trunk/db/gen_db.h"
 #include "EMCLTaskCmd.h"
 #include "CanTask.h"
+#include "RyTask.h"
 
 #define COOLCANBIT00 (1<<0) // RTOS timer 
 //#define COOLCANBIT01 (1<<1) // CAN msg: actual torq
@@ -34,6 +35,7 @@ static void motorcontrol_init(struct COOLINGFUNCTION* p);
 void do_ramp(struct MOTORRAMP* p);
 static void do_pcCAN(struct CANRCVBUF* pcan);
 static void send_hbstatus1(struct COOLINGFUNCTION* p);
+static void send_hbstatus2(struct COOLINGFUNCTION* p);
 
 extern struct CAN_CTLBLOCK* pctl0; // Pointer to CAN1 control block
 extern struct CAN_CTLBLOCK* pctl1; // Pointer to CAN2 control block
@@ -88,6 +90,7 @@ void timer_do(struct COOLINGFUNCTION* p)
 	if (p->hbct_ctr <= 0)
 	{
 		send_hbstatus1(p);
+		send_hbstatus2(p);
 		p->hbct_ctr = p->hbct_tic;
 	}
 
@@ -513,6 +516,20 @@ pay[7]=temperature deg C: jic
 */
 static void do_pcCAN(struct CANRCVBUF* pcan)
 {
+	struct COOLINGFUNCTION* p = &emclfunction.lc.lccool; // Convenience pointer
+	switch(pcan->cd.uc[1])
+	{
+	case EMCL_COOLING_STATUS1:  // 36 GET: Alert status & temperature report
+		send_hbstatus1(p);
+		break;
+	case EMCL_MOTORPWM_SETPWMX: // 37 SET: PWM PCT for all 4: pump, blower, DMOC, JIC
+		break;
+	case EMCL_MOTORPWM_GETPWMX: // 38 GET: PWM PCT for all 4: pump, blower, DMOC, JIC
+		send_hbstatus2(p);
+		break;
+	default:
+		break;
+	}
 	return;
 }
 /* ***********************************************************************************************************
@@ -567,6 +584,32 @@ static void send_hbstatus1(struct COOLINGFUNCTION* p)
 	pcan->cd.uc[5] = adc1.abs[p->tx_amb ].filt;
 	pcan->cd.uc[6] = adc1.abs[p->tx_jic ].filt;
 	pcan->cd.uc[7] = 0xA5; // Dummy for now
+
+	// Place CAN msg on CanTask queue
+	xQueueSendToBack(CanTxQHandle,&p->cancool1,4);
+	return;
+}
+/* ***********************************************************************************************************
+ * static void send_hbstatus2(struct COOLINGFUNCTION* p);
+ * @brief  : Send heartbeat status CAN msg on CAN1
+ * @param  : p = pointer to function struct
+ ************************************************************************************************************* */
+/* Payload layout
+[0] EMCL_MOTORPWM_GETPWMX; // Code for payload
+[1] Reserved
+[2] Group A & B bits
+[3] reserved
+[4] Group C percent
+[5] Group C percent
+[6] Group C percent
+[7] Group C percent
+*/
+static void send_hbstatus2(struct COOLINGFUNCTION* p)
+{
+	struct CANRCVBUF* pcan = &p->cancool1.can;
+	pcan->cd.uc[0] = EMCL_MOTORPWM_GETPWMX; // See: EMCLTaskCmd.h
+	pcan->cd.uc[1] = 0; // Reserved
+	RyTask_CANpayload(pcan); // Fill payload with Relay info
 
 	// Place CAN msg on CanTask queue
 	xQueueSendToBack(CanTxQHandle,&p->cancool1,4);

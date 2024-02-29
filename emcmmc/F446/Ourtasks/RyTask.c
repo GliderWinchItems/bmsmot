@@ -72,10 +72,9 @@ struct RELAYWV // Working variables
    uint8_t pwm_wv;     // PWM percent when energized: (0 - 100)
                              //   100 = full ON; 20-40 = normal range, relay dependent
    int8_t on;         // minus = pulling in; zero = OFF; plus = pulled & pwm'ing
-
    uint8_t cancel;   // 1 = cancel request for delay; 0 = not cancel
-
    uint8_t kp_flag;   // Upon interrupt: 1 = reset kp time; 0 = let kp_wv countdown or remain zero
+   uint8_t pwmx;     // Latest actual setting
 };
 struct RELAYWV relaywv[NRELAYS];
 
@@ -98,6 +97,40 @@ static  int8_t idx_delay; // Index for relay in process of pull-in; minus = none
 static  int8_t idx_abort; // 1 = TIM9 abort current pullin
 static uint8_t delay_flag; // 1 = TIM9 delay is in-progress; 0 = idle
 
+/* *************************************************************************
+ *  void RyTask_CANpayload(struct CANRCVBUF* pcan);
+ *	@brief	: Fill CAN payload with relay status and info
+ *  @param  : pointer to CAN msg
+ * *************************************************************************/
+void RyTask_CANpayload(struct CANRCVBUF* pcan)
+{
+/*
+payload:
+[2] Group A & B bits [0]-[7]
+[3] reserved
+[4] Group C percent [ 8]
+[5] Group C percent [ 9]
+[6] Group C percent [10]
+[7] Group C percent [11]
+*/
+	pcan->cd.uc[2] = 
+		(relaywv[0].on << 0) |
+		(relaywv[1].on << 1) |
+		(relaywv[2].on << 2) |
+		(relaywv[3].on << 3) |
+		(relaywv[4].on << 4) |
+		(relaywv[5].on << 5) |
+		(relaywv[6].on << 6) |
+		(relaywv[7].on << 7);
+
+	pcan->cd.uc[3] = 0;
+
+	pcan->cd.uc[4] = relaywv[ 8].pwmx;
+	pcan->cd.uc[5] = relaywv[ 9].pwmx;
+	pcan->cd.uc[6] = relaywv[10].pwmx;
+	pcan->cd.uc[7] = relaywv[11].pwmx;
+	return;
+}
 /* *************************************************************************
  * static void rydbuf_startdelay(uint8_t idx);
  *	@brief	: Start delay timer
@@ -275,6 +308,8 @@ static void ry_setpwm(uint32_t pwmx, uint8_t idx)
 	{ // Here, limit pwm to parameter (expect less than 100%)
 		pwmx = emclfunction.lc.relay[idx].pwmx;
 	}
+	relaywv[idx].pwmx = pwmx; // Save for CAN msging
+
 	// Convert percent to timer ticks
 	uint16_t pwm = pwmx * PWMPCTtoTICK;
 	/* Set timer pwm for this relay. */
