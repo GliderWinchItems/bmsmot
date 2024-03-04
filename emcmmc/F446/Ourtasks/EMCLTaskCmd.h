@@ -9,8 +9,9 @@
 
 // Numbering chosen to not conflict with loader commands
 #define EMCL_COOLING_STATUS1    36 // GET: Alert status & temperature report
-#define EMCL_MOTORPWM_SETPWMX   37 // SET: PWM PCT for all 4: pump, blower, DMOC, JIC
-#define EMCL_MOTORPWM_GETPWMX   38 // GET: PWM PCT for all 4: pump, blower, DMOC, JIC
+#define EMCL_MOTOR_RY_SET       37 // SET: Relays and PWM PCT for motors
+#define EMCL_MOTOR_RY_STATUS2   38 // GET: Relay status groups OA, OB, and PWM PCT for OC motors
+
 
 
 /* Payload layout
@@ -32,5 +33,59 @@
 [6] adc1.abs[p->tx_jic ]: JIC
 [7] Reserve for DMOC report of motor temperature 
 */
+
+/* Payload layout: EMCL_MOTOR_RY_STATUS2   38 // GET: Relay status groups OA, OB, and PWM PCT for OC motors
+[0] EMCL_MOTOR_RY_STATUS2; // Get Relay & motor settings
+[1] 
+[2]
+[3] Relay on/off bits: 1 = ON
+    7: OCB4
+    6: OCB3
+    5: OCB2
+    4: OCB1
+    3: OCA4
+    2: OCA3
+    1: OCA2
+    0: OCA1
+[4] OC1 motor percent
+[5] OC2 motor percent
+[6] OC3 motor percent
+[7] OC4 motor percent
+*/
+/* Payload layout: EMCL_MOTOR_RY_SET       37 // SET: Relays and PWM PCT for motors
+[0] EMCL_MOTOR_RY_SET; // Set relays & motors
+[1] Motors to be changed bits: 0 = no change
+    7: Disable auto-cooling motor control
+    6: reserved
+    5: reserved
+    4: reserved
+    3: OC1 motor percent
+    2: OC2 motor percent
+    1: OC3 motor percent
+    0: OC4 motor percent
+[2] Relays to be set: bits 0 = no change
+    7: OCB4
+    6: OCB3
+    5: OCB2
+    4: OCB1
+    3: OCA4
+    2: OCA3
+    1: OCA2
+    0: OCA1
+[3] Relay on/off bits: 1 = ON
+    7: OCB4
+    6: OCB3
+    5: OCB2
+    4: OCB1
+    3: OCA4
+    2: OCA3
+    1: OCA2
+    0: OCA1
+[4] OC1 motor percent
+[5] OC2 motor percent
+[6] OC3 motor percent
+[7] OC4 motor percent
+*/
+
 
 #endif

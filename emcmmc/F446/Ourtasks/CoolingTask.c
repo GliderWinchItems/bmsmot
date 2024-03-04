@@ -91,7 +91,6 @@ void timer_do(struct COOLINGFUNCTION* p)
 	{
 		send_hbstatus1(p);
 		send_hbstatus2(p);
-		p->hbct_ctr = p->hbct_tic;
 	}
 
 	return;
@@ -522,9 +521,9 @@ static void do_pcCAN(struct CANRCVBUF* pcan)
 	case EMCL_COOLING_STATUS1:  // 36 GET: Alert status & temperature report
 		send_hbstatus1(p);
 		break;
-	case EMCL_MOTORPWM_SETPWMX: // 37 SET: PWM PCT for all 4: pump, blower, DMOC, JIC
+	case EMCL_MOTOR_RY_SET:     // SET: Relays and PWM PCT for motors
 		break;
-	case EMCL_MOTORPWM_GETPWMX: // 38 GET: PWM PCT for all 4: pump, blower, DMOC, JIC
+	case EMCL_MOTOR_RY_STATUS2: // GET: Relay status groups OA, OB, and PWM PCT for OC motors
 		send_hbstatus2(p);
 		break;
 	default:
@@ -584,7 +583,7 @@ static void send_hbstatus1(struct COOLINGFUNCTION* p)
 	pcan->cd.uc[5] = adc1.abs[p->tx_amb ].filt;
 	pcan->cd.uc[6] = adc1.abs[p->tx_jic ].filt;
 	pcan->cd.uc[7] = 0xA5; // Dummy for now
-
+	p->hbct_ctr = p->hbct_tic; // Reset heartbeat count
 	// Place CAN msg on CanTask queue
 	xQueueSendToBack(CanTxQHandle,&p->cancool1,4);
 	return;
@@ -610,7 +609,7 @@ static void send_hbstatus2(struct COOLINGFUNCTION* p)
 	pcan->cd.uc[0] = EMCL_MOTORPWM_GETPWMX; // See: EMCLTaskCmd.h
 	pcan->cd.uc[1] = 0; // Reserved
 	RyTask_CANpayload(pcan); // Fill payload with Relay info
-
+	p->hbct_ctr = p->hbct_tic; // Reset heartbeat count
 	// Place CAN msg on CanTask queue
 	xQueueSendToBack(CanTxQHandle,&p->cancool1,4);
 	return;
