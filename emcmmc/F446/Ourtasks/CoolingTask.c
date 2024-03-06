@@ -32,22 +32,51 @@
 
 void extract_dmoc_hv_temps(struct COOLINGFUNCTION* p, struct CANRCVBUF* pcan);
 static void motorcontrol_init(struct COOLINGFUNCTION* p);
+void motorcontrol(struct COOLINGFUNCTION* pc, uint8_t i, uint8_t pwm);
 void do_ramp(struct MOTORRAMP* p);
 static void do_pcCAN(struct CANRCVBUF* pcan);
 static void send_hbstatus1(struct COOLINGFUNCTION* p);
 static void send_hbstatus2(struct COOLINGFUNCTION* p);
+static void set_motor_ry(struct CANRCVBUF* pcan);
+static void relay_req_init(void);
 
 extern struct CAN_CTLBLOCK* pctl0; // Pointer to CAN1 control block
 extern struct CAN_CTLBLOCK* pctl1; // Pointer to CAN2 control block
 extern CAN_HandleTypeDef hcan1;
 extern CAN_HandleTypeDef hcan2;
 
+// Relay CAN msg request
+static struct RYREQ_Q ryreq_q[NRELAYS]; // Queue requests to RyTask
+static struct RYREQ_Q* pryreq_q[NRELAYS]; // Queue requests to RyTask
+
+/* CAN msg command EMCL_MOTOR_RY_SET control of motor and relays requires keep alive. */
+#define CANMOTRY_TIMEOUT 600 // (30 sec with 50 ms per count) KeepAlive for CAN msg requests
+
+struct MOTRY
+{
+	uint8_t canpwm; // CAN msg pwm request
+	uint8_t autpwm; // Automatic control pwm request
+	uint8_t control;  // control: 0 = automatic; 1 = CAN msg
+};
+
+/* Relays and motor requests can come from either CAN msgs or Automatic control.
+The CAN msgs have priority as long as keep-alive count is active.
+   To spread the processing and queueing load, the relay/motor keep-alive updates are
+done one for each 50 ms timer tick. A cycle of eleven takes 550 ms. 
+*/   
+struct MOTRYINFO
+{
+	uint32_t cankeepalive_ctr; // CAN timer tick countdown,
+	struct MOTRY motry[NRELAYS]; 
+	uint8_t canautidx; // Index for cyclic updating
+};
+static struct MOTRYINFO motryinfo;
+
 uint32_t dbgcool1;
 struct CANRCVBUF cooltest; 
 uint8_t cooltest1;
 
 TaskHandle_t CoolingTaskHandle = NULL;
-
 
 /*{
 	struct CANRCVBUF can;		// CAN msg
@@ -84,15 +113,64 @@ void timer_do(struct COOLINGFUNCTION* p)
 	if (p->timeout_cmd_emcmmcx_pc_ctr > 0)	
 		p->timeout_cmd_emcmmcx_pc_ctr -= 1;
 
-/* Count down for heartbeats. */\
+/* Count down for heartbeats. */
 	if (p->hbct_ctr > 0)
 		p->hbct_ctr -= 1;
 	if (p->hbct_ctr <= 0)
 	{
-		send_hbstatus1(p);
-		send_hbstatus2(p);
+		send_hbstatus1(p); // Temperatures
+		send_hbstatus2(p); // Relays & motors
 	}
 
+	/* RyTask expects queue requests to keep alive. */
+	/* CAN msg control needs a separate keep-alive, and
+	   the timer_do() handles updating queued requests
+	   to RYTask and timeout for CAN msgs. */
+
+	// CAN msg control overrides auto controls.
+	if (motryinfo.cankeepalive_ctr > 0)
+	{ // CAN msg control is still active
+		motryinfo.cankeepalive_ctr -= 1; // Countdown time (50ms steps)
+		if (motryinfo.cankeepalive_ctr == 0)
+		{ // Here, keep-alive timed out. Cancel overrides
+			for (int i = 0; i < NRELAYS; i++)
+			{
+				if (motryinfo.motry[i].control != 0)
+				{ // Here, this relay/motor port was CAN msg controlled
+					motryinfo.motry[i].control = 0; // Set automatic control
+					if (i > 7)
+					{ // Here, motor, revert via ramping to automatic setting
+						motorcontrol(&emclfunction.lc.lccool,i,motryinfo.motry[i].canpwm);
+					}
+					else
+					{ // Here, relay, revert to automatic control
+						ryreq_q[i].pwm = motryinfo.motry[i].autpwm; // Queue setup
+						xQueueSendToBack(RyTaskReadReqQHandle,&pryreq_q[i],500);
+					}
+				}
+			}
+		}
+	}
+
+	/* Update to satisfy RyTask keep-alive. */
+uint8_t j = motryinfo.canautidx; // Convenience index
+	if (j > 7)
+	{ // Here, Motors
+		if (motryinfo.motry[j].control != 0)
+			motorcontrol(&emclfunction.lc.lccool,j,motryinfo.motry[j].canpwm);
+		else
+			motorcontrol(&emclfunction.lc.lccool,j,motryinfo.motry[j].autpwm);
+	}
+	else
+	{ // Here, relays
+		if (motryinfo.motry[j].control != 0)
+			ryreq_q[j].pwm = motryinfo.motry[j].canpwm; // CAN control pwm
+		else
+			ryreq_q[j].pwm = motryinfo.motry[j].autpwm; // Automatic control pwm
+		xQueueSendToBack(RyTaskReadReqQHandle,&pryreq_q[j],500);
+	}
+	j += 1; // Cycle index through all 12 relays.
+	if (j >= NRELAYS) motryinfo.canautidx = 0;
 	return;
 }
 /* *************************************************************************
@@ -135,8 +213,8 @@ void StartCoolingTask(void* argument)
 	emcl_idx_v_struct_hardcode_params(&emclfunction.lc); // JIC
 
 	coolingfunction_init(p);
-
 	motorcontrol_init(p);	
+	relay_req_init();
 
 	/* Add CAN Mailboxes                               CAN     CAN ID             TaskHandle,Notify bit,Skip, Paytype */
 	//47400000','DMOC',1,1,'I16','DMOC: Actual Torque: payload-30000'
@@ -351,9 +429,10 @@ static void motorcontrol_init(struct COOLINGFUNCTION* pc)
 	return;
 }
 /* ***********************************************************************************************************
- * static void motorcontrol(struct MOTORRAMP* p, uint8_t pwm);
+ * void motorcontrol(struct COOLINGFUNCTION* pc, uint8_t i, uint8_t pwm);
  * @brief	: Ramping control
  * @param   : p = pointer to struct for this motor
+ * @param   : i = motor number (0 - 3 i.e. MOTORNUM)
  * @param	: pwm = 0-100 for new target pwm 
  *          : 0 = off
  *          : 100 = full on
@@ -386,7 +465,7 @@ void motorcontrol(struct COOLINGFUNCTION* pc, uint8_t i, uint8_t pwm)
 			p->irampaccum  = 0;		
 			p->target      = 0;      // Update target pwm
 			p->ryreq.pwm   = 0;      // Update RyTask request and queue request
-			xQueueSendToBack(RyTaskReadReqQHandle,&p->pryreq,10000);
+			xQueueSendToBack(RyTaskReadReqQHandle,&p->pryreq,1000);
 			p->state = MOTSTATE_SPINDWN;
 			break;
 		}
@@ -516,12 +595,13 @@ pay[7]=temperature deg C: jic
 static void do_pcCAN(struct CANRCVBUF* pcan)
 {
 	struct COOLINGFUNCTION* p = &emclfunction.lc.lccool; // Convenience pointer
-	switch(pcan->cd.uc[1])
+	switch(pcan->cd.uc[0])
 	{
 	case EMCL_COOLING_STATUS1:  // 36 GET: Alert status & temperature report
 		send_hbstatus1(p);
 		break;
 	case EMCL_MOTOR_RY_SET:     // SET: Relays and PWM PCT for motors
+		set_motor_ry(pcan);
 		break;
 	case EMCL_MOTOR_RY_STATUS2: // GET: Relay status groups OA, OB, and PWM PCT for OC motors
 		send_hbstatus2(p);
@@ -606,11 +686,119 @@ static void send_hbstatus1(struct COOLINGFUNCTION* p)
 static void send_hbstatus2(struct COOLINGFUNCTION* p)
 {
 	struct CANRCVBUF* pcan = &p->cancool1.can;
-	pcan->cd.uc[0] = EMCL_MOTORPWM_GETPWMX; // See: EMCLTaskCmd.h
+	pcan->cd.uc[0] = EMCL_MOTOR_RY_STATUS2; // See: EMCLTaskCmd.h
 	pcan->cd.uc[1] = 0; // Reserved
-	RyTask_CANpayload(pcan); // Fill payload with Relay info
+	RyTask_CANpayload(pcan); // Fill payload with Relay & motor info
 	p->hbct_ctr = p->hbct_tic; // Reset heartbeat count
 	// Place CAN msg on CanTask queue
 	xQueueSendToBack(CanTxQHandle,&p->cancool1,4);
+	return;
+}
+/* ***********************************************************************************************************
+ * static void relay_req_init(void);
+ * @brief  : Initialize relay and motor queue arrays
+ ************************************************************************************************************* */
+static void relay_req_init(void)
+{
+	int i;
+	for (i = 0; i < NRELAYS; i++) // All relays and motors
+	{
+		pryreq_q[i] = &ryreq_q[i]; // Pointer for queue
+		ryreq_q[i].cancel = 0;     // jic
+		ryreq_q[i].pwm = 0;      // Use parameter list value
+		ryreq_q[i].idx = i;        // Relay identification
+
+		motryinfo.motry[i].canpwm  = 0;
+		motryinfo.motry[i].autpwm  = 0;
+		motryinfo.motry[i].control = 0;
+	}
+	motryinfo.cankeepalive_ctr = 0; // CAN in control timer tick countdown
+	motryinfo.canautidx = 0; // Index for cyclic updating
+	return;
+}
+
+static struct RYREQ_Q ryreq_q[NRELAYS]; // Queue requests to RyTask
+static struct RYREQ_Q* pryreq_q[NRELAYS]; // Queue requests to RyTask
+/* ***********************************************************************************************************
+ * static void set_motor_ry(struct COOLINGFUNCTION* p);
+ * @brief  : CAN code: EMCL_MOTOR_RY_SET sets relays and motors
+ * @param  : p = pointer to CAN msg
+ ************************************************************************************************************* */
+/* Payload layout: EMCL_MOTOR_RY_SET       37 // SET: Relays and PWM PCT for motors
+[0] EMCL_MOTOR_RY_SET; // Set relays & motors
+[1] Motors to be changed bits: 0 = no change
+    7: 1 = revert to automatic control (following payload gets ignored)
+    6: reserved
+    5: reserved
+    4: reserved
+    3: 1 = OC4 motor percent change to payload [7] relay array [11]
+    2: 1 = OC3 motor percent change to payload [6] relay array [10]
+    1: 1 = OC2 motor percent change to payload [5] relay array [ 9]
+    0: 1 = OC1 motor percent change to payload [4] relay array [ 8]
+[2] Relays to be set: bits 0 = no change
+    7: OCB4
+    6: OCB3
+    5: OCB2
+    4: OCB1
+    3: OCA4
+    2: OCA3
+    1: OCA2
+    0: OCA1
+[3] Relay on/off bits: 1 = ON
+    7: OCB4
+    6: OCB3
+    5: OCB2
+    4: OCB1
+    3: OCA4
+    2: OCA3
+    1: OCA2
+    0: OCA1
+[4] OC1 motor percent
+[5] OC2 motor percent
+[6] OC3 motor percent
+[7] OC4 motor percent
+*/
+static void set_motor_ry(struct CANRCVBUF* pcan)
+{
+	/* Update list of relays and motors receiving CAN msgs w control changes. */
+	motryinfo.cankeepalive_ctr = CANMOTRY_TIMEOUT; // Reset keep-alive count
+
+	int i;
+	if ((pcan->cd.uc[1] & 0x80) != 0)
+	{ // Here. Command to stop CAN msg control
+		// Next timer_do() will look like a CAN msg timeout
+		motryinfo.cankeepalive_ctr = 1;
+		return;
+	}
+
+	if ((pcan->cd.uc[1] & 0x0F) != 0)
+	{ // Here, one or more motors to be set
+		for (i = 0; i < 4; i++) // OC1-OC4
+		{
+			if ((pcan->cd.uc[1] & (1<<i)) != 0)
+			{ // Send pwm request to motor ramp control
+				motryinfo.motry[4+i].canpwm  = pcan->cd.uc[4+i]; // Save pwm
+				motryinfo.motry[4+i].control = 1; // Show CAN msg controls
+				motorcontrol(&emclfunction.lc.lccool, i, pcan->cd.uc[4+i]);
+			}
+		}
+	}
+	if (pcan->cd.uc[2] != 0)
+	{ // Here, one or more relays to be set
+		for (i = 0; i < 8; i++) // OA1-OA4,OB1-OB4
+		{
+			if ((pcan->cd.uc[2] & (1<<i)) != 0)
+			{ // Here, set this relay
+				if ((pcan->cd.uc[3] & (1<<i)) != 0)
+					motryinfo.motry[i].canpwm  = 255; // Use parameter PWM.
+				else
+					motryinfo.motry[i].canpwm  = 0; // OFF
+
+				motryinfo.motry[i].control = 1;	// CAN msg controls
+				ryreq_q[i].pwm = motryinfo.motry[i].canpwm; // Queue setup
+				xQueueSendToBack(RyTaskReadReqQHandle,&pryreq_q[i],500);
+			}
+		}
+	}
 	return;
 }

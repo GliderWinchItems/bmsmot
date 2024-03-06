@@ -57,12 +57,11 @@ TaskHandle_t RyTaskHandle = NULL;
 #define PWMPCTtoTICK 180 // Number of timer ticks per percent PWM
 
 /* Queue */
-#define QUEUESIZE 16	// Total size of relay queue
+#define QUEUESIZE 64	// Total size of relay queue
 osMessageQId RyTaskReadReqQHandle;
 
 
 /* Relay status and working vars. */
-#define NRELAYS 12 // Number of fet driver relay outputs
 struct RELAYWV // Working variables
 {
    uint32_t kp_wv; // Maximum time duration (ms) between keep-alive requests
@@ -106,14 +105,16 @@ void RyTask_CANpayload(struct CANRCVBUF* pcan)
 {
 /*
 payload:
-[2] Group A & B bits [0]-[7]
-[3] reserved
+[2] reserved
+[3] Group A & B bits [0]-[7]
 [4] Group C percent [ 8]
 [5] Group C percent [ 9]
 [6] Group C percent [10]
 [7] Group C percent [11]
 */
-	pcan->cd.uc[2] = 
+	pcan->cd.uc[2] = 0;
+
+	pcan->cd.uc[3] = 
 		(relaywv[0].on << 0) |
 		(relaywv[1].on << 1) |
 		(relaywv[2].on << 2) |
@@ -122,8 +123,6 @@ payload:
 		(relaywv[5].on << 5) |
 		(relaywv[6].on << 6) |
 		(relaywv[7].on << 7);
-
-	pcan->cd.uc[3] = 0;
 
 	pcan->cd.uc[4] = relaywv[ 8].pwmx;
 	pcan->cd.uc[5] = relaywv[ 9].pwmx;

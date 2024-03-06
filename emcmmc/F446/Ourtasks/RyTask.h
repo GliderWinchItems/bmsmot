@@ -27,6 +27,8 @@
 #define HDR_OC3 10 // Group C
 #define HDR_OC4 11 // Group C
 
+#define NRELAYS 12 // Number of fet driver relay outputs
+
 /* Keep-Alive timer (TIM5) OC interrupt rate */
 // Prescalar = 9000; Sysclock = 180 MHz
 #define KPUPDATEDUR 100 // 10 ms = 100 * 0.1ms

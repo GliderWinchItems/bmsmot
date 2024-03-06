@@ -11,6 +11,7 @@
 #define EMCL_COOLING_STATUS1    36 // GET: Alert status & temperature report
 #define EMCL_MOTOR_RY_SET       37 // SET: Relays and PWM PCT for motors
 #define EMCL_MOTOR_RY_STATUS2   38 // GET: Relay status groups OA, OB, and PWM PCT for OC motors
+#define EMCL_RY_HOLD_PWM_SET    39 // SET: Special relay hold pwm (after pullin testing)
 
 
 
@@ -55,14 +56,14 @@
 /* Payload layout: EMCL_MOTOR_RY_SET       37 // SET: Relays and PWM PCT for motors
 [0] EMCL_MOTOR_RY_SET; // Set relays & motors
 [1] Motors to be changed bits: 0 = no change
-    7: Disable auto-cooling motor control
+    7: 1 = revert to automatic control (following payload gets ignored)
     6: reserved
     5: reserved
     4: reserved
-    3: OC1 motor percent
-    2: OC2 motor percent
-    1: OC3 motor percent
-    0: OC4 motor percent
+    3: 1 = OC4 motor percent change to payload [7] relay array [11]
+    2: 1 = OC3 motor percent change to payload [6] relay array [10]
+    1: 1 = OC2 motor percent change to payload [5] relay array [ 9]
+    0: 1 = OC1 motor percent change to payload [4] relay array [ 8]
 [2] Relays to be set: bits 0 = no change
     7: OCB4
     6: OCB3
@@ -85,6 +86,13 @@
 [5] OC2 motor percent
 [6] OC3 motor percent
 [7] OC4 motor percent
+*/
+
+/* Payload layout: EMCL_RY_HOLD_PWM_SET    39 // SET: Special relay hold pwm (after pullin testing)
+[0] EMCL_RY_HOLD_PWM_SET; // Set relays & motors
+[1] Relay index (0 - 11)
+[2] holding pwm (0 - 100)
+[3]-[7] reserved
 */
 
 
