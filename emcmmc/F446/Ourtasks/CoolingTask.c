@@ -153,24 +153,22 @@ void timer_do(struct COOLINGFUNCTION* p)
 	}
 
 	/* Update to satisfy RyTask keep-alive. */
-uint8_t j = motryinfo.canautidx; // Convenience index
-	if (j > 7)
+	for (int i = 0; i < 4; i++)
 	{ // Here, Motors
-		if (motryinfo.motry[j].control != 0)
-			motorcontrol(&emclfunction.lc.lccool,j,motryinfo.motry[j].canpwm);
+		if (motryinfo.motry[8+i].control != 0)
+			motorcontrol(&emclfunction.lc.lccool,i,motryinfo.motry[8+i].canpwm);
 		else
-			motorcontrol(&emclfunction.lc.lccool,j,motryinfo.motry[j].autpwm);
+			motorcontrol(&emclfunction.lc.lccool,i,motryinfo.motry[8+i].autpwm);
 	}
+
+	#define B  motryinfo.canautidx //; // Convenience index
+	if (motryinfo.motry[B].control != 0)
+		ryreq_q[B].pwm = motryinfo.motry[B].canpwm; // CAN control pwm
 	else
-	{ // Here, relays
-		if (motryinfo.motry[j].control != 0)
-			ryreq_q[j].pwm = motryinfo.motry[j].canpwm; // CAN control pwm
-		else
-			ryreq_q[j].pwm = motryinfo.motry[j].autpwm; // Automatic control pwm
-		xQueueSendToBack(RyTaskReadReqQHandle,&pryreq_q[j],500);
-	}
-	j += 1; // Cycle index through all 12 relays.
-	if (j >= NRELAYS) motryinfo.canautidx = 0;
+		ryreq_q[B].pwm = motryinfo.motry[B].autpwm; // Automatic control pwm
+	xQueueSendToBack(RyTaskReadReqQHandle,&pryreq_q[B],500);
+	B += 1; // Cycle index through 0-7 indexed relay ports
+	if (B > 7) B = 0;
 	return;
 }
 /* *************************************************************************
@@ -410,9 +408,9 @@ static void motorcontrol_init(struct COOLINGFUNCTION* pc)
 	{
 		p    = &pc->motorramp[i]; // Working struct
 		pprm = &pc->motorrampparam[i];// Parameter struct		
-		// Convert from pct-per-sec to pct-per-timer tick
-		p->ramppertickup = (pprm->rampuprate * 1000) / COOLTIMERMS; // Timer tick conversion
-		p->ramppertickup = (pprm->rampdnrate * 1000) / COOLTIMERMS; // Timer tick conversion
+		// Convert from pct-per-sec to milli-pct-per-timer tick
+		p->ramppertickup = (pprm->rampuprate * 1000.0f) / COOLTIMERMS; // Timer tick conversion
+		p->ramppertickdn = (pprm->rampdnrate * 1000.0f) / COOLTIMERMS; // Timer tick conversion
 		p->shutdowntic = pprm->shutoffwait / COOLTIMERMS; // Unknown. Could be coasting down
 
 		p->spindownctr = p->shutdowntic; // Re-boot might find motor still spinning down
@@ -424,7 +422,8 @@ static void motorcontrol_init(struct COOLINGFUNCTION* pc)
 		p->frampaccum  = 0; // In-progress of changing pwm
 		p->irampaccum  = 0; // (Probably not necessary)
 		p->target      = 0; // Last static pwm value
-		xQueueSendToBack(RyTaskReadReqQHandle,&p->pryreq,10000);
+// Might not want this. Spindown might be taking place. Depends on type of sub-board.
+//		xQueueSendToBack(RyTaskReadReqQHandle,&p->pryreq,10000);
 	}
 	return;
 }
@@ -447,10 +446,10 @@ void motorcontrol(struct COOLINGFUNCTION* pc, uint8_t i, uint8_t pwm)
 	{
 	case MOTSTATE_SPINDWN: // spin-down still counting.
 		p->spindownctr -= 1;
-		if (&p->spindownctr > 0)
+		if (p->spindownctr > 0)
 			break;		
 		p->state = MOTSTATE_RAMPING;
-	
+
 	case MOTSTATE_RAMPING:
 		// Check for a turn-off request
 		if (pwm == 0)
@@ -465,7 +464,6 @@ void motorcontrol(struct COOLINGFUNCTION* pc, uint8_t i, uint8_t pwm)
 			p->irampaccum  = 0;		
 			p->target      = 0;      // Update target pwm
 			p->ryreq.pwm   = 0;      // Update RyTask request and queue request
-			xQueueSendToBack(RyTaskReadReqQHandle,&p->pryreq,1000);
 			p->state = MOTSTATE_SPINDWN;
 			break;
 		}
@@ -506,6 +504,9 @@ void motorcontrol(struct COOLINGFUNCTION* pc, uint8_t i, uint8_t pwm)
 		}
 		break;		
 	}
+	/* Update pwm and maintain keep-alive. */
+	xQueueSendToBack(RyTaskReadReqQHandle,&p->pryreq,1000);
+	return;
 }
 /* ***********************************************************************************************************
  * static void do_ramp(struct MOTORRAMP* p);
@@ -777,8 +778,8 @@ static void set_motor_ry(struct CANRCVBUF* pcan)
 		{
 			if ((pcan->cd.uc[1] & (1<<i)) != 0)
 			{ // Send pwm request to motor ramp control
-				motryinfo.motry[4+i].canpwm  = pcan->cd.uc[4+i]; // Save pwm
-				motryinfo.motry[4+i].control = 1; // Show CAN msg controls
+				motryinfo.motry[8+i].canpwm  = pcan->cd.uc[4+i]; // Save pwm
+				motryinfo.motry[8+i].control = 1; // Show CAN msg controls
 				motorcontrol(&emclfunction.lc.lccool, i, pcan->cd.uc[4+i]);
 			}
 		}

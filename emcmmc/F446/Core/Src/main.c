@@ -1367,7 +1367,7 @@ HAL_GPIO_WritePin(GPIOB, GPIO_PIN_13, GPIO_PIN_SET); // RED OFF
       osDelay(500-5);
 #endif
 
-#if 1 // pwm testing
+#if 0 // pwm testing
 static struct RYREQ_Q ryreq_q1;
 static struct RYREQ_Q* pryreqpssb;
 static uint8_t ryreqinit;
