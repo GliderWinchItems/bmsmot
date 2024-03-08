@@ -1357,15 +1357,30 @@ HAL_GPIO_WritePin(GPIOB, GPIO_PIN_13, GPIO_PIN_SET); // RED OFF
   /* Infinite loop */
   for(;;)
   {   
+
+#if 0    
   extern uint32_t dbgcool1;
     yprintf(&pbuf1,"%5d\n\r", dbgcool1);
+#endif
 
 #if 1
     HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, GPIO_PIN_RESET); // GRN ON
-        osDelay(5);
+        osDelay(3);
     HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, GPIO_PIN_SET); // GRN OFF
-      osDelay(500-5);
+      osDelay(50-3);
 #endif
+  static uint32_t yctr;      
+//  yprintf(&pbuf2,"%5d", yctr++);
+  struct MOTORRAMP* pmr; //
+  //for (int k = 0; k < 4; k++)
+  int k = 2; // Motor index (0-3) to be monitored
+  {
+    pmr = &emclfunction.lc.lccool.motorramp[k]; // Working struct
+    yprintf(&pbuf1,"%5d%2d %2d %3.1f %3d %0.3f",yctr++,pmr->state, pmr->target, 
+      pmr->frampaccum,pmr->irampaccum,pmr->ramppertickup);
+  }
+  yprintf(&pbuf2,"\n\r");
+
 
 #if 0 // pwm testing
 static struct RYREQ_Q ryreq_q1;
@@ -1408,7 +1423,7 @@ yprintf(&pbuf1,"PWM: %4d\n\r",ryreq_q1.pwm);
 
 #endif      
 
-#if 1
+#if 0
 static uint32_t ctr;      
 if (ctr == 0)
 {

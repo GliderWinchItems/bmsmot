@@ -408,10 +408,11 @@ static void motorcontrol_init(struct COOLINGFUNCTION* pc)
 	{
 		p    = &pc->motorramp[i]; // Working struct
 		pprm = &pc->motorrampparam[i];// Parameter struct		
-		// Convert from pct-per-sec to milli-pct-per-timer tick
-		p->ramppertickup = (pprm->rampuprate * 1000.0f) / COOLTIMERMS; // Timer tick conversion
-		p->ramppertickdn = (pprm->rampdnrate * 1000.0f) / COOLTIMERMS; // Timer tick conversion
-		p->shutdowntic = pprm->shutoffwait / COOLTIMERMS; // Unknown. Could be coasting down
+		// Convert from pct-per-sec to pct-per-timer tick
+		#define SCALE (COOLTIMERMS * 0.001f)
+		p->ramppertickup = pprm->rampuprate  * SCALE; // Timer tick conversion
+		p->ramppertickdn = pprm->rampdnrate  * SCALE; // Timer tick conversion
+		p->shutdowntic   = pprm->shutoffwait * SCALE; // Unknown. Could be coasting down
 
 		p->spindownctr = p->shutdowntic; // Re-boot might find motor still spinning down
 		p->ryreq.idx   = pprm->hdrnum; // Map motor number (0-3) to header index (0-11)
@@ -525,13 +526,8 @@ void do_ramp(struct MOTORRAMP* p)
 		// In case ramp up-tick goes exceeds pct limit.
 		if (p->irampaccum > 100) // Yes, it could be for fast ramp rates
 			p->irampaccum = 100;
-		// Compare whole pct values
-		if (p->irampaccum_prev == p->irampaccum)
-			return;
-		// Here a pwm update is needed
-		p->irampaccum_prev = p->irampaccum;
 		p->ryreq.pwm = p->irampaccum;
-		xQueueSendToBack(RyTaskReadReqQHandle,&p->pryreq,10000);
+//		xQueueSendToBack(RyTaskReadReqQHandle,&p->pryreq,10000);
 		if (p->irampaccum >= p->target)
 		{ // Done. Reached goal
 			p->frampaccum = p->target; // Clean up float
@@ -541,14 +537,9 @@ void do_ramp(struct MOTORRAMP* p)
 	// Here, framaccum > target: Current level too high
 		p->frampaccum -= p->ramppertickdn;
 		p->irampaccum  = p->frampaccum; // Convert float
-		// Compare whole pct values
-		if (p->irampaccum_prev == p->irampaccum)
-			return;
-		// Here a pwm update is needed
-		p->irampaccum_prev = p->irampaccum;
 		p->ryreq.pwm = p->irampaccum;
-		xQueueSendToBack(RyTaskReadReqQHandle,&p->pryreq,10000);		
-		if (p->irampaccum >= p->target)
+//		xQueueSendToBack(RyTaskReadReqQHandle,&p->pryreq,10000);		
+		if (p->irampaccum <= p->target)
 		{ // Done. Reached goal
 			p->frampaccum = p->target; // Clean up float
 		}
