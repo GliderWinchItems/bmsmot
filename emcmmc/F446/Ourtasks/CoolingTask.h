@@ -25,19 +25,25 @@
 // 5 = DMOC CAN msg
 
 #define COOLXNUM 4 // Number of cooling sub-board/headers
-#define COOLX_PUMP    0 //OC1 Header
-#define COOLX_BLOWER  1 //OC2 Header
-#define COOLX_DMOCFAN 2 //OC3 Header
+#define COOLX_DMOCFAN 0 // OC1 Header 
+#define COOLX_PUMP    1 // OC2 Header 
+#define COOLX_BLOWER  2 // OC3 Header 
 #define COOLX_JIC     3 //OC4 Header
 
 #define COOLTIMERMS 50 // Number ms per timer callback
 #define MOTORNUM 4	//Number of motors controlled
 #define COOLARRAYSZ 6 // Number of temperatures 
 
-#define MOTSTATE_SPINDWN  0
-#define MOTSTATE_MINSTAT  1
-#define MOTSTATE_RAMPING  2
-#define MOTSTATE_MINSTART 3
+#define MOTSTATE_SPINDWN   0
+#define MOTSTATE_MINSTAT   1
+#define MOTSTATE_RAMPING   2
+#define MOTSTATE_MINSTART1 3
+#define MOTSTATE_MINSTART2 4
+#define MOTSTATE_RUN       5
+#define MOTSTATE_STOPPED   6
+#define MOTSTATE_IDLE      7
+#define MOTSTATE_SHUTDOWN  8
+
 
 /* Command codes. */
 #define MISCQ_COOL_TEMPS 1  // Send temperatures
@@ -64,6 +70,8 @@ struct MOTORRAMPPARAM // Parameters
 	float rampdnrate;     // Pct per sec ramping down
 	uint8_t idle;         // PWM for running at "idle" speed (0-100)
 	uint8_t minstart;     // PWM required to assure motor runs (0-100)
+	uint8_t initstart;    // Start from stopped initial pwm (0-100)
+	uint8_t subbrdtype;   // Sub-board type (affects shutdown strategy)
 	uint8_t hdrnum;       // Header number mapping (Relay number) to this motor
 };
 

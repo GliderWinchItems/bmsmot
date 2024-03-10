@@ -27,6 +27,15 @@
 #define HDR_OC3 10 // Group C
 #define HDR_OC4 11 // Group C
 
+// Relay assignments for EMCMMC local
+#define RYASGN_CNTCR_HVP    HDR_OB1 // HV plus contactor
+#define RYASGN_CNTCR_HVM    HDR_OB2 // HV minus contactor
+#define RYASGN_SEL_AC_SRC   HDR_OA2 // Select AC source
+#define RYASGN_SEL_RSP_ACDC HDR_OA3 // Select RSP input DC(AC)
+#define RYASGN_SEL_AUX_RS   HDR_OA4 // Select AUX R S (?)
+
+
+
 #define NRELAYS 12 // Number of fet driver relay outputs
 
 /* Keep-Alive timer (TIM5) OC interrupt rate */

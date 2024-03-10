@@ -153,6 +153,7 @@ void emcl_idx_v_struct_hardcode_params(struct EMCLLC* p)
 // Cooling motor control
   p->lccool.motorrampparam[COOLX_PUMP].idle        = 15;    // Pct for idle speed
   p->lccool.motorrampparam[COOLX_PUMP].minstart    = 30;    // Pct for minimum start
+  p->lccool.motorrampparam[COOLX_PUMP].initstart   = 15;    // Pct for initial startup
   p->lccool.motorrampparam[COOLX_PUMP].shutoffwait = 2000;  // Wait after turn off for turn on (ms)
   p->lccool.motorrampparam[COOLX_PUMP].rampuprate  = 2.0f;  // Pct per sec ramping up 
   p->lccool.motorrampparam[COOLX_PUMP].rampdnrate  = 3.0f;  // Pct per sec ramping down
@@ -160,13 +161,15 @@ void emcl_idx_v_struct_hardcode_params(struct EMCLLC* p)
 
   p->lccool.motorrampparam[COOLX_BLOWER].idle        = 15;    // Pct for idle speed
   p->lccool.motorrampparam[COOLX_BLOWER].minstart    = 30;    // Pct for minimum start
+  p->lccool.motorrampparam[COOLX_BLOWER].initstart   = 30;    // Pct for initial startup
   p->lccool.motorrampparam[COOLX_BLOWER].shutoffwait = 3000;  // Wait after turn off for turn on (ms)
   p->lccool.motorrampparam[COOLX_BLOWER].rampuprate  = 2.5f;  // Pct per sec ramping up 
   p->lccool.motorrampparam[COOLX_BLOWER].rampdnrate  = 2.0f;  // Pct per sec ramping down
   p->lccool.motorrampparam[COOLX_BLOWER].hdrnum      = HDR_OC2;// Header (Relay index) to this motor
 
   p->lccool.motorrampparam[COOLX_DMOCFAN].idle        = 20;    // Pct for idle speed
-  p->lccool.motorrampparam[COOLX_DMOCFAN].minstart    = 60;    // Pct for minimum start
+  p->lccool.motorrampparam[COOLX_DMOCFAN].minstart    = 30;    // Pct for minimum start
+  p->lccool.motorrampparam[COOLX_DMOCFAN].initstart   = 18;    // Pct for initial startup
   p->lccool.motorrampparam[COOLX_DMOCFAN].shutoffwait = 1500;  // Wait after turn off for turn on (ms)
   p->lccool.motorrampparam[COOLX_DMOCFAN].rampuprate  = 5.0f;  // Pct per sec ramping up 
   p->lccool.motorrampparam[COOLX_DMOCFAN].rampdnrate  = 3.7f;  // Pct per sec ramping down
@@ -174,6 +177,7 @@ void emcl_idx_v_struct_hardcode_params(struct EMCLLC* p)
 
   p->lccool.motorrampparam[COOLX_JIC].idle        = 15;    // Pct for idle speed
   p->lccool.motorrampparam[COOLX_JIC].minstart    = 30;    // Pct for minimum start
+  p->lccool.motorrampparam[COOLX_JIC].initstart   =  1;    // Pct for initial startup
   p->lccool.motorrampparam[COOLX_JIC].shutoffwait = 3000;  // Wait after turn off for turn on (ms)
   p->lccool.motorrampparam[COOLX_JIC].rampuprate  = 4.0f;  // Pct per sec ramping up 
   p->lccool.motorrampparam[COOLX_JIC].rampdnrate  = 2.5f;  // Pct per sec ramping down

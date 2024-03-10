@@ -33,7 +33,7 @@
 void extract_dmoc_hv_temps(struct COOLINGFUNCTION* p, struct CANRCVBUF* pcan);
 static void motorcontrol_init(struct COOLINGFUNCTION* p);
 void motorcontrol(struct COOLINGFUNCTION* pc, uint8_t i, uint8_t pwm);
-void do_ramp(struct MOTORRAMP* p);
+uint8_t do_ramp(struct MOTORRAMP* p);
 static void do_pcCAN(struct CANRCVBUF* pcan);
 static void send_hbstatus1(struct COOLINGFUNCTION* p);
 static void send_hbstatus2(struct COOLINGFUNCTION* p);
@@ -442,6 +442,23 @@ void motorcontrol(struct COOLINGFUNCTION* pc, uint8_t i, uint8_t pwm)
 	// Convenience pointers
 	struct MOTORRAMP*      p    = &pc->motorramp[i]; // Working struct
 	struct MOTORRAMPPARAM* pprm = &pc->motorrampparam[i];// Parameter struct
+	uint8_t ret;
+
+	/* JIC algorithm gets carried away. */
+	if (pwm > 100) pwm = 100;
+
+	/* Request for pwm = 0 stops whatever was being done. */
+	if (pwm == 0)
+	{
+		switch(p->state)
+		{
+		case MOTSTATE_SPINDWN:
+		case MOTSTATE_STOPPED:
+			break;
+		default:
+			p->state = MOTSTATE_SHUTDOWN;
+		}		
+	}
 
 	switch (p->state)
 	{
@@ -449,75 +466,86 @@ void motorcontrol(struct COOLINGFUNCTION* pc, uint8_t i, uint8_t pwm)
 		p->spindownctr -= 1;
 		if (p->spindownctr > 0)
 			break;		
-		p->state = MOTSTATE_RAMPING;
+		p->state = MOTSTATE_STOPPED;
 
-	case MOTSTATE_RAMPING:
+	case MOTSTATE_STOPPED:
 		// Check for a turn-off request
 		if (pwm == 0)
 		{ // Here, request is for the motor to be OFF
-			if (p->target == 0)
-			{ // Here, previous was also zero (OFF)
-				break; // No need to update.
-			}
-			// Here motor was previously NOT-OFF.
 			p->spindownctr = p->shutdowntic; // Set a new spin-down delay
 			p->frampaccum  = 0;
 			p->irampaccum  = 0;		
 			p->target      = 0;      // Update target pwm
 			p->ryreq.pwm   = 0;      // Update RyTask request and queue request
-			p->state = MOTSTATE_SPINDWN;
 			break;
 		}
-		// Check for initial over-target required to get motor spinning
-		if (pwm < pprm->minstart)
-		{ // Here, pwm request requires the motor to be turning
-			if (p->target >= pprm->idle)
-			{ // Here, motor was turning. Normal ramp-up/ramp-down
-				p->target = pwm;
-				do_ramp(p);
-				break;
-			}
-			// Here motor likely not turning. 
-			p->target = pprm->minstart;
+
+		p->target = pprm->minstart;
+		do_ramp(p);
+		p->state = MOTSTATE_MINSTART2;
+		break;
+
+	case MOTSTATE_MINSTART2:
+		ret = do_ramp(p);
+		if (ret != 0)
+			break;
+		// Here, motor ramp reached minstart
+		p->state = MOTSTATE_RUN;
+
+	case MOTSTATE_RUN:
+/*
+If pwm request would drop back and be below IDLE, then the motor
+is held at IDLE pwm. But, when pwm is request is zero the shutdown
+is state starts. */		
+		if (pwm < pprm->idle)
+		{
+			p->target = pprm->idle;
 			do_ramp(p);
-			p->state  = MOTSTATE_MINSTART;
 			break;
 		}
-		// Here, pwm request is greater than minstart
+		// Here, between at idle and 100%.
 		p->target = pwm;
 		do_ramp(p);
-		break;
+		break;		
+/*
+Sub-boards with diode flyback spin free when the pwm is dropped
+from a running level to zero.
 
-	case MOTSTATE_MINSTART:
-		if (p->frampaccum == (float)p->target)
+Half-bridge sub-boards apply a short if the immediately drops
+to zero. If the power fet can withstand shorting the spinning
+motor, and the mechanism can withstand the negative torque,
+this is OK. Otherwise a rampdown is needed. 
+*/
+	case MOTSTATE_SHUTDOWN:
+		switch (pprm->subbrdtype)
 		{
-			p->target = pwm;
-			p->state = MOTSTATE_RAMPING;
+		case 0: // diode flyback: let spin free with a timeout
+			p->state = MOTSTATE_SPINDWN;
+			break;
+		case 1: // half-bridge: ramp down to zero
+			ret =do_ramp(p);
+			if (ret != 0)
+				break;
+			p->state = MOTSTATE_STOPPED;			
 			break;
 		}
-		do_ramp(p);
 		break;
-
-		// Here, not a turn off request (and not a spindownwait delay)
-		if (pwm != p->target)
-		{ // New target
-			p->target = pwm;
-		}
-		break;		
-	}
-	/* Update pwm and maintain keep-alive. */
+	}		
+	/* Update RyTask pwm and maintain keep-alive. */
+	p->irampaccum  = p->frampaccum; // Convert float	
 	xQueueSendToBack(RyTaskReadReqQHandle,&p->pryreq,1000);
 	return;
 }
 /* ***********************************************************************************************************
- * static void do_ramp(struct MOTORRAMP* p);
+ * static uint8_t do_ramp(struct MOTORRAMP* p);
  * @brief	: Ramping control
  * @param   : p = pointer to working value struct for this motor
+ * @param   : 0 = done, frampaccum == target; 1 = ramping upwards; 2 = ramping downwards
  ************************************************************************************************************* */
-void do_ramp(struct MOTORRAMP* p)
+uint8_t do_ramp(struct MOTORRAMP* p)
 {
 	if (p->frampaccum == (float)p->target)
-		return;
+		return 0;
 
 	if (p->frampaccum < (float)p->target)
 	{ // Here, currently lower than request: current level too low
@@ -526,24 +554,20 @@ void do_ramp(struct MOTORRAMP* p)
 		// In case ramp up-tick goes exceeds pct limit.
 		if (p->irampaccum > 100) // Yes, it could be for fast ramp rates
 			p->irampaccum = 100;
-		p->ryreq.pwm = p->irampaccum;
-//		xQueueSendToBack(RyTaskReadReqQHandle,&p->pryreq,10000);
 		if (p->irampaccum >= p->target)
 		{ // Done. Reached goal
 			p->frampaccum = p->target; // Clean up float
 		}
-		return;
+		return 1;
 	}
 	// Here, framaccum > target: Current level too high
 		p->frampaccum -= p->ramppertickdn;
 		p->irampaccum  = p->frampaccum; // Convert float
-		p->ryreq.pwm = p->irampaccum;
-//		xQueueSendToBack(RyTaskReadReqQHandle,&p->pryreq,10000);		
 		if (p->irampaccum <= p->target)
 		{ // Done. Reached goal
 			p->frampaccum = p->target; // Clean up float
 		}
-	return;	
+	return 2;	
 }
 /* ***********************************************************************************************************
  * static void do_pcCAN(struct CANRCVBUF* pcan);
