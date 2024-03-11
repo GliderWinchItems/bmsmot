@@ -1372,12 +1372,13 @@ HAL_GPIO_WritePin(GPIOB, GPIO_PIN_13, GPIO_PIN_SET); // RED OFF
   static uint32_t yctr;      
 //  yprintf(&pbuf2,"%5d", yctr++);
   struct MOTORRAMP* pmr; //
-  //for (int k = 0; k < 4; k++)
-  int k = 2; // Motor index (0-3) to be monitored
+   yprintf(&pbuf2,"%5d",yctr++);
+  for (int k = 0; k < 4; k++)
+// int k = 2; // Motor index (0-3) to be monitored
   {
     pmr = &emclfunction.lc.lccool.motorramp[k]; // Working struct
-    yprintf(&pbuf1,"%5d%2d %2d %3.1f %3d %0.3f",yctr++,pmr->state, pmr->target, 
-      pmr->frampaccum,pmr->irampaccum,pmr->ramppertickup);
+    yprintf(&pbuf1,":%2d %2d %4.1f %3d",pmr->state, pmr->target, 
+      pmr->frampaccum,pmr->irampaccum);
   }
   yprintf(&pbuf2,"\n\r");
 

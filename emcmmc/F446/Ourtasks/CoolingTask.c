@@ -415,7 +415,7 @@ static void motorcontrol_init(struct COOLINGFUNCTION* pc)
 		p->shutdowntic   = pprm->shutoffwait * SCALE; // Unknown. Could be coasting down
 
 		p->spindownctr = p->shutdowntic; // Re-boot might find motor still spinning down
-		p->ryreq.idx   = pprm->hdrnum; // Map motor number (0-3) to header index (0-11)
+		p->ryreq.idx   = (8+i); //pprm->hdrnum; // Map motor number (0-3) to header index (0-11)
 		p->pryreq      = &p->ryreq;
 		p->state       = MOTSTATE_SPINDWN;
 		p->updatectr   = 0; // 
@@ -443,22 +443,10 @@ void motorcontrol(struct COOLINGFUNCTION* pc, uint8_t i, uint8_t pwm)
 	struct MOTORRAMP*      p    = &pc->motorramp[i]; // Working struct
 	struct MOTORRAMPPARAM* pprm = &pc->motorrampparam[i];// Parameter struct
 	uint8_t ret;
-
+if(i > 3) morse_trap(6767);
+if (pwm > 100) morse_trap(888);
 	/* JIC algorithm gets carried away. */
 	if (pwm > 100) pwm = 100;
-
-	/* Request for pwm = 0 stops whatever was being done. */
-	if (pwm == 0)
-	{
-		switch(p->state)
-		{
-		case MOTSTATE_SPINDWN:
-		case MOTSTATE_STOPPED:
-			break;
-		default:
-			p->state = MOTSTATE_SHUTDOWN;
-		}		
-	}
 
 	switch (p->state)
 	{
@@ -499,6 +487,29 @@ is held at IDLE pwm. But, when pwm is request is zero the shutdown
 is state starts. */		
 		if (pwm < pprm->idle)
 		{
+			if (pwm == 0)
+			{
+/* Sub-boards with diode flyback spin free when the pwm is dropped
+from a running level to zero.
+
+Half-bridge sub-boards apply a short if the immediately drops
+to zero. If the power fet can withstand shorting the spinning
+motor, and the mechanism can withstand the negative torque,
+this is OK. Otherwise a rampdown is needed. */
+				p->target = 0;
+				if (pprm->subbrdtype != 0)
+				{ // Here, half-bridge, so ramp down
+					ret =do_ramp(p);
+					if (ret != 0)
+						break; 
+					p->state = MOTSTATE_STOPPED;
+					break;
+				}
+				// Here, diode flyback, so let spin
+				p->frampaccum  = 0;				
+				p->state = MOTSTATE_SPINDWN;
+				break;
+			}
 			p->target = pprm->idle;
 			do_ramp(p);
 			break;
@@ -506,33 +517,15 @@ is state starts. */
 		// Here, between at idle and 100%.
 		p->target = pwm;
 		do_ramp(p);
-		break;		
-/*
-Sub-boards with diode flyback spin free when the pwm is dropped
-from a running level to zero.
+		break;
 
-Half-bridge sub-boards apply a short if the immediately drops
-to zero. If the power fet can withstand shorting the spinning
-motor, and the mechanism can withstand the negative torque,
-this is OK. Otherwise a rampdown is needed. 
-*/
-	case MOTSTATE_SHUTDOWN:
-		switch (pprm->subbrdtype)
-		{
-		case 0: // diode flyback: let spin free with a timeout
-			p->state = MOTSTATE_SPINDWN;
-			break;
-		case 1: // half-bridge: ramp down to zero
-			ret =do_ramp(p);
-			if (ret != 0)
-				break;
-			p->state = MOTSTATE_STOPPED;			
-			break;
-		}
+	default:
+		morse_trap(7339);
 		break;
 	}		
 	/* Update RyTask pwm and maintain keep-alive. */
-	p->irampaccum  = p->frampaccum; // Convert float	
+	p->irampaccum = p->frampaccum; // Convert float
+	p->ryreq.pwm  = p->irampaccum;
 	xQueueSendToBack(RyTaskReadReqQHandle,&p->pryreq,1000);
 	return;
 }

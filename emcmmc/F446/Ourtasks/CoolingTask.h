@@ -25,7 +25,7 @@
 // 5 = DMOC CAN msg
 
 #define COOLXNUM 4 // Number of cooling sub-board/headers
-#define COOLX_DMOCFAN 0 // OC1 Header 
+#define COOLX_DMOCFAN 0 // OC1 Header:  
 #define COOLX_PUMP    1 // OC2 Header 
 #define COOLX_BLOWER  2 // OC3 Header 
 #define COOLX_JIC     3 //OC4 Header

@@ -50,7 +50,7 @@ void emcl_idx_v_struct_hardcode_params(struct EMCLLC* p)
       p->relay[i].kp        = KYTODEFAULT; //((KYTODEFAULT*10) /(12*KPUPDATEDUR)); // Timeout duration between requests
       p->relay[i].pulldelay = PULLINDEFAULT; // Pull-in delay (TIM9: 0.1 ms)
       p->relay[i].pwm       = HOLDPWM; // After pull-in pwm (0 - 100%)
-      p->relay[i].trans     =    0; // Default: 1 = no translation 
+      p->relay[i].trans     =    0; // Default: 0 = no translation 
       p->relay[i].pwmx      =   96; // Default translation pwm
    }
    /* Override defaults. */
@@ -157,6 +157,7 @@ void emcl_idx_v_struct_hardcode_params(struct EMCLLC* p)
   p->lccool.motorrampparam[COOLX_PUMP].shutoffwait = 2000;  // Wait after turn off for turn on (ms)
   p->lccool.motorrampparam[COOLX_PUMP].rampuprate  = 2.0f;  // Pct per sec ramping up 
   p->lccool.motorrampparam[COOLX_PUMP].rampdnrate  = 3.0f;  // Pct per sec ramping down
+  p->lccool.motorrampparam[COOLX_PUMP].subbrdtype  = 1;     // Sub-board type
   p->lccool.motorrampparam[COOLX_PUMP].hdrnum      = HDR_OC1;// Header (Relay index) to this motor
 
   p->lccool.motorrampparam[COOLX_BLOWER].idle        = 15;    // Pct for idle speed
@@ -165,14 +166,16 @@ void emcl_idx_v_struct_hardcode_params(struct EMCLLC* p)
   p->lccool.motorrampparam[COOLX_BLOWER].shutoffwait = 3000;  // Wait after turn off for turn on (ms)
   p->lccool.motorrampparam[COOLX_BLOWER].rampuprate  = 2.5f;  // Pct per sec ramping up 
   p->lccool.motorrampparam[COOLX_BLOWER].rampdnrate  = 2.0f;  // Pct per sec ramping down
+  p->lccool.motorrampparam[COOLX_BLOWER].subbrdtype  = 1;     // Sub-board type
   p->lccool.motorrampparam[COOLX_BLOWER].hdrnum      = HDR_OC2;// Header (Relay index) to this motor
 
-  p->lccool.motorrampparam[COOLX_DMOCFAN].idle        = 20;    // Pct for idle speed
+  p->lccool.motorrampparam[COOLX_DMOCFAN].idle        = 15;    // Pct for idle speed
   p->lccool.motorrampparam[COOLX_DMOCFAN].minstart    = 30;    // Pct for minimum start
-  p->lccool.motorrampparam[COOLX_DMOCFAN].initstart   = 18;    // Pct for initial startup
+  p->lccool.motorrampparam[COOLX_DMOCFAN].initstart   = 12;    // Pct for initial startup
   p->lccool.motorrampparam[COOLX_DMOCFAN].shutoffwait = 1500;  // Wait after turn off for turn on (ms)
-  p->lccool.motorrampparam[COOLX_DMOCFAN].rampuprate  = 5.0f;  // Pct per sec ramping up 
-  p->lccool.motorrampparam[COOLX_DMOCFAN].rampdnrate  = 3.7f;  // Pct per sec ramping down
+  p->lccool.motorrampparam[COOLX_DMOCFAN].rampuprate  = 8.0f;  // Pct per sec ramping up 
+  p->lccool.motorrampparam[COOLX_DMOCFAN].rampdnrate  = 3.0f;  // Pct per sec ramping down
+  p->lccool.motorrampparam[COOLX_DMOCFAN].subbrdtype  = 1;     // Sub-board type
   p->lccool.motorrampparam[COOLX_DMOCFAN].hdrnum      = HDR_OC3;// Header (Relay index) to this motor
 
   p->lccool.motorrampparam[COOLX_JIC].idle        = 15;    // Pct for idle speed
@@ -181,6 +184,7 @@ void emcl_idx_v_struct_hardcode_params(struct EMCLLC* p)
   p->lccool.motorrampparam[COOLX_JIC].shutoffwait = 3000;  // Wait after turn off for turn on (ms)
   p->lccool.motorrampparam[COOLX_JIC].rampuprate  = 4.0f;  // Pct per sec ramping up 
   p->lccool.motorrampparam[COOLX_JIC].rampdnrate  = 2.5f;  // Pct per sec ramping down
+  p->lccool.motorrampparam[COOLX_JIC].subbrdtype  = 0;     // Sub-board type
   p->lccool.motorrampparam[COOLX_JIC].hdrnum      = HDR_OC4;// Header (Relay index) to this motor
 
 
