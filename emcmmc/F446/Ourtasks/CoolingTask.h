@@ -25,12 +25,13 @@
 // 5 = DMOC CAN msg
 
 #define COOLXNUM 4 // Number of cooling sub-board/headers
-#define COOLX_DMOCFAN 0 // OC1 Header:  
-#define COOLX_PUMP    1 // OC2 Header 
-#define COOLX_BLOWER  2 // OC3 Header 
-#define COOLX_JIC     3 //OC4 Header
+#define COOLX_DMOCFAN 0 // OC1 Header: DMOC cooling fan or blower
+#define COOLX_PUMP    1 // OC2 Header: Coolant pump
+#define COOLX_HEXFAN  2 // OC3 Header: Heat exchanger fan or blower
+#define COOLX_JIC     3 // OC4 Header: reserved
 
 #define COOLTIMERMS 50 // Number ms per timer callback
+#define COOLTIMERTR (1000/COOLTIMERMS) // Timer tick rate (ticks/sec)
 #define MOTORNUM 4	//Number of motors controlled
 #define COOLARRAYSZ 6 // Number of temperatures 
 
@@ -44,11 +45,8 @@
 #define MOTSTATE_IDLE      7
 #define MOTSTATE_SHUTDOWN  8
 
-
 /* Command codes. */
 #define MISCQ_COOL_TEMPS 1  // Send temperatures
-
-
 
 struct COOLX
 {
@@ -93,15 +91,15 @@ struct MOTORRAMPPARAM // Parameters
 
 struct MOTORCONTROL
 {
-	uint8_t X;
+	uint8_t X; // Place holder
 };
 
 struct TEMPERATUREPARAM
-{
-	float tdel;     // Run Above Ambient
-	float coef[2];  // pwm = coef[0]+coef[1]*Temperature
-	uint8_t toohi;    // Temperature too high to run--Alert
-	uint8_t not_installed;	
+{ // Note: temperatures are in deg C
+	float tcoef[2];    // pwm = coef[0]+coef[1]*(temperature ABOVE ambient) (max 100)
+	uint8_t toohi;    // Temperature too high--Alert
+	uint8_t toohimax; // Full speed temperature threshold (absolute)
+	uint8_t not_installed; // 0 = installed; 1 = not installed
 };
 struct TEMPERATUREWORK
 {
@@ -146,6 +144,7 @@ struct COOLINGFUNCTION
 	int32_t timeout_cmd_emcmmcx_pc_ctr; // Timeout counter: count down
 	int32_t timeout_cmd_emcmmcx_emc_ctr; // Timeout counter: count down
 
+	uint8_t contactor_state; // 0 = not reporting; 1 = connected; 2 = disconnected or other
 	struct CANTXQMSG cancool1; // CAN1 msg for tx
 	struct CANTXQMSG cancool2; // CAN2 msg for tx
 

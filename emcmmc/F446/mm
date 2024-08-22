@@ -26,8 +26,9 @@ echo "################ PARAMETER FILES ################"
 echo $ADC_PARAM : $EMC_PARAM
 
 export I_AM_CANID=0x$1
-
-./script-all F446
+echo I_AM_CANID
+make clean
+./script-all F446 $1
 
 
 

@@ -66,8 +66,11 @@ a queued request it notifies CanCommTask and the notification bit is
 used to lookup the CAN msg that initiated the BMSTask request. 
 */
 /* xTaskNotifyWait Notification bits */
-#define CANCOMMBIT00 (1 <<  0) // EMC CAN msg
-#define CANCOMMBIT01 (1 <<  1) // PC CAN msg
+#define CANCOMMBIT00 (1 <<  0) // A1600000 EMC CAN msg
+#define CANCOMMBIT01 (1 <<  1) // A1800000 PC CAN msg
+#define CANCOMMBIT02 (1 <<  2) // AEC00000 CAN loading
+#define CANCOMMBIT03 (1 <<  3) // B0000000
+#define CANCOMMBIT04 (1 <<  4) // B0200000
 
 // The following reserves notification bits 7-12 (out of 0-31)
 #define CANQEDSIZE 8   // Max number of BMSTask requests that can be queued
@@ -144,11 +147,11 @@ static uint8_t for_us(struct CANRCVBUF* pcan, struct EMCFUNCTION* p)
     // 01 = Only identified string and module responds
     // 00 = reserved        
 	code = pcan->cd.uc[1] & 0xC0; // Extract identification code
-#if 0
+#if 1
     // Does this CAN node qualify for a response?
 	if  ((((code == (3 << 6))) ||
 		  ((code == (2 << 6)) && ((pcan->cd.uc[2] & (3 << 4)) == p->ident_string)) ||
-		  ((code == (1 << 6)) && ((pcan->cd.uc[2] & 0x0F) == p->ident_onlyus)) ||
+	/*	  ((code == (1 << 6)) && ((pcan->cd.uc[2] & 0x0F) == p->ident_onlyus)) || */
 		  ((canid == p->lc.cid_msg_bms_cellvsmr))))
 	{
 		return 0; // Yes, respond.	
@@ -165,10 +168,21 @@ void CanComm_init(struct EMCLFUNCTION* p )
 	uint8_t i;
 
 	/* Add CAN Mailboxes                               CAN     CAN ID             TaskHandle,Notify bit,Skip, Paytype */
-    p->pmbx_cid_cmd_emcmmcx_pc      = MailboxTask_add(pctl0,p->lc.cid_cmd_emcmmcx_pc, NULL, CANCOMMBIT00,0,U8); // universal #1
+    p->pmbx_cid_cmd_emcmmcx_pc      = MailboxTask_add(pctl0,p->lc.cid_cmd_emcmmcx_pc, NULL, CANCOMMBIT00,0,U8); // A1600000
     if (p->pmbx_cid_cmd_emcmmcx_pc == NULL) morse_trap(622);
-    p->pmbx_cid_cmd_emcmmcx_emc      = MailboxTask_add(pctl0,p->lc.cid_cmd_emcmmcx_emc,   NULL, CANCOMMBIT01,0,U8); // universal #2
-    if (p->pmbx_cid_cmd_emcmmcx_emc == NULL) morse_trap(622);
+ 
+    p->pmbx_cid_cmd_emcmmcx_emc      = MailboxTask_add(pctl0,p->lc.cid_cmd_emcmmcx_emc,   NULL, CANCOMMBIT01,0,U8); // A1800000
+    if (p->pmbx_cid_cmd_emcmmcx_emc == NULL) morse_trap(623);
+
+    p->pmbx_cid_uni_bms_pc_i      = MailboxTask_add(pctl0,p->lc.cid_uni_bms_pc_i,   NULL, CANCOMMBIT02,0,U8); // AEC00000
+    if (p->pmbx_cid_uni_bms_pc_i == NULL) morse_trap(624);
+
+    p->pmbx_cid_uni_bms_emc1_i      = MailboxTask_add(pctl0,p->lc.cid_uni_bms_emc1_i,   NULL, CANCOMMBIT03,0,U8); // B0000000
+    if (p->pmbx_cid_uni_bms_emc1_i == NULL) morse_trap(625);
+
+    p->pmbx_cid_uni_bms_emc2_i      = MailboxTask_add(pctl0,p->lc.cid_uni_bms_emc2_i,   NULL, CANCOMMBIT04,0,U8); // B0200000
+    if (p->pmbx_cid_uni_bms_emc2_i == NULL) morse_trap(626);
+
 
     /* Add CAN msgs to incoming CAN hw filter. (Skip to allow all incoming msgs. */
  //   canfilt(603, p->pmbx_cid_cmd_emcmmcx_emc);
@@ -263,6 +277,17 @@ dbgCanCommTask1_noteval = noteval;
 				do_req_codes(pcan);
 			}
 		}
+
+/* ******* CAN msg to all nodes. PC poll msg. BMS codes. */
+		if ((noteval & CANCOMMBIT02) != 0) // CAN id: cid_uni_bms_pc_i [AEC00000]
+		{ //   
+//morse_trap(55);
+			pcan = &p->pmbx_cid_uni_bms_pc_i->ncan.can;
+			if (for_us(pcan,p) == 0)
+			{ // This CAN msg includes us.
+				do_req_codes(pcan);
+			}
+		}		
 
 /* ******* Heartbeat timing: status */
 		if 	((int)(xTaskGetTickCount() - p->HBstatus_ctr) > 0)
@@ -445,21 +470,20 @@ static uint8_t toosoonchk(struct CANRCVBUF* pcan)
  * *************************************************************************/
 static void do_req_codes(struct CANRCVBUF* pcan)
 {
-#if 0	
 	/* First payload byte holds root request code. */
 	switch (pcan->cd.uc[0])
 	{
 	case LDR_RESET: // Execute a RESET ###############################
 		#define SCB_AIRCR 0xE000ED0C
 		*(volatile unsigned int*)SCB_AIRCR = (0x5FA << 16) | 0x4;// Cause a RESET
-//		while (1==1);
-		break; // Redundant
+//		while (1==1);// Redundant. Reset means it is "gone"
+		break; 
 
 	case CMD_CMD_CELLPOLL: // (42) Queue BSMTask read, then send cells when read completes
 		// If sufficient time between requests, queue a BMSTask read. If
 		// the readings are not stale BMSTask will do an immediate notification.
 //		if (toosoonchk(pcan) == 0)
-			CanComm_qreq(REQ_READBMS, 0, pcan);
+//			CanComm_qreq(REQ_READBMS, 0, pcan);
 		break;
 
 	case CMD_CMD_TYPE2: // (43) Misc: Some may not need queueing BMSTask
@@ -474,7 +498,6 @@ static void do_req_codes(struct CANRCVBUF* pcan)
 morse_trap(551);
 		break;
 	}
-#endif	
 	return;
 }
 /* *************************************************************************

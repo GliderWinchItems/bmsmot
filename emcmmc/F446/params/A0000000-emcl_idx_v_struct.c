@@ -50,8 +50,8 @@ void emcl_idx_v_struct_hardcode_params(struct EMCLLC* p)
       p->relay[i].kp        = KYTODEFAULT; //((KYTODEFAULT*10) /(12*KPUPDATEDUR)); // Timeout duration between requests
       p->relay[i].pulldelay = PULLINDEFAULT; // Pull-in delay (TIM9: 0.1 ms)
       p->relay[i].pwm       = HOLDPWM; // After pull-in pwm (0 - 100%)
-      p->relay[i].trans     =    0; // Default: 0 = no translation 
-      p->relay[i].pwmx      =   96; // Default translation pwm
+      p->relay[i].limit     =    0; // Default: 0 = no limiting
+      p->relay[i].pwmx      =   96; // Default pwm limit
    }
    /* Override defaults. */
    // Relay pullin delays
@@ -65,10 +65,10 @@ void emcl_idx_v_struct_hardcode_params(struct EMCLLC* p)
    p->relay[ 7].pulldelay =  100; //
 
    // Motors with current limiter comparatr sub-board limit at less than 100%
-   p->relay[ 8].trans = 0; // OC1 motor 1 
-   p->relay[ 9].trans = 1; // OC2 motor 2
-   p->relay[10].trans = 1; // OC3 motor 3
-   p->relay[11].trans = 0; // OC4 jic
+   p->relay[ 8].limit = 0; // OC1 motor 1 
+   p->relay[ 9].limit = 1; // OC2 motor 2
+   p->relay[10].limit = 1; // OC3 motor 3
+   p->relay[11].limit = 0; // OC4 jic
 
    /* Override default for group C. */
    for (i = 8; i < 12; i++)
@@ -79,12 +79,12 @@ void emcl_idx_v_struct_hardcode_params(struct EMCLLC* p)
    // NOTE: sub-board pwm for 'v6 must not be 100%
    // Set the appropiate index and trans = 1;
    // Uncomment, e/g/--
-//     p->relay[8].trans     =    0; // Default: no translation 
+//     p->relay[8].limit     =    0; // Default: no translation 
 //     p->relay[8].PWMX      =   90; // Max pwm at 90%.
  
 
 /* ============== CoolingTask: =============== */
-   // Temperature sensing thermistors: map function to header
+   // Temperature sensing thermistors: map function to pcb header
    p->lccool.tx_pmpo = ADC1IDX_THERMISTOR1; // ADC index: JP9  coolant pump outlet thermistor
    p->lccool.tx_moto = ADC1IDX_THERMISTOR2; // ADC index: JP8  motor outlet thermistor
    p->lccool.tx_hexo = ADC1IDX_THERMISTOR3; // ADC index: JP10 heat exchange outlet thermistor
@@ -97,32 +97,36 @@ void emcl_idx_v_struct_hardcode_params(struct EMCLLC* p)
    p->lccool.temperatureparm[p->lccool.tx_dmoc].not_installed = 1;
 
    // Temperature is too high threshold: set alert
-   p->lccool.temperatureparm[p->lccool.tx_pmpo].toohi = 60;
-   p->lccool.temperatureparm[p->lccool.tx_moto].toohi = 60;
-   p->lccool.temperatureparm[p->lccool.tx_hexo].toohi = 60;
-   p->lccool.temperatureparm[p->lccool.tx_amb ].toohi = 44;
+   p->lccool.temperatureparm[p->lccool.tx_pmpo].toohi = 60;  // Pump outlet
+   p->lccool.temperatureparm[p->lccool.tx_moto].toohi = 60;  // Winch motor outlet
+   p->lccool.temperatureparm[p->lccool.tx_hexo].toohi = 60;  // Heat exchanger outlet
+   p->lccool.temperatureparm[p->lccool.tx_amb ].toohi = 40;  // Ambient
    p->lccool.temperatureparm[p->lccool.tx_jic ].toohi = 255; // Not installed
-   p->lccool.temperatureparm[p->lccool.tx_dmoc].toohi = 50;
+   p->lccool.temperatureparm[p->lccool.tx_dmoc].toohi = 50;  // DMOC cooling fins
 
+   // PWM versus temperature difference from ambient: offset (coef[0])
+   p->lccool.temperatureparm[p->lccool.tx_pmpo].tcoef[0] =  5.0f;
+   p->lccool.temperatureparm[p->lccool.tx_moto].tcoef[0] =  5.0f;
+   p->lccool.temperatureparm[p->lccool.tx_hexo].tcoef[0] =  5.0f;
+   p->lccool.temperatureparm[p->lccool.tx_amb ].tcoef[0] =  5.0f;
+   p->lccool.temperatureparm[p->lccool.tx_jic ].tcoef[0] =  5.0f; // Not installed
+   p->lccool.temperatureparm[p->lccool.tx_dmoc].tcoef[0] =  5.0f;
+   // PWM versus temperature difference from ambient: scale (coef[1])
+   p->lccool.temperatureparm[p->lccool.tx_pmpo].tcoef[1] = 6.0f;
+   p->lccool.temperatureparm[p->lccool.tx_moto].tcoef[1] = 6.0f;
+   p->lccool.temperatureparm[p->lccool.tx_hexo].tcoef[1] = 6.0f;
+   p->lccool.temperatureparm[p->lccool.tx_amb ].tcoef[1] = 6.0f;
+   p->lccool.temperatureparm[p->lccool.tx_jic ].tcoef[1] = 6.0f; // Not installed
+   p->lccool.temperatureparm[p->lccool.tx_dmoc].tcoef[1] = 6.0f;
 
-   // Motor drive: PWM header mapping: map function to header
-      // C group: no delay, 74VHCT125 drive buffer to sub-board
-   p->lccool.coolx[COOLX_PUMP].idx_ry    =  8; // Ry index: OC1: Pump motor 
-   p->lccool.coolx[COOLX_BLOWER].idx_ry  =  9; // Ry index: OC2: Heat exchanger blower motor
-   p->lccool.coolx[COOLX_DMOCFAN].idx_ry = 10; // Ry index: OC3: DMOC fans
-   p->lccool.coolx[COOLX_JIC].idx_ry     = 11; // Ry index: OC4: just in case spare
+// PWM = full speed when temperature is equal/greater than this temperature (degC)
+   p->lccool.temperatureparm[p->lccool.tx_pmpo].toohimax = 60;
+   p->lccool.temperatureparm[p->lccool.tx_moto].toohimax = 60;
+   p->lccool.temperatureparm[p->lccool.tx_hexo].toohimax = 60;
+   p->lccool.temperatureparm[p->lccool.tx_amb ].toohimax =  0; // Not applicable
+   p->lccool.temperatureparm[p->lccool.tx_jic ].toohimax = 60; // Not installed
+   p->lccool.temperatureparm[p->lccool.tx_dmoc].toohimax = 60;
 
-   // Ramp up rate (% pwm per 100 ms tick)
-   p->lccool.coolx[COOLX_PUMP].pwm_ramp    =   5; // Pump motor 
-   p->lccool.coolx[COOLX_BLOWER].pwm_ramp  =   5; // Heat exchanger blower motor
-   p->lccool.coolx[COOLX_DMOCFAN].pwm_ramp =  10; // DMOC fans
-   p->lccool.coolx[COOLX_JIC].pwm_ramp     =   1; // just in case spare
-
-   // PWM when in idle state (minimum run pwm)
-   p->lccool.coolx[COOLX_PUMP].pwm_idle    =  30; // Pump motor 
-   p->lccool.coolx[COOLX_BLOWER].pwm_idle  =  30; // Heat exchanger blower motor
-   p->lccool.coolx[COOLX_DMOCFAN].pwm_idle =  30; // DMOC fans
-   p->lccool.coolx[COOLX_JIC].pwm_idle     =   0; // just in case spare
 
    // Timeout (50 ms ticks) for missing CAN msgs
    p->lccool.timeout_CANdmoc     = (100*20); // 10 secs
@@ -131,13 +135,13 @@ void emcl_idx_v_struct_hardcode_params(struct EMCLLC* p)
  //  p->lccool.timeout_mcstate_ctr = (100*20); // 10 secs
    p->lccool.timeout_cntctrkar_ctr = (100*20); // 10 secs
 
+// Contactor status
+//   p->contactor_state = 0; // 0 = not reporting; 1 = connected; 2 = disconnected or other
+
    p->lccool.status_cool = 0;
 
    p->lccool.cid_test = 0xB2200000; // Cooling function test of CAN
 
-// List of CAN ID's for suscribing to incoming msgs
-  p->cid_cmd_emcmmcx_pc  = CANID_CMD_EMCMMC1_PC; // 'A1600000','PC SENDS');
-  p->cid_cmd_emcmmcx_emc = CANID_CMD_EMCMMC1_EMC;// 'A1800000', EMC SENDS'); 
 
 /* Cooling task function */
 
@@ -151,44 +155,54 @@ void emcl_idx_v_struct_hardcode_params(struct EMCLLC* p)
   p->lccool.cid_cmd_emcmmcx_emc = CANID_CMD_EMCMMC1_EMC;// 'A1800000', EMC SENDS'); 
 
 // Cooling motor control
-  p->lccool.motorrampparam[COOLX_PUMP].idle        = 15;    // Pct for idle speed
-  p->lccool.motorrampparam[COOLX_PUMP].minstart    = 30;    // Pct for minimum start
-  p->lccool.motorrampparam[COOLX_PUMP].initstart   = 15;    // Pct for initial startup
-  p->lccool.motorrampparam[COOLX_PUMP].shutoffwait = 2000;  // Wait after turn off for turn on (ms)
-  p->lccool.motorrampparam[COOLX_PUMP].rampuprate  = 2.0f;  // Pct per sec ramping up 
-  p->lccool.motorrampparam[COOLX_PUMP].rampdnrate  = 3.0f;  // Pct per sec ramping down
-  p->lccool.motorrampparam[COOLX_PUMP].subbrdtype  = 1;     // Sub-board type
-  p->lccool.motorrampparam[COOLX_PUMP].hdrnum      = HDR_OC1;// Header (Relay index) to this motor
-
-  p->lccool.motorrampparam[COOLX_BLOWER].idle        = 15;    // Pct for idle speed
-  p->lccool.motorrampparam[COOLX_BLOWER].minstart    = 30;    // Pct for minimum start
-  p->lccool.motorrampparam[COOLX_BLOWER].initstart   = 30;    // Pct for initial startup
-  p->lccool.motorrampparam[COOLX_BLOWER].shutoffwait = 3000;  // Wait after turn off for turn on (ms)
-  p->lccool.motorrampparam[COOLX_BLOWER].rampuprate  = 2.5f;  // Pct per sec ramping up 
-  p->lccool.motorrampparam[COOLX_BLOWER].rampdnrate  = 2.0f;  // Pct per sec ramping down
-  p->lccool.motorrampparam[COOLX_BLOWER].subbrdtype  = 1;     // Sub-board type
-  p->lccool.motorrampparam[COOLX_BLOWER].hdrnum      = HDR_OC2;// Header (Relay index) to this motor
-
+  // DMOC fan|blower IDX 0: Header OC1
   p->lccool.motorrampparam[COOLX_DMOCFAN].idle        = 15;    // Pct for idle speed
   p->lccool.motorrampparam[COOLX_DMOCFAN].minstart    = 30;    // Pct for minimum start
   p->lccool.motorrampparam[COOLX_DMOCFAN].initstart   = 12;    // Pct for initial startup
-  p->lccool.motorrampparam[COOLX_DMOCFAN].shutoffwait = 1500;  // Wait after turn off for turn on (ms)
-  p->lccool.motorrampparam[COOLX_DMOCFAN].rampuprate  = 8.0f;  // Pct per sec ramping up 
+  p->lccool.motorrampparam[COOLX_DMOCFAN].shutoffwait = 3000;  // Wait after turn off for turn on (ms)
+  p->lccool.motorrampparam[COOLX_DMOCFAN].rampuprate  = 5.0f;  // Pct per sec ramping up 
   p->lccool.motorrampparam[COOLX_DMOCFAN].rampdnrate  = 3.0f;  // Pct per sec ramping down
-  p->lccool.motorrampparam[COOLX_DMOCFAN].subbrdtype  = 1;     // Sub-board type
+  p->lccool.motorrampparam[COOLX_DMOCFAN].subbrdtype  = 1;     // Sub-board type (1 = half-bridge)
   p->lccool.motorrampparam[COOLX_DMOCFAN].hdrnum      = HDR_OC3;// Header (Relay index) to this motor
-
+  // Pump IDX 1: Header OC2
+  p->lccool.motorrampparam[COOLX_PUMP].idle        = 15;    // Pct for idle speed
+  p->lccool.motorrampparam[COOLX_PUMP].minstart    = 30;    // Pct for minimum start
+  p->lccool.motorrampparam[COOLX_PUMP].initstart   = 15;    // Pct for initial startup
+  p->lccool.motorrampparam[COOLX_PUMP].shutoffwait = 3000;  // Wait after turn off for turn on (ms)
+  p->lccool.motorrampparam[COOLX_PUMP].rampuprate  = 4.0f;  // Pct per sec ramping up 
+  p->lccool.motorrampparam[COOLX_PUMP].rampdnrate  = 3.0f;  // Pct per sec ramping down
+  p->lccool.motorrampparam[COOLX_PUMP].subbrdtype  = 1;     // Sub-board type
+  p->lccool.motorrampparam[COOLX_PUMP].hdrnum      = HDR_OC1;// Header (Relay index) to this motor
+  // Heat Exchanger fan|blower IDX 2: Header OC3
+  p->lccool.motorrampparam[COOLX_HEXFAN].idle        = 15;    // Pct for idle speed
+  p->lccool.motorrampparam[COOLX_HEXFAN].minstart    = 30;    // Pct for minimum start
+  p->lccool.motorrampparam[COOLX_HEXFAN].initstart   = 30;    // Pct for initial startup
+  p->lccool.motorrampparam[COOLX_HEXFAN].shutoffwait = 3000;  // Wait after turn off for turn on (ms)
+  p->lccool.motorrampparam[COOLX_HEXFAN].rampuprate  = 2.5f;  // Pct per sec ramping up 
+  p->lccool.motorrampparam[COOLX_HEXFAN].rampdnrate  = 2.0f;  // Pct per sec ramping down
+  p->lccool.motorrampparam[COOLX_HEXFAN].subbrdtype  = 1;     // Sub-board type
+  p->lccool.motorrampparam[COOLX_HEXFAN].hdrnum      = HDR_OC2;// Header (Relay index) to this motor
+  // IDX3 OC4
   p->lccool.motorrampparam[COOLX_JIC].idle        = 15;    // Pct for idle speed
   p->lccool.motorrampparam[COOLX_JIC].minstart    = 30;    // Pct for minimum start
   p->lccool.motorrampparam[COOLX_JIC].initstart   =  1;    // Pct for initial startup
   p->lccool.motorrampparam[COOLX_JIC].shutoffwait = 3000;  // Wait after turn off for turn on (ms)
   p->lccool.motorrampparam[COOLX_JIC].rampuprate  = 4.0f;  // Pct per sec ramping up 
   p->lccool.motorrampparam[COOLX_JIC].rampdnrate  = 2.5f;  // Pct per sec ramping down
-  p->lccool.motorrampparam[COOLX_JIC].subbrdtype  = 0;     // Sub-board type
+  p->lccool.motorrampparam[COOLX_JIC].subbrdtype  = 0;     // Sub-board type (0 = diode flyback)
   p->lccool.motorrampparam[COOLX_JIC].hdrnum      = HDR_OC4;// Header (Relay index) to this motor
-
 
 // CAN ids EMCMMC sends, others receive
    p->cid_unit_emcmmcx = I_AM_CANID; // A0000000
+
+// List of CAN ID's for suscribing to incoming msgs
+  p->cid_cmd_emcmmcx_pc  = CANID_CMD_EMCMMC1_PC; // 'A1600000','PC SENDS');
+  p->cid_cmd_emcmmcx_emc = CANID_CMD_EMCMMC1_EMC;// 'A1800000', EMC SENDS'); 
+
+  p->cid_uni_bms_emc1_i = CANID_UNI_BMS_EMC1_I;   // B0000000 UNIversal From EMC,  Incoming msg to BMS: X4=target CANID');   
+  p->cid_uni_bms_emc2_i = CANID_UNI_BMS_EMC2_I;   // B0200000 UNIversal From EMC,  Incoming msg to BMS: X4=target CANID');   
+  p->cid_uni_bms_pc_i   = CANID_UNI_BMS_PC_I;     // AEC00000 UNIversal From PC,   Incoming msg to BMS: X4=target CANID');     
+
+
 	return;
 }

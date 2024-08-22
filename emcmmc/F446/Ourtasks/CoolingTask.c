@@ -19,6 +19,12 @@
 #include "EMCLTaskCmd.h"
 #include "CanTask.h"
 #include "RyTask.h"
+#include "mastercontroller_states.h"
+//#include "../../../../contactor/Ourtasks/ContactorTask.h"
+
+static void tempsetOFF(void);
+static void tempsetRUN(void);
+static void tempsetIDLE(void);
 
 #define COOLCANBIT00 (1<<0) // RTOS timer 
 //#define COOLCANBIT01 (1<<1) // CAN msg: actual torq
@@ -39,6 +45,10 @@ static void send_hbstatus1(struct COOLINGFUNCTION* p);
 static void send_hbstatus2(struct COOLINGFUNCTION* p);
 static void set_motor_ry(struct CANRCVBUF* pcan);
 static void relay_req_init(void);
+static void tempautoctl_init();
+static uint8_t temrun(void);
+static void tempautoctl(void);
+static void do_contactorCAN(struct CANRCVBUF* pcan);
 
 extern struct CAN_CTLBLOCK* pctl0; // Pointer to CAN1 control block
 extern struct CAN_CTLBLOCK* pctl1; // Pointer to CAN2 control block
@@ -113,6 +123,10 @@ void timer_do(struct COOLINGFUNCTION* p)
 	if (p->timeout_cmd_emcmmcx_pc_ctr > 0)	
 		p->timeout_cmd_emcmmcx_pc_ctr -= 1;
 
+/* Check if contactor CAN msg keep-alive timed out. */
+	if (p->timeout_cntctrkar_ctr == 0)
+		p->contactor_state = 0; // Not reporting
+
 /* Count down for heartbeats. */
 	if (p->hbct_ctr > 0)
 		p->hbct_ctr -= 1;
@@ -169,6 +183,10 @@ void timer_do(struct COOLINGFUNCTION* p)
 	xQueueSendToBack(RyTaskReadReqQHandle,&pryreq_q[B],500);
 	B += 1; // Cycle index through 0-7 indexed relay ports
 	if (B > 7) B = 0;
+
+	/* Temperture controlled automatic control */
+	tempautoctl();
+
 	return;
 }
 /* *************************************************************************
@@ -213,6 +231,7 @@ void StartCoolingTask(void* argument)
 	coolingfunction_init(p);
 	motorcontrol_init(p);	
 	relay_req_init();
+	tempautoctl_init();
 
 	/* Add CAN Mailboxes                               CAN     CAN ID             TaskHandle,Notify bit,Skip, Paytype */
 	//47400000','DMOC',1,1,'I16','DMOC: Actual Torque: payload-30000'
@@ -277,6 +296,7 @@ void StartCoolingTask(void* argument)
 		{ //     
 			p->timeout_cntctrkar_ctr = p->timeout_cntctrkar; // Reset timeout ctr
 			pcan = &p->pmbx_cid_cntctrkar->ncan.can;
+			do_contactorCAN(pcan);
 		}
 
 		if ((noteval & COOLCANBIT05) != 0) // CAN msg: PC 
@@ -628,7 +648,7 @@ static void do_pcCAN(struct CANRCVBUF* pcan)
 /* Payload layout
 [0] EMCL_COOLING_STATUS1; // Code for payload
 [1] Alert status: 0 = NO ALERTS; otherwise bits set--
-    7: 
+    7: Contactor CAN msgs missing
     6:
     5: DMOC motor greater than over-temperature parameter
     4: Greater than over-temperature parameter: pump outlet
@@ -684,7 +704,9 @@ static void send_hbstatus1(struct COOLINGFUNCTION* p)
  ************************************************************************************************************* */
 /* Payload layout
 [0] EMCL_MOTORPWM_GETPWMX; // Code for payload
-[1] Reserved
+[1] 7: reserved
+	6: Contactor CAN msg missing
+	5-0: reserved
 [2] Group A & B bits
 [3] reserved
 [4] Group C percent
@@ -698,6 +720,9 @@ static void send_hbstatus2(struct COOLINGFUNCTION* p)
 	pcan->cd.uc[0] = EMCL_MOTOR_RY_STATUS2; // See: EMCLTaskCmd.h
 	pcan->cd.uc[1] = 0; // Reserved
 	RyTask_CANpayload(pcan); // Fill payload with Relay & motor info
+	if (p->contactor_state == 0) // Set missing contactor CAN msgs
+			pcan->cd.uc[1] = (1<<7);
+
 	p->hbct_ctr = p->hbct_tic; // Reset heartbeat count
 	// Place CAN msg on CanTask queue
 	xQueueSendToBack(CanTxQHandle,&p->cancool1,4);
@@ -809,5 +834,267 @@ static void set_motor_ry(struct CANRCVBUF* pcan)
 			}
 		}
 	}
+	return;
+}
+#define TMR_IDLE_END (30*COOLTIMERTR) // Timeout ending of IDLE: 30 secs
+#define TMR_TEST     (15*COOLTIMERTR) // Timeout waiting for thermister stablize: 15 secs
+
+#define TEM_OFF  0
+#define TEM_IDLE 1
+#define TEM_TEST 2
+#define TEM_RUN  3
+struct TEMRUNX
+{
+	int32_t timectr;
+	float fpwm;
+	float delta;
+	uint8_t ipwm;
+	uint8_t alert;   // Bits for too high
+	uint8_t run;     // Bits for run
+	uint8_t toohi; 
+	uint8_t ambient; // Ambient temperature
+	uint8_t ttmp;
+	uint8_t pwm[6];
+	uint8_t tstate;  // Temperature control state machine state
+};
+static struct TEMRUNX temrunx;
+/* ***********************************************************************************************************
+ * static void temx(struct TEMRUNX* p, uint8_t idx, uint8_t abit);
+ * @brief  : Temperature Automatic Control of cooling motors
+ * @param  : p = pointer to convenience struct
+ * @param  : idx = index into array for thermistor
+ * @param  : abit = shift count for alert status byte setup
+ * @return : pwm for motor associated with this thermistor index
+ ************************************************************************************************************* */
+static uint8_t temx(struct TEMRUNX*p, uint8_t idx, uint8_t abit)
+{
+	struct COOLINGFUNCTION* pc = &emclfunction.lc.lccool; // Convenience pointer	
+	if (pc->temperatureparm[idx].not_installed == 0)
+	{ // Here, motor coolant thermistor is installed
+		p->ttmp = adc1.abs[idx].filt; // Get temperature
+		if (p->ttmp >= pc->temperatureparm[idx].toohi)
+			p->alert |= (1<<abit); // Set status alert bit for too high
+
+		// When absolute temperature too hi return full speed pwm
+		if (p->ttmp >= pc->temperatureparm[idx].toohimax)
+		{
+			p->toohi |= (1<<abit); // Set status alert bit for too high
+			p->run   |= (1<<idx); // Needs to run
+			p->pwm[idx] = 100;
+			return 100;
+		}
+	}
+
+	p->delta = (p->ambient - (float)p->ttmp);
+	p->fpwm = pc->temperatureparm[idx].tcoef[0] + 
+			  pc->temperatureparm[idx].tcoef[1] * p->delta;
+	if (p->fpwm < 0) p->fpwm = 0; // Avoid undefined behavior
+	p->pwm[idx] = p->fpwm; // Convert float to uint
+	if (p->fpwm == 0)
+	{ // Colder than ambient plus a bit
+		p->run &= ~(1<<idx); // No need to run
+		return 0;
+	} 
+	if (p->fpwm >= 100)
+	{ // Quite hot indeed.
+		p->run |= (1<<abit); // Set status alert bit for too high
+		{	
+			p->pwm[idx] = 100;	
+			p->run |= (1<<idx); // Needs to run
+			return 100;
+		}	
+	}
+	if (p->fpwm > 0)
+	{ // Here anything from 1 - 99.
+		p->run |= (1<<idx); // Needs to run
+	return p->pwm[idx];
+	}
+	return 0;
+}	
+/* ***********************************************************************************************************
+ * static uint8_t temrun(void);
+ * @brief  : Temperature Automatic Control of cooling motors
+ * @return : 0 = NO; 1 = YES
+ ************************************************************************************************************* */
+/*
+[1] Alert status: 0 = NO ALERTS; otherwise bits set--
+    7: Contactor CAN msg missing
+    6:
+    5: DMOC motor greater than over-temperature parameter
+    4: Greater than over-temperature parameter: pump outlet
+    3: Greater than over-temperature parameter: winch motor
+    2: Greater than over-temperature parameter: heat exchanger
+    1: Greater than over-temperature parameter: ambient
+    0: Greater than over-temperature parameter: jic 
+*/
+static uint8_t temrun(void)
+{
+	uint8_t ret = 0;
+	struct COOLINGFUNCTION* pc = &emclfunction.lc.lccool; // Convenience pointer	
+	struct TEMRUNX* p = &temrunx;
+	temrunx.alert  = 0;
+	temrunx.run    = 0;
+	pc->contactor_state = 0;
+	temrunx.ambient = adc1.abs[pc->tx_amb].filt; // Ambient air
+
+	// If ambient is too hi, bad news! 
+	if (temrunx.ambient > pc->temperatureparm[pc->tx_amb].toohi)
+		temrunx.alert |= (1<<1);
+
+//	if (p->contactor_state == 1) // 0 = not reporting; 1 = connected; 2 = disconnected or other)
+	{
+
+	}
+
+	/* Check each temperature measurement. Set alert and run bits */
+	temx(p, pc->tx_moto, 4); // Save pwm
+	// Winch motor coolant outlet temperature
+	temx(p, pc->tx_moto, 3);
+	// Heat exchanger outlet temperature
+	temx(p, pc->tx_hexo, 2);
+	// DMOC cooling fins
+	temx(p, pc->tx_dmoc, 0);
+
+	if(p->pwm[4] > 0) ret |= (1<<4);
+	if(p->pwm[3] > 0) ret |= (1<<3);
+	if(p->pwm[2] > 0) ret |= (1<<3);
+
+	return ret;
+}
+/* ***********************************************************************************************************
+ * static void tempautoctl_init(void);
+ * @brief  : Temperature Automatic Control initializations
+ ************************************************************************************************************* */
+static void tempautoctl_init(void)
+{
+	struct TEMRUNX* p = &temrunx;
+	p->tstate  = TEM_TEST;
+	p->timectr = TMR_TEST;
+ // ... more?...
+	return;
+}
+/* ***********************************************************************************************************
+ * static void tempsetRUN(void);
+ * @brief  : Set pwm for motors for RUN state
+ ************************************************************************************************************* */
+static void tempsetRUN(void)
+{
+	/* Pump, Heat exchanger fan, DMOC blower|fan */
+	for (int i = 0; i < 3; i++)
+		motorcontrol(&emclfunction.lc.lccool, i, temrunx.pwm[0]);
+	return;
+}
+/* ***********************************************************************************************************
+ * static void tempsetOFF(void);
+ * @brief  : Set motors OFF
+ ************************************************************************************************************* */
+static void tempsetOFF(void)
+{
+	/* Pump, Heat exchanger fan, DMOC blower|fan */
+	for (int i = 0; i < 3; i++)
+		motorcontrol(&emclfunction.lc.lccool, i, 0);
+	return;
+}
+/* ***********************************************************************************************************
+ * static void tempsetIDLE(void);
+ * @brief  : Set pwm for motors for IDLE state
+ ************************************************************************************************************* */
+static void tempsetIDLE(void)
+{
+	struct COOLINGFUNCTION* pc = &emclfunction.lc.lccool; // Convenience pointer	
+
+	motorcontrol(pc,0, pc->motorrampparam[COOLX_PUMP].idle);   // Pump
+	motorcontrol(pc,1, pc->motorrampparam[COOLX_HEXFAN].idle); // Heat exchanger
+	motorcontrol(pc,2, pc->motorrampparam[COOLX_DMOCFAN].idle);// DMOC blower|fan
+	return;
+}
+/* ***********************************************************************************************************
+ * static void tempautoctl(void);
+ * @brief  : Temperature Automatic Control of cooling motors. 50 ms timer poll calls this.
+ ************************************************************************************************************* */
+static void tempautoctl(void)
+{
+	struct TEMRUNX* p = &temrunx;
+	/* Check temperatures */
+	temrun();
+
+	/* Overide states when thermistors indicate run condition. */
+	if(p->run != 0)
+	{
+		tempsetRUN();
+		p->tstate = TEM_RUN;
+		return;
+	}
+
+	// Time counter used by states
+	if (p->timectr > 0)
+		p->timectr -= 1;
+
+	switch (p->tstate)
+	{
+	case TEM_OFF:
+		tempsetOFF();
+		break;
+
+	case TEM_IDLE:
+		tempsetIDLE();
+		break;
+
+	case TEM_RUN:
+		// Here, p->run == 0
+		tempsetOFF();
+		p->tstate = TEM_OFF;
+		break;
+
+	case TEM_TEST: // Run to bring thermistors up to temperature
+		if (p->timectr != 0)
+		{ // Waiting
+			tempsetIDLE();
+			break;
+		}		
+		if(p->run == 0)
+		{
+			tempsetOFF();
+			p->tstate = TEM_OFF;
+			break;
+		}
+		break;
+
+	default:
+		morse_trap(793);
+		break;
+	}
+}
+/* ***********************************************************************************************************
+ * static void do_contactorCAN(struct CANRCVBUF* pcan);
+ * @brief  : Deal with CAN msg: eval bit COOLCANBIT04; CAN msg: contactor status
+ * @param  : pcan = pointer to contactor CAN msg
+ ************************************************************************************************************* */
+#if 1
+// copied from contactor/ContactorTask.h for convenience
+enum CONTACTOR_STATE
+{
+	DISCONNECTED,   /*  0 */
+	CONNECTING,     /*  1 */
+	CONNECTED,      /*  2 */
+	FAULTING,       /*  3 */
+	FAULTED,        /*  4 */
+	RESETTING,      /*  5 */
+	DISCONNECTING,  /*  6 */
+	OTOSETTLING,    /*  7 one time intializing. */
+};
+#endif
+static void do_contactorCAN(struct CANRCVBUF* pcan)
+{
+//	enum CONTACTOR_STATE cstate = CONNECTED;
+	struct COOLINGFUNCTION* p = &emclfunction.lc.lccool; // Convenience pointer	
+	// Reset keep-alive timeout (50 ms) counter. 
+	p->timeout_cntctrkar_ctr = p->timeout_cntctrkar; // Reset timeout ctr
+
+	// If contactor is CONNECTED cooling motors should run at least minimum
+	if ((pcan->cd.uc[0] & 0x0F) == CONNECTED)
+		p->contactor_state = 1; // CONNECTED
+	else
+		p->contactor_state = 0; // NOT CONNECTED or something in progress.
 	return;
 }

@@ -35,7 +35,7 @@ struct RELAY
 // The following is used to prevent pwm requests of 100% locking out the
 // sub-board over-current logic tripping the latch and turning the FET continous
 // OFF. The substituted pwm, i.e. pwmx, might be 95 (95 percent) more or less.
-   uint8_t trans; // 0 = use pwm; not 0 = test for transation.
+   uint8_t limit; // 1 = this relay/motor has a pwm limit (e.g. 96%)
    uint8_t pwmx;  // If trans != 0, then pwm > than pwmx, use pmx.   
 };
 
@@ -69,6 +69,10 @@ struct EMCLLC
  // List of CAN ID's for setting up hw filter for incoming msgs
   uint32_t cid_cmd_emcmmcx_pc;  //'CANID_CMD_EMCMMC1_PC' ,'A1600000','PC SENDS');
   uint32_t cid_cmd_emcmmcx_emc; //'CANID_CMD_EMCMMC1_EMC','A1800000', EMC SENDS'); 
+
+  uint32_t cid_uni_bms_emc1_i; // CANID_UNI_BMS_EMC1_I;   // B0000000 UNIversal From EMC,  Incoming msg to BMS: X4=target CANID');   
+  uint32_t cid_uni_bms_emc2_i; // CANID_UNI_BMS_EMC2_I;   // B0200000 UNIversal From EMC,  Incoming msg to BMS: X4=target CANID');   
+  uint32_t cid_uni_bms_pc_i;   // CANID_UNI_BMS_PC_I;     // AEC00000 UNIversal From PC,   Incoming msg to BMS: X4=target CANID');       
 
   uint8_t hbseq; // heartbeat CAN msg sequence number
  };
