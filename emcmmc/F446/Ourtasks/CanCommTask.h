@@ -15,7 +15,7 @@
 #include "ADCTask.h"
 
 /* *************************************************************************/
- void CanComm_init(struct EMCFUNCTION* p );
+ void CanComm_init(struct EMCLFUNCTION* p );
 /*	@brief	: Task startup
  * *************************************************************************/
  TaskHandle_t xCanCommCreate(uint32_t taskpriority);

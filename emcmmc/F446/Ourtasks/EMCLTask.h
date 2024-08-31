@@ -48,13 +48,11 @@ struct EMCLFUNCTION
 	uint32_t HBstatus_ctr; // Count RTOS ticks for hearbeat timing: status msg
 
 	/* Pointers to incoming CAN msg mailboxes. */
-	struct MAILBOXCAN* pmbx_cid_cmd_bms_cellvq_emc;// CANID_CMD_BMS_CELLVQ: BMSV1 U8: EMC requests to BMS to send cellv, cmd code
-	struct MAILBOXCAN* pmbx_cid_cmd_bms_miscq_emc; // CANID_CMD_BMS_MISCQ: BMSV1 U8: EMC requests to BMS to value for given cmd code
-	struct MAILBOXCAN* pmbx_cid_uni_bms_emc_i;     // CANID_UNI_BMS_I  B0000000 UNIversal BMS Incoming msg to BMS: X4=target CANID
-
-	struct MAILBOXCAN* pmbx_cid_cmd_bms_cellvq_pc;// CANID_CMD_BMS_CELLVQ: BMSV1 U8: EMC requests to BMS to send cellv, cmd code
-	struct MAILBOXCAN* pmbx_cid_cmd_bms_miscq_pc; // CANID_CMD_BMS_MISCQ: BMSV1 U8: EMC requests to BMS to value for given cmd code
-	struct MAILBOXCAN* pmbx_cid_uni_bms_pc_i;     // CANID_UNI_BMS_I  B0000000 UNIversal BMS Incoming msg to BMS: X4=target CANID
+   struct MAILBOXCAN* pmbx_cid_cmd_emcmmcx_pc;  //'CANID_CMD_EMCMMC1_PC' , A1600000 PC SENDS');
+   struct MAILBOXCAN* pmbx_cid_cmd_emcmmcx_emc; //'CANID_CMD_EMCMMC1_EMC', A1800000 EMC SENDS'); 
+   struct MAILBOXCAN* pmbx_cid_uni_bms_emc1_i;  // CANID_UNI_BMS_EMC1_I;    B0000000 UNIversal From EMC
+   struct MAILBOXCAN* pmbx_cid_uni_bms_emc2_i;  // CANID_UNI_BMS_EMC2_I;    B0200000 UNIversal From EMC
+   struct MAILBOXCAN* pmbx_cid_uni_bms_pc_i;    // CANID_UNI_BMS_PC_I;      AEC00000 UNIversal From PC
 
 	uint8_t state;      // main state
 	uint8_t substateA;  // 

@@ -5,7 +5,7 @@
 *******************************************************************************/
 #include "can_iface.h"
 #include "CanTask.h"
-#include "EMCTask.h"
+#include "EMCLTask.h"
 #include "cancomm_items.h"
 #include "CanCommTask.h"
 #include "adcparams.h"

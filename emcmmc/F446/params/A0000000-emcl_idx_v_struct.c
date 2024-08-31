@@ -145,7 +145,7 @@ void emcl_idx_v_struct_hardcode_params(struct EMCLLC* p)
 
 /* Cooling task function */
 
-  p->lccool.hbct_t = 2000; // Duration between cooling function status heartbeats (ms)
+  p->lccool.hbct_t = 4000; // Duration between cooling function status heartbeats (ms)
 
 //  p->lccool.cid_dmoc_actualtorq = CANID_DMOC_ACTUALTORQ; //47400000','DMOC',1,1,'I16','DMOC: Actual Torque: payload-30000'
   p->lccool.cid_dmoc_hv_temps = CANID_DMOC_HV_TEMPS; //'CA200000','DMOC',1,1,'U8_U8_U8''DMOC: Temperature:rotor,invert,stator'

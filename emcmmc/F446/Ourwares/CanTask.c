@@ -65,14 +65,17 @@ void StartCanTxTask(void* argument)
 		CAN_IT_RX_FIFO0_MSG_PENDING |  \
 		CAN_IT_RX_FIFO1_MSG_PENDING    );
 
+		HAL_StatusTypeDef  ret1 = HAL_CAN_Start(&hcan1); // CAN1
+//	if (ret1 != HAL_OK) morse_trap (94);
+
 	/* Select interrupts for CAN2 */
 	HAL_CAN_ActivateNotification(&hcan2, \
 		CAN_IT_TX_MAILBOX_EMPTY     |  \
 		CAN_IT_RX_FIFO0_MSG_PENDING |  \
 		CAN_IT_RX_FIFO1_MSG_PENDING    );
 
-	HAL_StatusTypeDef  ret1 = HAL_CAN_Start(&hcan1); // CAN1
-	if (ret1 != HAL_OK) morse_trap (94);
+	ret1 = HAL_CAN_Start(&hcan1); // CAN1
+//	if (ret1 != HAL_OK) morse_trap (95);
 
 	CANTaskreadyflag = 1;
 

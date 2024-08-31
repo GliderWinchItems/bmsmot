@@ -41,7 +41,7 @@
 #include "yprintf.h"
 #include "ADCTask.h"
 #include "MailboxTask.h"
-//#include "CanCommTask.h"
+#include "CanCommTask.h"
 #include "CoolingTask.h"
 #include "rtcregs.h"
 #include "EMCLTask.h"
@@ -321,6 +321,22 @@ int main(void)
 /* Create CoolingTask */
   Thrdret = xCoolingTaskCreate(osPriorityNormal);
   if (Thrdret == NULL) morse_trap(110);
+
+/* CAN communication */
+  TaskHandle_t retT = xCanCommCreate(osPriorityNormal+2);
+  if (retT == NULL) morse_trap(121);
+
+    /* Select interrupts for CAN1 */
+  HAL_CAN_ActivateNotification(&hcan1, \
+    CAN_IT_TX_MAILBOX_EMPTY     |  \
+    CAN_IT_RX_FIFO0_MSG_PENDING |  \
+    CAN_IT_RX_FIFO1_MSG_PENDING    );
+
+    /* Select interrupts for CAN2 */
+  HAL_CAN_ActivateNotification(&hcan2, \
+    CAN_IT_TX_MAILBOX_EMPTY     |  \
+    CAN_IT_RX_FIFO0_MSG_PENDING |  \
+    CAN_IT_RX_FIFO1_MSG_PENDING    );
 
   /* USER CODE END RTOS_THREADS */
 
@@ -1367,7 +1383,7 @@ HAL_GPIO_WritePin(GPIOB, GPIO_PIN_13, GPIO_PIN_SET); // RED OFF
     HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, GPIO_PIN_RESET); // GRN ON
         osDelay(3);
     HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, GPIO_PIN_SET); // GRN OFF
-      osDelay(50-3);
+      osDelay(250-3);
 #endif
   static uint32_t yctr;      
 //  yprintf(&pbuf2,"%5d", yctr++);
