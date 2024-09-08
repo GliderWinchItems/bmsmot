@@ -52,14 +52,14 @@ uint32_t dbuggateway1;
 #define CAN1CIRBUFSIZE 32
 #define CAN2CIRBUFSIZE 16
 
-struct CANRCVBUF can1cirbuf[CAN1CIRBUFSIZE];
-struct CANRCVBUF can2cirbuf[CAN2CIRBUFSIZE];
+struct CANRCVBUFS can1cirbuf[CAN1CIRBUFSIZE];
+struct CANRCVBUFS can2cirbuf[CAN2CIRBUFSIZE];
 struct CIRBUF
 {
-	struct CANRCVBUF* pbegin;
-	struct CANRCVBUF* pend;
-	struct CANRCVBUF* padd;
-	struct CANRCVBUF* ptake;	
+	struct CANRCVBUFS* pbegin;
+	struct CANRCVBUFS* pend;
+	struct CANRCVBUFS* padd;
+	struct CANRCVBUFS* ptake;	
 };
 static struct CIRBUF circan1;
 static struct CIRBUF circan2;
@@ -71,6 +71,7 @@ extern struct CAN_CTLBLOCK* pctl0;	// Pointer to CAN1 control block
 extern struct CAN_CTLBLOCK* pctl1;	// Pointer to CAN2 control block
 
 void StartGatewayTask(void const * argument);
+static int8_t selectCAN1(struct CANRCVBUF* pcan);
 
 osThreadId GatewayTaskHandle;
 
@@ -78,27 +79,27 @@ osThreadId GatewayTaskHandle;
 uint32_t noteval = 0;    // Receives notification word upon an API notify
 
 /* *************************************************************************
- * struct CANRCVBUF* GatewayTask_takecan1(void);
- * struct CANRCVBUF* GatewayTask_takecan2(void);
+ * struct CANRCVBUFS* GatewayTask_takecan1(void);
+ * struct CANRCVBUFS* GatewayTask_takecan2(void);
  *	@brief	: Get CAN1 msg if buffer not empty
- *  @return : NULL = no entries, else pointer to CAN msg
+ *  @return : NULL = no entries, else pointer to CAN msg on buffer with code
  * *************************************************************************/
-static struct CANRCVBUF* takecan(struct CIRBUF* pcircan)
+static struct CANRCVBUFS* takecan(struct CIRBUF* pcircan)
 {
-	struct CANRCVBUF* ptmp;
+	struct CANRCVBUFS* ptmp;
 	if (pcircan->ptake == pcircan->padd)
 		return NULL;
 	ptmp = pcircan->ptake;
 	pcircan->ptake += 1;
-	if (pcircan->ptake >= circan1.pend) 
+	if (pcircan->ptake >= pcircan->pend) 
 		pcircan->ptake = pcircan->pbegin;
 	return ptmp;
 }
-struct CANRCVBUF* GatewayTask_takecan1(void)
+struct CANRCVBUFS* GatewayTask_takecan1(void)
 {
 	return takecan(&circan1);
 }
-struct CANRCVBUF* GatewayTask_takecan2(void)
+struct CANRCVBUFS* GatewayTask_takecan2(void)
 {
 	return takecan(&circan2);
 }
@@ -108,14 +109,15 @@ struct CANRCVBUF* GatewayTask_takecan2(void)
  *  @param  : pcircan = pointer to pointers to circular buffer
  *  @param  : pcan = pointer to CAN msg to be added to buffer
  * *************************************************************************/
-static int8_t addcan(struct CIRBUF* pcircan, struct CANRCVBUF* pcan)
+static int8_t addcan(struct CIRBUF* pcircan, struct CANRCVBUF* pcan, int16_t sel)
 {
-	struct CANRCVBUF* ptmp = pcircan->padd; // Current available position
+	struct CANRCVBUFS* ptmp = pcircan->padd; // Current available position
 	ptmp += 1; // Advance and check if an overflow
 	if (ptmp >= pcircan->pend) ptmp = pcircan->pbegin;
 	if (ptmp == pcircan->ptake)
 		return -1; // Here: overflow
-	*pcircan->padd = *pcan; // Copy CAN msg to buffer
+	pcircan->padd->can = *pcan; // Copy CAN msg to buffer
+	pcircan->padd->sel = sel; // Selection code
 	pcircan->padd = ptmp;   // Update add pointer to next position
 	return 0;
 }
@@ -163,7 +165,7 @@ void StartGatewayTask(void const * argument)
 
 	/* Setup serial output buffers for uarts. */
 	struct SERIALSENDTASKBCB* pbuf2 = getserialbuf(&HUARTMON,  96); // PC monitor uart
-	struct SERIALSENDTASKBCB* pbuf3 = getserialbuf(&HUARTMON,  96); // PC monitor uart
+//	struct SERIALSENDTASKBCB* pbuf3 = getserialbuf(&HUARTMON,  96); // PC monitor uart
 
 	/* Pointers into the CAN  msg circular buffer for each CAN module. */
 	struct CANTAKEPTR* ptake[STM32MAXCANNUM] = {NULL};
@@ -226,29 +228,24 @@ extern CAN_HandleTypeDef hcan1;
 					/* Convert binary to the ascii/hex format for PC. */
 						canqtx2.can = pncan->can; // Save a local copy
 
-						if(canqtx2.can.id == 0xB1000000)
-						{
-							if (addcan(&circan1, &pncan->can) == 0)
-							{
-		extern TaskHandle_t StringChgrTaskHandle;							
+						int ret = selectCAN1(&pncan->can); // Selection for StringChgrTask
+						if (ret >= 0)
+						{ // Here, CAN msg has been selected for StringChgrTask
+
+							/* Place CAN msg on circular buffer w selection code */
+							if (addcan(&circan1, &pncan->can, ret) == 0)
+							{ // Here, success (no overflow)
+								/* Notify StringChgrTask of an addition to buffer. */
+								extern TaskHandle_t StringChgrTaskHandle;							
 								xTaskNotify(StringChgrTaskHandle,STRINGCHRGBIT00,eSetBits);
-							}
-					}
 
-/* Debug */		
-extern uint32_t dbgS1;
-if (canqtx2.can.id == 0xB2200000)
-{
-	yprintf(&pbuf2,"C1 %08X %d %d\n\r",canqtx2.can.id,canqtx2.can.cd.uc[0], dbgS1);
-  canqtx2.can.id = 0x24800000;
-  xQueueSendToBack(CanTxQHandle, &canqtx2.can, 4);	
-}
-
-
+					/* Bridging === CAN1 -> CAN2 === */
 #ifdef CONFIGCAN2 // CAN2 setup
 					/* === CAN1 -> CAN2 === */
 //?						xQueueSendToBack(CanTxQHandle,&canqtx2,portMAX_DELAY);
 #endif
+							}
+						}
 					}
 				} while (pncan != NULL);	// Drain the buffer
 			}
@@ -268,14 +265,7 @@ if (canqtx2.can.id == 0xB2200000)
 					/* Convert binary to the ascii/hex format for PC. */
 						canqtx1.can = pncan->can;	// Save a local copy
 
-if (canqtx1.can.id == 0xB0A00000)
-{
-	yprintf(&pbuf3,"C2 %08X %d\n\r",canqtx1.can.id,canqtx2.can.cd.uc[0]);
-  canqtx1.can.id = 0x16600000;
-  xQueueSendToBack(CanTxQHandle, &canqtx1.can, 4);	
-}
-
-					/* === CAN1 -> CAN2 === */
+					/* Bridging === CAN2 -> CAN1 === */
 //?						xQueueSendToBack(CanTxQHandle,&canqtx1,portMAX_DELAY);
 					}
 				} while (pncan != NULL);	// Drain the buffer
@@ -284,4 +274,38 @@ if (canqtx1.can.id == 0xB0A00000)
 #endif
   }
 }
+/* *************************************************************************
+ * static int8_t selectCAN1(struct CANRCVBUF* pcan;
+ *	@brief	: Check if CAN ID and msg is for StringChrgTask
+ *  @param  : pcan = pointer to msg of interest
+ *  @return : 0 = BMS node msg
+ *          : 1 = ELCON msg
+ *          :-1 = no
+ * *************************************************************************/
+static int8_t selectCAN1(struct CANRCVBUF* pcan)
+{
+	/* Check Pollsters and BMS nodes. */
+	// BMS CAN id range: 'AEC00000' - 'B31E0000'
+	if ((pcan->id >= (uint32_t)CANID_UNI_BMS_PC_I) &&
+		  (pcan->id <= (uint32_t)CANID_UNI_BMS14_R ) )
+	{
+		return C1SELCODE_BMS; // Yes!
+	}
 
+	/* Check for an ELCON charger msg */
+	if (pcan->id == CANID_ELCON_TX)
+		return C1SELCODE_ELCON; // 'C7FA872C'
+/*
+INSERT INTO CANID VALUES ('CANID_ELCON_TX','C7FA872C','ELCON ',1,1,'I16_I16_U8_U8_U8_U8','ELCON  CAN BUS Charger transmit: ');
+INSERT INTO CANID VALUES ('CANID_ELCON_RX','C0372FA4','ELCON ',1,1,'I16_I16_U8_U8_U8_U8','ELCON  CAN BUS Charger receive: ');
+
+#define C1SELCODE_BMS       0 // BMS node CAN id 
+#define C1SELCODE_ELCON     2 // ELCON (not translated) on string
+*/
+
+	/* Check for contactor. */
+
+
+	return -1; // None of the above!
+
+}

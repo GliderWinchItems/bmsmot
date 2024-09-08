@@ -17,6 +17,8 @@
 
 #include "StringChgrTask.h"
 #include "GatewayTask.h"
+#include "stringchgr_items.h"
+
 
 extern UART_HandleTypeDef huart3;
 
@@ -28,12 +30,13 @@ TaskHandle_t StringChgrTaskHandle = NULL;
  *	@brief	: Task startup
  * *************************************************************************/
 uint32_t dbgS1;				
-
+uint8_t dbgalt;
 
 void StartStringChgrTask(void* argument)
 {
 	uint32_t noteval;
-	struct CANRCVBUF* pcan;
+//	struct CANRCVBUF* pcan;
+	struct CANRCVBUFS* pcans;
 
 /* Setup serial output buffers for uarts. */
 	struct SERIALSENDTASKBCB* pbuf1 = getserialbuf(&HUARTMON,  96); // PC monitor uart	
@@ -50,22 +53,38 @@ void StartStringChgrTask(void* argument)
 			if ((noteval & STRINGCHRGBIT00) != 0)
 			{
 dbgS1 += 1;				
-				pcan = GatewayTask_takecan1();
-				if (pcan != NULL)
+				do
 				{
-yprintf(&pbuf1,"\tS1 %08X\n\r",pcan->id);
-				}
+					pcans = GatewayTask_takecan1();
+					if (pcans != NULL)
+					{
+//yprintf(&pbuf1,"\tS1 %08X %d: %d\n\r",pcans->can.id,pcans->can.dlc,pcans->can.cd.uc[0]);
+yprintf(&pbuf1,"\tS1 %d %08X %d: %d\n\r",pcans->sel, pcans->can.id,pcans->can.dlc,pcans->can.cd.uc[0]);
+
+						if (pcans->sel == 0)
+						{ // Here, a BMS node CAN msg
+						//	bmsmsg(pcans);
+						}
+
+					}
+
+				} while (pcans != NULL);
 
 
 				/* Wink green led */
-//				HAL_GPIO_WritePin(LED5_GRN_GPIO_Port,LED5_GRN_Pin,GPIO_PIN_RESET); // GRN LED
-//				osDelay(15); 	
-//				HAL_GPIO_WritePin(LED5_GRN_GPIO_Port,LED5_GRN_Pin,GPIO_PIN_SET); // GRN LED
+				if ((dbgalt++ & 1) == 0)
+				{
+					HAL_GPIO_WritePin(LED5_GRN_GPIO_Port,LED5_GRN_Pin,GPIO_PIN_RESET); // GRN LED
+				}
+				else
+				{
+					HAL_GPIO_WritePin(LED5_GRN_GPIO_Port,LED5_GRN_Pin,GPIO_PIN_SET); // GRN LED					
+				}
 			}
 		}
 	}		
 }
-
+    
 /* *************************************************************************
  * TaskHandle_t xStringChgrTaskCreate(uint32_t taskpriority);
  * @brief	: Create task; task handle created is global for all to enjoy!
@@ -90,3 +109,4 @@ TaskHandle_t *pxCreatedTask );
 
 	return StringChgrTaskHandle;
 }
+

@@ -17,6 +17,18 @@
 #include "common_can.h"
 #include "../../../../GliderWinchCommons/embed/svn_common/trunk/db/gen_db.h"
 
+/* CAN msg ID codes for CANRCVBUFS passed to StringChgrTask. */
+#define C1SELCODE_BMS       0 // BMS node CAN id 
+#define C1SELCODE_ELCON     2 // ELCON (not translated) on string
+#define C1SELCODE_CONTACTOR 3 // CONTACTOR on string
+
+/* CAN msg buffer with selection code. */
+struct CANRCVBUFS
+{
+	struct CANRCVBUF can;
+	uint16_t sel;  // Selection code
+};
+
 /* *************************************************************************/
 osThreadId xGatewayTaskCreate(uint32_t taskpriority);
 /* @brief	: Create task; task handle created is global for all to enjoy!
@@ -31,10 +43,10 @@ osThreadId xGatewayTaskCreate(uint32_t taskpriority);
  * @param	: taskpriority = Task priority (just as it says!)
  * @return	: GatewayHandle
  * *************************************************************************/
- struct CANRCVBUF* GatewayTask_takecan1(void);
- struct CANRCVBUF* GatewayTask_takecan2(void);
+ struct CANRCVBUFS* GatewayTask_takecan1(void);
+ struct CANRCVBUFS* GatewayTask_takecan2(void);
 /*	@brief	: Get CAN1/2 msg if buffer not empty
- *  @return : NULL = no entries, else pointer to CAN msg
+ *  @return : NULL = no entries, else pointer to CAN msg w selection code
  * *************************************************************************/
 
 

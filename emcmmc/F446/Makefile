@@ -106,6 +106,7 @@ C_SOURCES += Ourtasks/RyTask.c
 C_SOURCES += Ourtasks/EMCLTask.c
 C_SOURCES += Ourtasks/CoolingTask.c
 C_SOURCES += Ourtasks/StringChgrTask.c
+C_SOURCES += Ourtasks/stringchgr_items.c
 
 
 # /* USER CODE END */ 
