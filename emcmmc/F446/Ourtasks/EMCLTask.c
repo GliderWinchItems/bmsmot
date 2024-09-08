@@ -31,7 +31,7 @@ void StartEmclTask(void* argument)
 #if 0
 		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_13, GPIO_PIN_RESET); // GRN ON
     	osDelay(30);
-	    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_13, GPIO_PIN_SET); // GRN OFF		
+	    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_13, GPIO_PIN_SET);   // GRN OFF		
 #endif
 		osDelay(1901-30);
 	}
@@ -41,7 +41,7 @@ void StartEmclTask(void* argument)
  * TaskHandle_t xEMCLTaskCreate(uint32_t taskpriority);
  * @brief	: Create task; task handle created is global for all to enjoy!
  * @param	: taskpriority = Task priority (just as it says!)
- * @return	: RyTaskHandle
+ * @return	: EMCLTaskHandle
  * *************************************************************************/
 TaskHandle_t xEMCLTaskCreate(uint32_t taskpriority)
 {

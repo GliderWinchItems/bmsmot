@@ -32,7 +32,7 @@ static struct MAILBOXCAN* loadmbx(struct MAILBOXCANNUM* pmbxnum, struct CANRCVBU
 
 /* *************************************************************************
  * struct MAILBOXCANNUM* MailboxTask_add_CANlist(struct CAN_CTLBLOCK* pctl, uint16_t arraysize);
- *	@brief	: Add CAN module mailbox list
+ * @brief	: Add CAN module mailbox list
  * @param	: pctl = Pointer to CAN control block
  * @param	: arraysize = max number of mailboxes in sorted list
  * @return	: Pointer which probably will not be used; NULL = failed (more important)
@@ -81,7 +81,7 @@ taskEXIT_CRITICAL();
 /* *************************************************************************
  *  struct CANNOTIFYLIST* MailboxTask_disable_notifications(struct MAILBOXCAN* pmbx);
  *  struct CANNOTIFYLIST* MailboxTask_enable_notifications (struct MAILBOXCAN* pmbx);
- *	@brief	: Disable, enable mailbox notifications
+ * @brief	: Disable, enable mailbox notifications
  * @param	: pmbx = pointer to mailbox
  * @return	: Pointer to notification block, for calling task; NULL = task not found
  * *************************************************************************/

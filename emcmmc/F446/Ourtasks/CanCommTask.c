@@ -91,6 +91,14 @@ static uint8_t for_us(struct CANRCVBUF* pcan, struct EMCLFUNCTION* p)
 {
 	uint32_t canid;
 	uint8_t code;
+
+	/* Check for targeted RESET */
+	if ((pcan->dlc == 1) && (pcan->cd.uc[0] == LDR_RESET))
+	{			
+		do_req_codes(pcan); // Do RESET
+		return 1; // Not really necessary
+	}
+
 	 /* Extract CAN id for unit to respond. */
     canid = (pcan->cd.uc[4] << 0)|(pcan->cd.uc[5] << 8)|
             (pcan->cd.uc[6] <<16)|(pcan->cd.uc[7] <<24);
@@ -173,8 +181,10 @@ void StartCanComm(void* argument)
 	CanComm_init(p);
 	cancomm_items_init();
 
+#if 0 // Started by CanTask
 	extern CAN_HandleTypeDef hcan1;
 	HAL_CAN_Start(&hcan1); // Start CAN1
+#endif	
 
 osDelay(20); // Wait for ADCTask to get going.
 

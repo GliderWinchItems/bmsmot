@@ -41,18 +41,18 @@ struct EMCLFUNCTION
   [7:3] Cell (0 - 31) (cell #1 - #32)
   [2:0] Group sequence number (0 - 7) */
 	uint32_t morse_err; // Error code retrieved from backup SRAM registers
-	uint8_t err;
 	uint16_t warning;   // Error code that is a warning
+	uint8_t  err;
 
 	uint8_t hbseq; // heartbeat CAN msg sequence number
 	uint32_t HBstatus_ctr; // Count RTOS ticks for hearbeat timing: status msg
 
 	/* Pointers to incoming CAN msg mailboxes. */
-   struct MAILBOXCAN* pmbx_cid_cmd_emcmmcx_pc;  //'CANID_CMD_EMCMMC1_PC' , A1600000 PC SENDS');
-   struct MAILBOXCAN* pmbx_cid_cmd_emcmmcx_emc; //'CANID_CMD_EMCMMC1_EMC', A1800000 EMC SENDS'); 
-   struct MAILBOXCAN* pmbx_cid_uni_bms_emc1_i;  // CANID_UNI_BMS_EMC1_I;    B0000000 UNIversal From EMC
-   struct MAILBOXCAN* pmbx_cid_uni_bms_emc2_i;  // CANID_UNI_BMS_EMC2_I;    B0200000 UNIversal From EMC
-   struct MAILBOXCAN* pmbx_cid_uni_bms_pc_i;    // CANID_UNI_BMS_PC_I;      AEC00000 UNIversal From PC
+   struct MAILBOXCAN* pmbx_cid_cmd_emcmmcx_pc;  // CANID_CMD_EMCMMC1_PC  A1600000 PC SENDS
+   struct MAILBOXCAN* pmbx_cid_cmd_emcmmcx_emc; // CANID_CMD_EMCMMC1_EMC A1800000 EMC SENDS
+   struct MAILBOXCAN* pmbx_cid_uni_bms_emc1_i;  // CANID_UNI_BMS_EMC1_I  B0000000 UNIversal From EMC
+   struct MAILBOXCAN* pmbx_cid_uni_bms_emc2_i;  // CANID_UNI_BMS_EMC2_I  B0200000 UNIversal From EMC
+   struct MAILBOXCAN* pmbx_cid_uni_bms_pc_i;    // CANID_UNI_BMS_PC_I    AEC00000 UNIversal From PC
 
 	uint8_t state;      // main state
 	uint8_t substateA;  // 

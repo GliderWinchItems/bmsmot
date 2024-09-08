@@ -11,6 +11,7 @@
 #include "iir_f1.h"
 #include "RyTask.h"
 #include "CoolingTask.h"
+#include "StringChgrTask.h"
 
 #ifndef __EMCL_IDX_V_STRUCT
 #define __EMCL_IDX_V_STRUCT
@@ -60,6 +61,9 @@ struct EMCLLC
 
 /* CoolingTask: */
   struct COOLINGFUNCTION lccool;
+
+/* StringChgrTask: */
+  struct STRINGCHGRFUNCTION lcstring;
 
  // CAN ids ...........................................................................
    //                                  CANID_NAME            CANID       PAYLOAD FORMAT

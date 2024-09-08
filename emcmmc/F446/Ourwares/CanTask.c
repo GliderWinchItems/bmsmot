@@ -66,24 +66,25 @@ void StartCanTxTask(void* argument)
 		CAN_IT_RX_FIFO1_MSG_PENDING    );
 
 		HAL_StatusTypeDef  ret1 = HAL_CAN_Start(&hcan1); // CAN1
-//	if (ret1 != HAL_OK) morse_trap (94);
+	if (ret1 != HAL_OK) morse_trap (94);
 
+#ifdef CONFIGCAN2 // CAN2 implemented
 	/* Select interrupts for CAN2 */
 	HAL_CAN_ActivateNotification(&hcan2, \
 		CAN_IT_TX_MAILBOX_EMPTY     |  \
 		CAN_IT_RX_FIFO0_MSG_PENDING |  \
 		CAN_IT_RX_FIFO1_MSG_PENDING    );
 
-	ret1 = HAL_CAN_Start(&hcan1); // CAN1
-//	if (ret1 != HAL_OK) morse_trap (95);
+	ret1 = HAL_CAN_Start(&hcan2); // CAN2
+	if (ret1 != HAL_OK) morse_trap (95);
+#endif
 
 	CANTaskreadyflag = 1;
 
   /* Infinite RTOS Task loop */
   for(;;)
   {
-//HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_14); // 14-RED, 13-ORANGE
-		Qret = xQueueReceive(CanTxQHandle,&txq,portMAX_DELAY);
+		Qret = xQueueReceive(CanTxQHandle, &txq, portMAX_DELAY);
 		if (Qret == pdPASS) // 
 		{
 dbgCanTask1 += 1;	

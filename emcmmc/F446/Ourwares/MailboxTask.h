@@ -16,7 +16,7 @@
 #include "common_can.h"
 #include "can_iface.h"
 
-#define STM32MAXCANNUM 2	// F46 only has two CAN modules
+#define STM32MAXCANNUM 2	// F446 only has two CAN modules
 
 /* Notification bit assignments for 'MailboxTask' */
 // The first three notification bits are reserved for CAN modules 

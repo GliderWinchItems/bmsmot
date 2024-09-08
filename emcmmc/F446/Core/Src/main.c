@@ -48,6 +48,8 @@
 #include "RyTask.h"
 #include "emcl_idx_v_struct.h"
 #include "iir_f1.h"
+#include "StringChgrTask.h"
+#include "GatewayTask.h"
 
 #include "FreeRTOS.h"
 #include "semphr.h"
@@ -280,11 +282,11 @@ int main(void)
 
   /* Setup CAN hardware filters to default to accept all ids. */
   HAL_StatusTypeDef Cret;
-  Cret = canfilter_setup_first(0, &hcan1, 15); // CAN1
+  Cret = canfilter_setup_first(1, &hcan1, 15); // CAN1
   if (Cret == HAL_ERROR) morse_trap(219);
 
 #ifdef CONFIGCAN2
-  Cret = canfilter_setup_first(1, &hcan2, 15); // CAN2
+  Cret = canfilter_setup_first(2, &hcan2, 15); // CAN2
   if (Cret == HAL_ERROR) morse_trap(217);
 #endif  
 
@@ -305,8 +307,14 @@ int main(void)
   // (CAN1 control block pointer, size of circular buffer)
   pmbxret = MailboxTask_add_CANlist(pctl0, 32);
   if (pmbxret == NULL) morse_trap(215);
-  pmbxret = MailboxTask_add_CANlist(pctl1, 32);
-  if (pmbxret == NULL) morse_trap(215);
+
+#ifdef CONFIGCAN2
+    pmbxret = MailboxTask_add_CANlist(pctl1, 32);
+    if (pmbxret == NULL) morse_trap(215);
+#endif    
+
+/* Create GatewayTask */
+  xGatewayTaskCreate(osPriorityNormal); // (arg) = priority  
 
   /* Create serial receiving task. */
   ret = xSerialTaskReceiveCreate(osPriorityNormal);
@@ -316,10 +324,15 @@ int main(void)
   Thrdret = xEMCLTaskCreate(osPriorityNormal);
   if (Thrdret == NULL) morse_trap(108);
 
+  /* Initialize hard-code params for functions. */
   emcl_idx_v_struct_hardcode_params(&emclfunction.lc);
 
 /* Create CoolingTask */
   Thrdret = xCoolingTaskCreate(osPriorityNormal);
+  if (Thrdret == NULL) morse_trap(110);
+
+/* Create String Charging Task. */  
+  Thrdret = xStringChgrTaskCreate(osPriorityNormal);
   if (Thrdret == NULL) morse_trap(110);
 
 /* CAN communication */
@@ -332,11 +345,13 @@ int main(void)
     CAN_IT_RX_FIFO0_MSG_PENDING |  \
     CAN_IT_RX_FIFO1_MSG_PENDING    );
 
+#ifdef CONFIGCAN2
     /* Select interrupts for CAN2 */
   HAL_CAN_ActivateNotification(&hcan2, \
     CAN_IT_TX_MAILBOX_EMPTY     |  \
     CAN_IT_RX_FIFO0_MSG_PENDING |  \
     CAN_IT_RX_FIFO1_MSG_PENDING    );
+#endif  
 
   /* USER CODE END RTOS_THREADS */
 
@@ -1379,12 +1394,18 @@ HAL_GPIO_WritePin(GPIOB, GPIO_PIN_13, GPIO_PIN_SET); // RED OFF
     yprintf(&pbuf1,"%5d\n\r", dbgcool1);
 #endif
 
-#if 1
+#if 0 // Green LED winking
     HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, GPIO_PIN_RESET); // GRN ON
         osDelay(3);
     HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, GPIO_PIN_SET); // GRN OFF
       osDelay(250-3);
+#else
+  static uint32_t yyctr;
+  yprintf(&pbuf2,"%5d\n\r",yyctr++);
+  osDelay(1001);
 #endif
+
+#if 0    
   static uint32_t yctr;      
 //  yprintf(&pbuf2,"%5d", yctr++);
   struct MOTORRAMP* pmr; //
@@ -1397,7 +1418,7 @@ HAL_GPIO_WritePin(GPIOB, GPIO_PIN_13, GPIO_PIN_SET); // RED OFF
       pmr->frampaccum,pmr->irampaccum);
   }
   yprintf(&pbuf2,"\n\r");
-
+#endif
 
 #if 0 // pwm testing
 static struct RYREQ_Q ryreq_q1;
@@ -1506,9 +1527,6 @@ extern uint8_t cooltest1;
  #endif
 }
 #endif
-
-
-
 
 #if 0 // 60 Hz output ac measurement
 float fnum;

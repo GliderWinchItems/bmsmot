@@ -131,6 +131,8 @@ void Error_Handler(void);
 
 #define CONFIGCAN2  // Configure for CAN2
 
+// Gateway task (for Mailbox use)
+#define GATEWAYTASKINCLUDED // Include gateway
 
 extern const uint32_t i_am_canid;
 
