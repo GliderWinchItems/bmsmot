@@ -73,10 +73,10 @@ static void updatetable(struct BMSTABLE* ptbl, struct CANRCVBUFS* pcans)
 	case CMD_CMD_CELLEMC1: // 46 EMC1 poll
 	case CMD_CMD_CELLPC:   // 47 PC poll
 	case CMD_CMD_CELLEMC2: // 51 EMC2 poll
-		idx = pcans->can.cd.uc[1] >> 8;
-		ptbl->cell[idx + 0] = pcans->can.cd.ui[1];
-		ptbl->cell[idx + 1] = pcans->can.cd.ui[2];
-		ptbl->cell[idx + 2] = pcans->can.cd.ui[3];
+		idx = pcans->can.cd.uc[1] >> 4;
+		ptbl->cell[idx + 0] = pcans->can.cd.us[1];
+		ptbl->cell[idx + 1] = pcans->can.cd.us[2];
+		ptbl->cell[idx + 2] = pcans->can.cd.us[3];
 		break;
 	}
 

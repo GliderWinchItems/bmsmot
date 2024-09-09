@@ -1415,14 +1415,18 @@ HAL_GPIO_WritePin(GPIOB, GPIO_PIN_13, GPIO_PIN_SET); // RED OFF
     bmsnum_prev = bmsnum;
     for (int j = 0; j < bmsnum; j++)
     {
-      yprintf(&pbuf2,"%2d %08X",j,pbmstbl[j]->id);
+      yprintf(&pbuf2,"\n\r%2d %08X",j,pbmstbl[j]->id);
       uint32_t msum = 0;
       for (int k = 0; k < 18; k++)
       {
         msum += pbmstbl[j]->cell[k];
       }
       float fmsum = msum;
-      yprintf(&pbuf1," %6.3f",fmsum/10000f);
+      yprintf(&pbuf1," %6.3f",fmsum/10000);
+      for (int k = 0; k < 18; k++)
+      {
+        yprintf(&pbuf2," %4d",pbmstbl[j]->cell[k]);
+      }
     }
     yprintf(&pbuf1,"\n\r",bmsnum);
   }
