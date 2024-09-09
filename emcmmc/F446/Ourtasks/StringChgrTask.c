@@ -39,7 +39,7 @@ void StartStringChgrTask(void* argument)
 	struct CANRCVBUFS* pcans;
 
 /* Setup serial output buffers for uarts. */
-	struct SERIALSENDTASKBCB* pbuf1 = getserialbuf(&HUARTMON,  96); // PC monitor uart	
+//	struct SERIALSENDTASKBCB* pbuf1 = getserialbuf(&HUARTMON,  96); // PC monitor uart	
 /*
 #define LED5_GRN_Pin GPIO_PIN_12
 #define LED5_GRN_GPIO_Port GPIOB
@@ -48,30 +48,28 @@ void StartStringChgrTask(void* argument)
 */
 	for (;;)
 	{
-		xTaskNotifyWait(0,0xffffffff, &noteval, 750-15);
+		xTaskNotifyWait(0,0xffffffff, &noteval, 500-15);
 		{
 			if ((noteval & STRINGCHRGBIT00) != 0)
-			{
+			{ // Here, gateway placed a CAN msg on circular buffer for us
 dbgS1 += 1;				
 				do
 				{
+					/* Gateway passes only CAN msgs needed for StringChgrTask. */
 					pcans = GatewayTask_takecan1();
 					if (pcans != NULL)
-					{
-//yprintf(&pbuf1,"\tS1 %08X %d: %d\n\r",pcans->can.id,pcans->can.dlc,pcans->can.cd.uc[0]);
-yprintf(&pbuf1,"\tS1 %d %08X %d: %d\n\r",pcans->sel, pcans->can.id,pcans->can.dlc,pcans->can.cd.uc[0]);
-
+					{ // Here, pcans points to CAN msg in gateway's circular buffer
+						/* Gateway selection adds a code, so no need to do compares. */
 						if (pcans->sel == 0)
-						{ // Here, a BMS node CAN msg
-						//	bmsmsg(pcans);
+						{ // Here: code = BMS node CAN msg
+							do_tableupdate(pcans); // Build or update table of BMS nodes
 						}
-
 					}
 
 				} while (pcans != NULL);
-
-
-				/* Wink green led */
+			}
+			if (noteval == 0)
+			{ /* Blink green led */
 				if ((dbgalt++ & 1) == 0)
 				{
 					HAL_GPIO_WritePin(LED5_GRN_GPIO_Port,LED5_GRN_Pin,GPIO_PIN_RESET); // GRN LED

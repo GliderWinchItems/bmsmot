@@ -49,6 +49,7 @@
 #include "emcl_idx_v_struct.h"
 #include "iir_f1.h"
 #include "StringChgrTask.h"
+#include "stringchgr_items.h"
 #include "GatewayTask.h"
 
 #include "FreeRTOS.h"
@@ -1401,9 +1402,25 @@ HAL_GPIO_WritePin(GPIOB, GPIO_PIN_13, GPIO_PIN_SET); // RED OFF
       osDelay(250-3);
 #else
   static uint32_t yyctr;
-  yprintf(&pbuf2,"%5d\n\r",yyctr++);
+  yprintf(&pbuf2,"%5d ",yyctr++);
   osDelay(1001);
 #endif
+
+#if 1
+  static uint8_t bmsnum_prev;
+  yprintf(&pbuf1,"bmsnum %d\n\r",bmsnum);
+  if ((bmsnum_prev != bmsnum) || 
+      ((yyctr % 10) == 0)      )
+  {
+    bmsnum_prev = bmsnum;
+    for (int j = 0; j < bmsnum; j++)
+    {
+      yprintf(&pbuf2,"%2d %08X\n\r",j,pbmstbl[j]->id);
+    }
+    yprintf(&pbuf1,"\n\r",bmsnum);
+  }
+
+#endif  
 
 #if 0    
   static uint32_t yctr;      

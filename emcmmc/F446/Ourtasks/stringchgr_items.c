@@ -6,7 +6,7 @@
 *******************************************************************************/
 #include "stringchgr_items.h"
 #include "cancomm_items.h"
-
+#include "bubblesort_uint32_t.h"
 
 /* Status bits (see BQTask.h)
 Battery--
@@ -39,21 +39,10 @@ Mode status bits 'mode_status' --
 	po->cd.uc[6] = p->mode_status;
 */
 
-/* BMS TABLE (not Bowel Movement STable) */
-struct BMSTABLE
-{
-	uint32_t id;       // Node CAN id
-	uint8_t batt;      // Battery status
-	uint8_t fet;       // FET status
-	uint8_t mode;      // Mode status
-	uint8_t rpid_ever; // CAN idReported: at least once
-	uint8_t rpid_now;  // CAN id Reported: poll response
-	uint8_t rpsts_ever;// Status reported: at least once
-	uint8_t rpsts_now; // Status reported: poll response
-};
-#define BMSTABLESIZE 16 // Max size of table
-static struct BMSTABLE bmstable[BMSTABLESIZE];
-static uint8_t bmsnum; // Number of reported BMS nodes
+struct BMSTABLE bmstable[BMSTABLESIZE];
+uint8_t bmsnum; // Number of reported BMS nodes
+/* Pointers for accessing table in sorted CAN id order. */
+struct BMSTABLE* pbmstbl[BMSTABLESIZE];
 
 /* *************************************************************************
  * int8_t do_tableupdate(struct CANRCVBUFS* pcans);
@@ -63,15 +52,34 @@ static uint8_t bmsnum; // Number of reported BMS nodes
  * *************************************************************************/
 static void updatetable(struct BMSTABLE* ptbl, struct CANRCVBUFS* pcans)
 {
+	uint8_t idx;
+
 	ptbl->rpid_now = 1; // Current report
-	if (pcans->can.cd.uc[1] == MISCQ_STATUS)
-	{ // Here, BMS node w status payload
-		ptbl->rpsts_ever = 1;
-		ptbl->rpsts_now  = 1;
-		ptbl->batt = pcans->can.cd.uc[4];
-		ptbl->fet  = pcans->can.cd.uc[5];
-		ptbl->mode = pcans->can.cd.uc[6];
+
+	switch (pcans->can.cd.uc[0])
+	{
+	case CMD_CMD_MISCHB: // 45 Heartbeat 
+		if (pcans->can.cd.uc[1] == MISCQ_STATUS)
+		{ // Here, BMS node w status payload
+			ptbl->rpsts_ever = 1;
+			ptbl->rpsts_now  = 1;
+			ptbl->batt = pcans->can.cd.uc[4];
+			ptbl->fet  = pcans->can.cd.uc[5];
+			ptbl->mode = pcans->can.cd.uc[6];
+		}
+		break;
+
+	case CMD_CMD_CELLHB:   // 44 Heartbeat
+	case CMD_CMD_CELLEMC1: // 46 EMC1 poll
+	case CMD_CMD_CELLPC:   // 47 PC poll
+	case CMD_CMD_CELLEMC2: // 51 EMC2 poll
+		idx = pcans->can.cd.uc[1] >> 8;
+		ptbl->cell[idx + 0] = pcans->can.cd.ui[1];
+		ptbl->cell[idx + 1] = pcans->can.cd.ui[2];
+		ptbl->cell[idx + 2] = pcans->can.cd.ui[3];
+		break;
 	}
+
 	return;	
 }
 
@@ -90,10 +98,18 @@ int8_t do_tableupdate(struct CANRCVBUFS* pcans)
 	/* Not in table. Add to table. */
 	if (i >= bmsnum)
 	{ // Not in table. Add to table
-		bmstable[i].id = pcans->can.id;
 		bmsnum += 1;
+		bmstable[i].id = pcans->can.id;
+		pbmstbl[i] = &bmstable[i];
 		updatetable(&bmstable[i], pcans);
+
+		if (bmsnum > 1)
+		{
+			/* Sort array for accessing in CAN id sorted order. */
+			bubble_sort_uint32t(&pbmstbl[0], bmsnum);
+		}
 	}
+
 	return 1;
 }
 							
