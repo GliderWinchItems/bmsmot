@@ -1409,26 +1409,31 @@ HAL_GPIO_WritePin(GPIOB, GPIO_PIN_13, GPIO_PIN_SET); // RED OFF
 #if 1
   static uint8_t bmsnum_prev;
   yprintf(&pbuf1,"bmsnum %d\n\r",bmsnum);
+  /* Output table when there is a change in size,
+     OR, every 10 cycles. */
   if ((bmsnum_prev != bmsnum) || 
       ((yyctr % 10) == 0)      )
-  {
+  { 
     bmsnum_prev = bmsnum;
+    float totalv = 0;
     for (int j = 0; j < bmsnum; j++)
     {
       yprintf(&pbuf2,"\n\r%2d %08X",j,pbmstbl[j]->id);
+      // Sum cell readings for module
       uint32_t msum = 0;
       for (int k = 0; k < 18; k++)
       {
         msum += pbmstbl[j]->cell[k];
       }
       float fmsum = msum;
-      yprintf(&pbuf1," %6.3f",fmsum/10000);
+      yprintf(&pbuf1," %6.3f",fmsum*0.0001f);
       for (int k = 0; k < 18; k++)
       {
         yprintf(&pbuf2," %4d",pbmstbl[j]->cell[k]);
       }
+      totalv += fmsum; // Sum total battery string volts
     }
-    yprintf(&pbuf1,"\n\r",bmsnum);
+    yprintf(&pbuf1,"\n\r,    total %7.3f\n\r",totalv*0.0001f);
   }
 
 #endif  
