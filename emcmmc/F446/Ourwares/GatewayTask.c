@@ -65,6 +65,7 @@ uint32_t dbuggateway1;
 
 struct CANRCVBUFS can1cirbuf[CAN1CIRBUFSIZE];
 struct CANRCVBUFS can2cirbuf[CAN2CIRBUFSIZE];
+
 struct CIRBUF
 {
 	struct CANRCVBUFS* pbegin;

@@ -7,7 +7,7 @@
 #include "common_can.h"
 #include "../../../../GliderWinchCommons/embed/svn_common/trunk/db/gen_db.h"
 
-/* Table lookup to classify CAN ID */
+/* Table lookup to classify CAN ID for StringChgrTask. */
 /* ##### CANID *MUST* BE IN SORTED ORDER for bsearch ##### */
 const struct CANIDCLASS canidclass[] =
 {
@@ -45,28 +45,25 @@ const struct CANIDCLASS canidclass[] =
 	{CANID_HB_CNTCTR1A,    C1SELCODE_CONTACTOR0 }, /* 'FF000000' Contactor1: Heartbeat: High voltage2:Current sensor2 */
 	{CANID_HB_CNTCTR1V,    C1SELCODE_CONTACTOR0 }, /* 'FF800000' Contactor1: Heartbeat: High voltage1:Current sensor1 */
 };
-/*
--- DMOC sends. Unit #1 untranslated
-INSERT INTO CANID VALUES ('CANID_DMOC_ACTUALTORQ','47400000','DMOC',1,1,'I16',       'DMOC: Actual Torque: payload-30000');
-INSERT INTO CANID VALUES ('CANID_DMOC_SPEED',     '47600000','DMOC',1,1,'I16_X6',    'DMOC: Actual Speed (rpm?)');
-INSERT INTO CANID VALUES ('CANID_DMOC_DQVOLTAMP', '47C00000','DMOC',1,1,'I16_I16_I16_I16','DMOC: D volt:amp, Q volt:amp');
-INSERT INTO CANID VALUES ('CANID_DMOC_TORQUE',    '05683004','DMOC',1,1,'I16_I16',   'DMOC: Torque,-(Torque-30000)');
-INSERT INTO CANID VALUES ('CANID_DMOC_CRITICAL_F','056837fc','DMOC',1,1,'NONE',      'DMOC: Critical Fault: payload = DEADB0FF');
-INSERT INTO CANID VALUES ('CANID_DMOC_HV_STATUS', 'CA000000','DMOC',1,1,'I16_I16_X6','DMOC: HV volts:amps, status');
-INSERT INTO CANID VALUES ('CANID_DMOC_HV_TEMPS',  'CA200000','DMOC',1,1,'U8_U8_U8',  'DMOC: Temperature:rotor,invert,stator');
--- DMOC sends: translated
--- Unit #2
-INSERT INTO CANID VALUES ('CANID_DMOC2_ACTUALTORQ','4740001C','DMOC',1,1,'I16',       'DMOC2: Actual Torque: payload-30000');
-INSERT INTO CANID VALUES ('CANID_DMOC2_SPEED',     '4760001C','DMOC',1,1,'I16_X6',    'DMOC2: Actual Speed (rpm?)');
-INSERT INTO CANID VALUES ('CANID_DMOC2_DQVOLTAMP', '47C0001C','DMOC',1,1,'I16_I16_I16_I16','DMOC1: D volt:amp, Q volt:amp');
-INSERT INTO CANID VALUES ('CANID_DMOC2_TORQUE',    '05683014','DMOC',1,1,'I16_I16',   'DMOC2: Torque,-(Torque-30000)');
-INSERT INTO CANID VALUES ('CANID_DMOC2_CRITICAL_F','056838fc','DMOC',1,1,'NONE',      'DMOC2: Critical Fault: payload = DEADB0FF');
-INSERT INTO CANID VALUES ('CANID_DMOC2_HV_STATUS', 'CA00001C','DMOC',1,1,'I16_I16_X6','DMOC2: HV volts:amps, status');
-INSERT INTO CANID VALUES ('CANID_DMOC2_HV_TEMPS',  'CA20001C','DMOC',1,1,'U8_U8_U8',  'DMOC2: Temperature:rotor,invert,stator');
-*/
+
+/*-- DMOC sends. Unit #1 untranslated */
+/* Table lookup for DMOC task. */
+const struct CANIDCLASS canidclass1[] =
+{
+	{CANID_DMOC_TORQUE,     C1SELCODE_DMOC }, /*'05683004': Torque,-(Torque-30000) */
+	{CANID_DMOC_CRITICAL_F, C1SELCODE_DMOC }, /*'056837fc': Critical Fault: payload = DEADB0FF */
+	{CANID_DMOC_ACTUALTORQ, C1SELCODE_DMOC }, /*'47400000': Actual Torque: payload-30000 */
+	{CANID_DMOC_SPEED,      C1SELCODE_DMOC }, /*'47600000': Actual Speed (rpm?) */
+	{CANID_DMOC_DQVOLTAMP,  C1SELCODE_DMOC }, /*'47C00000': D volt:amp, Q volt:amp */
+	{CANID_DMOC_HV_STATUS,  C1SELCODE_DMOC }, /*'CA000000': HV volts:amps, status */
+	{CANID_DMOC_HV_TEMPS,   C1SELCODE_DMOC }, /*'CA200000': Temperature:rotor,invert,stator */
+};
+
 
 /* Init code sets this to the number of elements in the above array. */
 uint16_t cidclsz; 
+uint16_t cidcl1sz; 
+
 /* *************************************************************************
  * uint16_t canidclass_init(void);
  *	@brief	: Setup size of table
@@ -76,4 +73,10 @@ uint16_t canidclass_init(void)
 	/* Number of elements in CAN1 id (const) lookup table. */
 	cidclsz = sizeof(canidclass)/sizeof(canidclass[0]);
 	return cidclsz;
+}
+uint16_t canidclass1_init(void)
+{
+	/* Number of elements in CAN1 id (const) lookup table. */
+	cidcl1sz = sizeof(canidclass1)/sizeof(canidclass1[0]);
+	return cidcl1sz;
 }

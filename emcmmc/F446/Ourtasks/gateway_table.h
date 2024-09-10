@@ -18,6 +18,8 @@
 #define C1SELCODE_CONTACTOR2 4 // CONTACTOR on string
 #define C1SELCODE_CONTACTOR3 4 // CONTACTOR on string
 
+#define C1SELCODE_DMOC   4 // Temp code for now
+
 
 struct CANIDCLASS
 {
@@ -27,6 +29,7 @@ struct CANIDCLASS
 
 /* *************************************************************************/
  uint16_t canidclass_init(void);
+ uint16_t canidclass1_init(void);
 /*	@brief	: Setup size of table
  * *************************************************************************/
 
@@ -34,5 +37,7 @@ struct CANIDCLASS
 
 /* Init code sets this to the number of elements in the above array. */
 extern uint16_t cidclsz; 
+extern uint16_t cidcl1sz; 
+
 
 #endif
