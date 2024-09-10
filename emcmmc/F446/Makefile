@@ -108,6 +108,7 @@ C_SOURCES += Ourtasks/CoolingTask.c
 C_SOURCES += Ourtasks/StringChgrTask.c
 C_SOURCES += Ourtasks/stringchgr_items.c
 C_SOURCES += Ourtasks/bubblesort_uint32_t.c
+C_SOURCES += Ourtasks/gateway_table.c
 
 
 # /* USER CODE END */ 

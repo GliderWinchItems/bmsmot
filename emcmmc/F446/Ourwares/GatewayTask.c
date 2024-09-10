@@ -25,6 +25,16 @@ The 'MailboxTask' is likely a high FreeRTOS priority task.  This task might run 
 a lower priority since timing is not critical, however delays require that the 
 circular buffer be large enough to avoid overrun since there is no protection for
 buffer overflow (since CAN msgs are added to the circular buffer under interrupt).
+
+  09/09/2024
+This takes a CAN msg from the incoming the Mailbox circular buffer (see above) and
+checks if it should be sent to an emcmmc task. If so, it places the msg on a 
+circular buffer for the task and makes a notification. 
+
+The table for determining the fate of the CAN msg stored in flash, and the struct
+holds the CAN id (of course) and a code for the use, e.g. is it a BMS node msg. The
+recipient of the msg, e.g. StringChgrTask, can use the code and avoid another CAN id
+lookup.
 */
 
 #include <string.h>
@@ -44,6 +54,7 @@ buffer overflow (since CAN msgs are added to the circular buffer under interrupt
 //#include "gateway_CANtoPC.h"
 #include "main.h"
 #include "StringChgrTask.h"
+#include "gateway_table.h"
 
 uint32_t dbuggateway1;
 
@@ -71,12 +82,12 @@ extern struct CAN_CTLBLOCK* pctl0;	// Pointer to CAN1 control block
 extern struct CAN_CTLBLOCK* pctl1;	// Pointer to CAN2 control block
 
 void StartGatewayTask(void const * argument);
-static int8_t selectCAN1(struct CANRCVBUF* pcan);
+static struct CANIDCLASS* selectCAN1(struct CANRCVBUF* pcan);
+
+/* Table (in flash) for CAN id lookup. */
+extern const struct CANIDCLASS canidclass[];
 
 osThreadId GatewayTaskHandle;
-
-/* A notification to Gateway copies the internal notification word to this. */
-uint32_t noteval = 0;    // Receives notification word upon an API notify
 
 /* *************************************************************************
  * struct CANRCVBUFS* GatewayTask_takecan1(void);
@@ -197,6 +208,9 @@ gatercvflag = 1;
 		}
 	}
 
+	/* Init number of elements in CAN1 id (const) lookup table. */
+	canidclass_init(); // sets: uint16_t cidclsz;
+
 #if 0 // Started by CanTask
 	/* Start CANs */
 extern CAN_HandleTypeDef hcan1;
@@ -207,6 +221,8 @@ extern CAN_HandleTypeDef hcan1;
 		HAL_CAN_Start(&hcan2); // CAN2
 #endif
 #endif
+
+	uint32_t noteval = 0;    // Receives notification word upon an API notify
 
   /* Infinite RTOS Task loop */
   for(;;)
@@ -228,22 +244,23 @@ extern CAN_HandleTypeDef hcan1;
 					/* Convert binary to the ascii/hex format for PC. */
 						canqtx2.can = pncan->can; // Save a local copy
 
-						int ret = selectCAN1(&pncan->can); // Selection for StringChgrTask
-						if (ret >= 0)
-						{ // Here, CAN msg has been selected for StringChgrTask
+						struct CANIDCLASS* pcl = selectCAN1(&pncan->can); // Selection for StringChgrTask
+						if (pcl != NULL)
+						{ // Here, CAN msg is in table for StringChgrTask
+							if (pcl->code == C1SELCODE_BMS)
+							{	/* Place CAN msg on circular buffer w selection code */
+								if (addcan(&circan1, &pncan->can, pcl->code) == 0)
+								{ // Here, success (no overflow)
+									/* Notify StringChgrTask of an addition to buffer. */
+									extern TaskHandle_t StringChgrTaskHandle;							
+									xTaskNotify(StringChgrTaskHandle,STRINGCHRGBIT00,eSetBits);
 
-							/* Place CAN msg on circular buffer w selection code */
-							if (addcan(&circan1, &pncan->can, ret) == 0)
-							{ // Here, success (no overflow)
-								/* Notify StringChgrTask of an addition to buffer. */
-								extern TaskHandle_t StringChgrTaskHandle;							
-								xTaskNotify(StringChgrTaskHandle,STRINGCHRGBIT00,eSetBits);
-
-					/* Bridging === CAN1 -> CAN2 === */
-#ifdef CONFIGCAN2 // CAN2 setup
-					/* === CAN1 -> CAN2 === */
-//?						xQueueSendToBack(CanTxQHandle,&canqtx2,portMAX_DELAY);
-#endif
+						/* Bridging === CAN1 -> CAN2 === */
+	#ifdef CONFIGCAN2 // CAN2 setup
+						/* === CAN1 -> CAN2 === */
+	//?						xQueueSendToBack(CanTxQHandle,&canqtx2,portMAX_DELAY);
+	#endif
+								}
 							}
 						}
 					}
@@ -275,37 +292,50 @@ extern CAN_HandleTypeDef hcan1;
   }
 }
 /* *************************************************************************
- * static int8_t selectCAN1(struct CANRCVBUF* pcan;
- *	@brief	: Check if CAN ID and msg is for StringChrgTask
+ * static struct CANIDCLASS* selectCAN1(struct CANRCVBUF* pcan;
+ *	@brief	: Find if CAN id is in table (in flash) for StringChgrTask
  *  @param  : pcan = pointer to msg of interest
- *  @return : 0 = BMS node msg
- *          : 1 = ELCON msg
- *          :-1 = no
+ *  @return : NULL = not found, otherwise pointer to table entry
  * *************************************************************************/
-static int8_t selectCAN1(struct CANRCVBUF* pcan)
+//#define LINEAR_SEARCH 
+#ifdef LINEAR_SEARCH
+/* LINEAR SEARCH */
+static struct CANIDCLASS* selectCAN1(struct CANRCVBUF* pcan)
 {
-	/* Check Pollsters and BMS nodes. */
-	// BMS CAN id range: 'AEC00000' - 'B31E0000'
-	if ((pcan->id >= (uint32_t)CANID_UNI_BMS_PC_I) &&
-		  (pcan->id <= (uint32_t)CANID_UNI_BMS14_R ) )
+	struct CANIDCLASS* pcl = &canidclass[0];
+	uint32_t id = pcan->id;
+	for (int i = 0; i < cidclsz; i++)
 	{
-		return C1SELCODE_BMS; // Yes!
+		if (pcl->id == id)
+		{
+			return pcl;
+		}
+		pcl += 1;
 	}
-
-	/* Check for an ELCON charger msg */
-	if (pcan->id == CANID_ELCON_TX)
-		return C1SELCODE_ELCON; // 'C7FA872C'
-/*
-INSERT INTO CANID VALUES ('CANID_ELCON_TX','C7FA872C','ELCON ',1,1,'I16_I16_U8_U8_U8_U8','ELCON  CAN BUS Charger transmit: ');
-INSERT INTO CANID VALUES ('CANID_ELCON_RX','C0372FA4','ELCON ',1,1,'I16_I16_U8_U8_U8_U8','ELCON  CAN BUS Charger receive: ');
-
-#define C1SELCODE_BMS       0 // BMS node CAN id 
-#define C1SELCODE_ELCON     2 // ELCON (not translated) on string
-*/
-
-	/* Check for contactor. */
-
-
-	return -1; // None of the above!
-
+	return NULL; // No match
 }
+
+#else
+/* BSEARCH */
+static struct CANIDCLASS* selectCAN1(struct CANRCVBUF* pcan)
+{
+	struct CANIDCLASS* pcl = &canidclass[0];
+	uint32_t id = pcan->id;
+	int16_t i,j,k;
+	  i = 0; j = (cidclsz - 1);
+	  while (i <= j) 
+	  {
+	      k = i + ((j - i) / 2);
+	      if ((pcl+k)->id == id) 
+	      { // Here, found
+	      	return (pcl+k);
+	      }
+	      else if ((pcl+k)->id < id) 
+	          i = k+1;
+	      else 
+	          j = k-1;
+	  }
+	return NULL; // No match
+}
+#endif	
+

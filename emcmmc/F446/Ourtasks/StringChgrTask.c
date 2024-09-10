@@ -60,8 +60,9 @@ dbgS1 += 1;
 					if (pcans != NULL)
 					{ // Here, pcans points to CAN msg in gateway's circular buffer
 						/* Gateway selection adds a code, so no need to do compares. */
-						if (pcans->sel == 0)
+						if (pcans->sel == C1SELCODE_BMS)
 						{ // Here: code = BMS node CAN msg
+//yprintf(&pbuf1,"S %08X %d\n\r",pcans->can.id, pcans->sel);
 							do_tableupdate(pcans); // Build or update table of BMS nodes
 						}
 					}
