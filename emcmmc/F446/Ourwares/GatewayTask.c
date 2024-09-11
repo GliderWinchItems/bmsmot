@@ -116,12 +116,13 @@ struct CANRCVBUFS* GatewayTask_takecan2(void)
 	return takecan(&circan2);
 }
 /* *************************************************************************
- * static int8_t addcan(struct CIRBUF* pcircan, struct CANRCVBUF* pcan);
+ * static int8_t addcan(struct CIRBUF* pcircan, struct CANIDCLASS* pcl);
  *	@brief	: Add CAN1/2 msg to circular buffer
  *  @param  : pcircan = pointer to pointers to circular buffer
+ *  @param  : pcl = pointer to const table in flash
  *  @param  : pcan = pointer to CAN msg to be added to buffer
  * *************************************************************************/
-static int8_t addcan(struct CIRBUF* pcircan, struct CANRCVBUF* pcan, int16_t sel)
+static int8_t addcan(struct CIRBUF* pcircan, struct CANRCVBUF* pcan, struct CANIDCLASS* pcl)
 {
 	struct CANRCVBUFS* ptmp = pcircan->padd; // Current available position
 	ptmp += 1; // Advance and check if an overflow
@@ -129,11 +130,10 @@ static int8_t addcan(struct CIRBUF* pcircan, struct CANRCVBUF* pcan, int16_t sel
 	if (ptmp == pcircan->ptake)
 		return -1; // Here: overflow
 	pcircan->padd->can = *pcan; // Copy CAN msg to buffer
-	pcircan->padd->sel = sel; // Selection code
-	pcircan->padd = ptmp;   // Update add pointer to next position
+	pcircan->padd->pcl = pcl;   // Selection code
+	pcircan->padd      = ptmp;  // Update add pointer to next position
 	return 0;
 }
-
 /* *************************************************************************
  * osThreadId xGatewayTaskCreate(uint32_t taskpriority);
  * @brief	: Create task; task handle created is global for all to enjoy!
@@ -250,7 +250,7 @@ extern CAN_HandleTypeDef hcan1;
 						{ // Here, CAN msg is in table for StringChgrTask
 							if (pcl->code == C1SELCODE_BMS)
 							{	/* Place CAN msg on circular buffer w selection code */
-								if (addcan(&circan1, &pncan->can, pcl->code) == 0)
+								if (addcan(&circan1, &pncan->can, pcl) == 0)
 								{ // Here, success (no overflow)
 									/* Notify StringChgrTask of an addition to buffer. */
 									extern TaskHandle_t StringChgrTaskHandle;							

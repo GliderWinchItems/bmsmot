@@ -46,6 +46,9 @@ void StartStringChgrTask(void* argument)
 #define LED6_RED_Pin GPIO_PIN_13
 #define LED6_RED_GPIO_Port GPIOB
 */
+	/* Init some things. */
+	stringchgr_items_init();
+
 	for (;;)
 	{
 		xTaskNotifyWait(0,0xffffffff, &noteval, 500-15);
@@ -53,20 +56,18 @@ void StartStringChgrTask(void* argument)
 			if ((noteval & STRINGCHRGBIT00) != 0)
 			{ // Here, gateway placed a CAN msg on circular buffer for us
 dbgS1 += 1;				
-				do
-				{
-					/* Gateway passes only CAN msgs needed for StringChgrTask. */
+				do // Loop until buffer emptied
+				{ /* Gateway passes only CAN msgs needed for StringChgrTask. */
 					pcans = GatewayTask_takecan1();
 					if (pcans != NULL)
 					{ // Here, pcans points to CAN msg in gateway's circular buffer
 						/* Gateway selection adds a code, so no need to do compares. */
-						if (pcans->sel == C1SELCODE_BMS)
-						{ // Here: code = BMS node CAN msg
-//yprintf(&pbuf1,"S %08X %d\n\r",pcans->can.id, pcans->sel);
+						if (pcans->pcl->code == C1SELCODE_BMS)
+						{ // Here: code = BMS node CAN msg group
+//yprintf(&pbuf1,"S %08X %d\n\r",pcans->can.id, pcans->pcl->code);
 							do_tableupdate(pcans); // Build or update table of BMS nodes
 						}
 					}
-
 				} while (pcans != NULL);
 			}
 			if (noteval == 0)

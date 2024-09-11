@@ -16,6 +16,7 @@
 #include "malloc.h"
 #include "common_can.h"
 #include "../../../../GliderWinchCommons/embed/svn_common/trunk/db/gen_db.h"
+#include "gateway_table.h"
 
 /* CAN msg ID codes for CANRCVBUFS passed to StringChgrTask. */
 #define C1SELCODE_NOT_FOUND  0  // Not in table
@@ -31,8 +32,8 @@
 /* CAN msg buffer with selection code. */
 struct CANRCVBUFS
 {
-	struct CANRCVBUF can;
-	uint16_t sel;  // Selection code
+	struct CANRCVBUF can;   // Copy of CAN msgs
+	struct CANIDCLASS* pcl; // Pointer to table of structs
 };
 
 /* *************************************************************************/

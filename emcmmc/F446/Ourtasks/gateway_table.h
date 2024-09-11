@@ -14,19 +14,18 @@
 #define C1SELCODE_ELCON      2 // ELCON (not translated) on string
 #define C1SELCODE_POLLS      3 // PC, EMC1, EMC2 polling
 #define C1SELCODE_CONTACTOR0 4 // CONTACTOR on string
-#define C1SELCODE_CONTACTOR1 4 // CONTACTOR on string
-#define C1SELCODE_CONTACTOR2 4 // CONTACTOR on string
-#define C1SELCODE_CONTACTOR3 4 // CONTACTOR on string
 
-#define C1SELCODE_DMOC   4 // Temp code for now
+#define C1SELCODE_DMOC   5 // Temp code for now
 
+#define BMSNODEIDSZ 18 // Number of CAN IDs in table
 
+/* Classification lookup table element. */
 struct CANIDCLASS
 {
 	uint32_t id;   // CAN id
-	uint16_t code; // code identifies "who" it is for
+	uint16_t code; // code identifies "group"
+	uint16_t rmap; // remapping (0 - n)
 };
-
 /* *************************************************************************/
  uint16_t canidclass_init(void);
  uint16_t canidclass1_init(void);

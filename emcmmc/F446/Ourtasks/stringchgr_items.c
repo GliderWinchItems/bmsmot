@@ -39,10 +39,31 @@ Mode status bits 'mode_status' --
 	po->cd.uc[6] = p->mode_status;
 */
 
+/* Table with data for each BMS node on the string. */
 struct BMSTABLE bmstable[BMSTABLESIZE];
 uint8_t bmsnum; // Number of reported BMS nodes
+
 /* Pointers for accessing table in sorted CAN id order. */
 struct BMSTABLE* pbmstbl[BMSTABLESIZE];
+
+/* Indices for accessing table element, given lookup mapped index. */
+// Entry every possible BMS CAN id. -1 = not in table, >= 0 index of table
+static int8_t remap[BMSNODEIDSZ]; 
+
+/* *************************************************************************
+ * void stringchgr_items_init(void);
+ * @brief	: Init stuff
+ * *************************************************************************/
+void stringchgr_items_init(void)
+{
+	int i;
+	for (i = 0; i < BMSNODEIDSZ; i++)
+	{
+		remap[i] = -1; // Show BMS node CAN ID position not accessed
+	}
+
+	return;
+}
 
 /* *************************************************************************
  * int8_t do_tableupdate(struct CANRCVBUFS* pcans);
@@ -85,31 +106,44 @@ static void updatetable(struct BMSTABLE* ptbl, struct CANRCVBUFS* pcans)
 
 int8_t do_tableupdate(struct CANRCVBUFS* pcans)
 {
-	int i;
-	for (i = 0; i < bmsnum; i++)
-	{
-		if (pcans->can.id == bmstable[i].id)
-		{ // CAN id is in the list
-			bmstable[i].rpid_now = 1; // Current report
-			updatetable(&bmstable[i], pcans);
+	int8_t rmaptmp = pcans->pcl->rmap;
+	if (remap[rmaptmp] < 0) 
+	{ // This CAN id has not been added to table
+		if (bmsnum < BMSTABLESIZE)
+		{ // Space available: Add CAN id to table
+
+			// pcans->pcl->rmap will get index into table
+			remap[rmaptmp] = bmsnum; // Set remap ID to table
+
+			// Copy CAN ID into table
+			bmstable[bmsnum].id = pcans->can.id;
+
+			// Array of pointers for sorting.
+			pbmstbl[bmsnum] = &bmstable[bmsnum];
+
+			// Update table items depending CAN msg payloard
+			updatetable(&bmstable[bmsnum], pcans);
+
+			// Advance size of BMS nodes discovered
+			bmsnum += 1;
+			if (bmsnum > 1)
+			{
+				/* Sort array for accessing in CAN id sorted order. */
+				bubble_sort_uint32t(&pbmstbl[0], bmsnum);
+			}
 			return 0;
+		}		
+		else
+		{ // Here, BMS CAN ID, but table is at max string size.
+			return -1; // Trouble
 		}
 	}
-	/* Not in table. Add to table. */
-	if (i >= bmsnum)
-	{ // Not in table. Add to table
-		bmsnum += 1;
-		bmstable[i].id = pcans->can.id;
-		pbmstbl[i] = &bmstable[i];
-		updatetable(&bmstable[i], pcans);
-
-		if (bmsnum > 1)
-		{
-			/* Sort array for accessing in CAN id sorted order. */
-			bubble_sort_uint32t(&pbmstbl[0], bmsnum);
-		}
-	}
-
-	return 1;
+	/* remap holds index into BMS table. */
+	uint8_t idx = remap[rmaptmp];
+	updatetable(&bmstable[idx], pcans);
+	return 0;
 }
+
+
+
 							

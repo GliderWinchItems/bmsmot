@@ -14,6 +14,7 @@
 #include "malloc.h"
 #include "StringChgrTask.h"
 #include "GatewayTask.h"
+#include "gateway_table.h"
 #include "main.h"
 #include "../../../../GliderWinchCommons/embed/svn_common/trunk/db/gen_db.h"
 
@@ -38,6 +39,9 @@ struct BMSTABLE
 /* @brief	: BMS msg received. 
  * @param	: pcans = pointer to CAN msg w selection code
  * @return	: 0 = updated; 1 = added entry and updated
+ * *************************************************************************/
+ void stringchgr_items_init(void);
+/* @brief	: Init stuff
  * *************************************************************************/
 
 extern struct BMSTABLE bmstable[BMSTABLESIZE];

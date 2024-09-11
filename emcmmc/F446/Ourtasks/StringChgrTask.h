@@ -15,7 +15,7 @@
 
 /* Notification bits */
 #define STRINGCHRGBIT00 (1<<0) //
-#define STRINGCHRGBIT01 (1<<0) //
+#define STRINGCHRGBIT01 (1<<1) //
 
 /* Working struct for EMC local function. */
 struct STRINGCHGRFUNCTION
