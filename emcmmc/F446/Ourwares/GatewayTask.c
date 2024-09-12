@@ -248,7 +248,7 @@ extern CAN_HandleTypeDef hcan1;
 						struct CANIDCLASS* pcl = selectCAN1(&pncan->can); // Selection for StringChgrTask
 						if (pcl != NULL)
 						{ // Here, CAN msg is in table for StringChgrTask
-							if (pcl->code == C1SELCODE_BMS)
+							if ((pcl->code == C1SELCODE_BMS) || (pcl->code == C1SELCODE_ELCON))
 							{	/* Place CAN msg on circular buffer w selection code */
 								if (addcan(&circan1, &pncan->can, pcl) == 0)
 								{ // Here, success (no overflow)

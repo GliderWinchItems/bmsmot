@@ -50,6 +50,8 @@ struct BMSTABLE* pbmstbl[BMSTABLESIZE];
 // Entry every possible BMS CAN id. -1 = not in table, >= 0 index of table
 static int8_t remap[BMSNODEIDSZ]; 
 
+static uint8_t status1;  // Bits on BMS number reporting
+
 /* *************************************************************************
  * void stringchgr_items_init(void);
  * @brief	: Init stuff
@@ -57,10 +59,12 @@ static int8_t remap[BMSNODEIDSZ];
 void stringchgr_items_init(void)
 {
 	int i;
+	/* Remap CAN ID array. */
 	for (i = 0; i < BMSNODEIDSZ; i++)
 	{
 		remap[i] = -1; // Show BMS node CAN ID position not accessed
 	}
+	status1 = 0;
 
 	return;
 }
@@ -75,7 +79,7 @@ static void updatetable(struct BMSTABLE* ptbl, struct CANRCVBUFS* pcans)
 {
 	uint8_t idx;
 
-	ptbl->rpid_now = 1; // Current report
+	ptbl->rpid_now = 1; // Reported ID now
 
 	switch (pcans->can.cd.uc[0])
 	{
@@ -98,6 +102,18 @@ static void updatetable(struct BMSTABLE* ptbl, struct CANRCVBUFS* pcans)
 		ptbl->cell[idx + 0] = pcans->can.cd.us[1];
 		ptbl->cell[idx + 1] = pcans->can.cd.us[2];
 		ptbl->cell[idx + 2] = pcans->can.cd.us[3];
+
+		/* Build summation of cells. */
+		ptbl->vsum_work += pcans->can.cd.us[1] +
+		                   pcans->can.cd.us[2] + 
+		                   pcans->can.cd.us[3];
+
+		if (idx == 0xF)
+		{ // Here, last CAN msg of group
+			ptbl->vsum      = ptbl->vsum_work;
+			ptbl->vsum_work = 0;
+		}
+
 		break;
 	}
 
@@ -126,16 +142,27 @@ int8_t do_tableupdate(struct CANRCVBUFS* pcans)
 
 			// Advance size of BMS nodes discovered
 			bmsnum += 1;
+
+			/* Sort array for accessing in CAN id sorted order. */
 			if (bmsnum > 1)
 			{
-				/* Sort array for accessing in CAN id sorted order. */
 				bubble_sort_uint32t(&pbmstbl[0], bmsnum);
+			}
+
+			if (bmsnum < emclfunction.lc.lcstring.bmsnum_expected)
+				status1 |= SCTSTATUS_FWR; // Fewer than expected reporting
+			else if ((bmsnum == emclfunction.lc.lcstring.bmsnum_expected))
+			{
+				status1 &= ~SCTSTATUS_FWR; // Fewer than expected reporting
+				status1 |=  SCTSTATUS_EXP; // Expected number reporting
 			}
 			return 0;
 		}		
 		else
-		{ // Here, BMS CAN ID, but table is at max string size.
-			return -1; // Trouble
+		{ // Here, BMS CAN ID not in table, but array is full.
+			status1 &= ~SCTSTATUS_EXP; // Expected number reporting
+			status1 |=  SCTSTATUS_OVF; // Received more than table size
+			return -1; // Keep-on-trucking jic
 		}
 	}
 	/* remap holds index into BMS table. */

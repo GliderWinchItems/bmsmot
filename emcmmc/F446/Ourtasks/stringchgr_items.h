@@ -17,11 +17,14 @@
 #include "gateway_table.h"
 #include "main.h"
 #include "../../../../GliderWinchCommons/embed/svn_common/trunk/db/gen_db.h"
+#include "EMCLTask.h"
 
-/* BMS TABLE (not Bowel Movement STable) */
+/* BMS TABLE (not Bowel Movements STable) */
 struct BMSTABLE
 {
 	uint32_t id;       // Node CAN id
+	uint32_t vsum;     // last complete voltage sum of cells (100uv)
+	uint32_t vsum_work;// summation in progress
 	uint16_t cell[18]; // Cell readings (100uv)
 	uint8_t batt;      // Battery status
 	uint8_t fet;       // FET status

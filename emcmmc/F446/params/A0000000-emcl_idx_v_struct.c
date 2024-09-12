@@ -192,6 +192,11 @@ void emcl_idx_v_struct_hardcode_params(struct EMCLLC* p)
   p->lccool.motorrampparam[COOLX_JIC].subbrdtype  = 0;     // Sub-board type (0 = diode flyback)
   p->lccool.motorrampparam[COOLX_JIC].hdrnum      = HDR_OC4;// Header (Relay index) to this motor
 
+  /* ================ StringChgrfunction ============================ */
+  p->lcstring.bmsnum_expected = 3; // Number of BMS nodes expected to be reporting
+
+
+/* ==================== ========================================= */
 // CAN ids EMCMMC sends, others receive
    p->cid_unit_emcmmcx = I_AM_CANID; // A0000000
 
@@ -199,9 +204,9 @@ void emcl_idx_v_struct_hardcode_params(struct EMCLLC* p)
   p->cid_cmd_emcmmcx_pc  = CANID_CMD_EMCMMC1_PC; // 'A1600000','PC SENDS');
   p->cid_cmd_emcmmcx_emc = CANID_CMD_EMCMMC1_EMC;// 'A1800000', EMC SENDS'); 
 
-  p->cid_uni_bms_emc1_i = CANID_UNI_BMS_EMC1_I;   // B0000000 UNIversal From EMC,  Incoming msg to BMS: X4=target CANID');   
-  p->cid_uni_bms_emc2_i = CANID_UNI_BMS_EMC2_I;   // B0200000 UNIversal From EMC,  Incoming msg to BMS: X4=target CANID');   
-  p->cid_uni_bms_pc_i   = CANID_UNI_BMS_PC_I;     // AEC00000 UNIversal From PC,   Incoming msg to BMS: X4=target CANID');     
+  p->cid_uni_bms_emc1_i = CANID_UNI_BMS_EMC1_I;   // B0000000 UNIversal From EMC1,  Incoming msg to BMS: X4=target CANID');   
+  p->cid_uni_bms_emc2_i = CANID_UNI_BMS_EMC2_I;   // B0200000 UNIversal From EMC2,  Incoming msg to BMS: X4=target CANID');   
+  p->cid_uni_bms_pc_i   = CANID_UNI_BMS_PC_I;     // AEC00000 UNIversal From PC,    Incoming msg to BMS: X4=target CANID');     
 
 
 	return;

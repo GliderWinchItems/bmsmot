@@ -8,6 +8,7 @@
 #include "task.h"
 #include "cmsis_os.h"
 #include "malloc.h"
+#include "timers.h"
 
 #include "main.h"
 #include "morse.h"
@@ -19,19 +20,30 @@
 #include "GatewayTask.h"
 #include "stringchgr_items.h"
 
-
 extern UART_HandleTypeDef huart3;
 
-
-
 TaskHandle_t StringChgrTaskHandle = NULL;
+TimerHandle_t StringChgrTimerHandle;
+
+uint32_t dbgS1;				
+uint8_t dbgalt;
+
+uint32_t swtim1_ctr; // Running count of swtim1 callbacks
+static uint32_t swtim1_ctr_prev;
+/* *************************************************************************
+ * void swtim1_callback(TimerHandle_t tm);
+ * @brief	: Software timer 1 timeout callback
+ * *************************************************************************/
+static void swtim1_callback(TimerHandle_t tm)
+{
+	swtim1_ctr += 1;
+	xTaskNotify(StringChgrTaskHandle, STRINGCHRGBIT01, eSetBits);
+	return;
+}
 /* *************************************************************************
  * void StartStringChgrTask(void const * argument);
  *	@brief	: Task startup
  * *************************************************************************/
-uint32_t dbgS1;				
-uint8_t dbgalt;
-
 void StartStringChgrTask(void* argument)
 {
 	uint32_t noteval;
@@ -39,13 +51,25 @@ void StartStringChgrTask(void* argument)
 	struct CANRCVBUFS* pcans;
 
 /* Setup serial output buffers for uarts. */
-//	struct SERIALSENDTASKBCB* pbuf1 = getserialbuf(&HUARTMON,  96); // PC monitor uart	
+	struct SERIALSENDTASKBCB* pbuf1 = getserialbuf(&HUARTMON,  96); // PC monitor uart	
 /*
 #define LED5_GRN_Pin GPIO_PIN_12
 #define LED5_GRN_GPIO_Port GPIOB
 #define LED6_RED_Pin GPIO_PIN_13
 #define LED6_RED_GPIO_Port GPIOB
 */
+#define SWTIME1PERIOD 10 // 10 ms ticks
+#if 1
+/* Create timer swtimer1 Auto-reload/periodic (128 per sec) */
+	StringChgrTimerHandle = xTimerCreate("swtim1",SWTIME1PERIOD,pdTRUE,\
+		(void *) 0, swtim1_callback);
+	if (StringChgrTimerHandle == NULL) {morse_trap(404);}
+
+	/* Start command/keep-alive timer */
+	BaseType_t bret = xTimerReset(StringChgrTimerHandle, 10);
+	if (bret != pdPASS) {morse_trap(405);}
+#endif
+
 	/* Init some things. */
 	stringchgr_items_init();
 
@@ -62,14 +86,34 @@ dbgS1 += 1;
 					if (pcans != NULL)
 					{ // Here, pcans points to CAN msg in gateway's circular buffer
 						/* Gateway selection adds a code, so no need to do compares. */
-						if (pcans->pcl->code == C1SELCODE_BMS)
-						{ // Here: code = BMS node CAN msg group
-//yprintf(&pbuf1,"S %08X %d\n\r",pcans->can.id, pcans->pcl->code);
+						switch(pcans->pcl->code)
+						{ 
+						case C1SELCODE_BMS: // BMS node CAN msg group
 							do_tableupdate(pcans); // Build or update table of BMS nodes
+							break;
+					
+						case C1SELCODE_ELCON: // ELCON msg
+							// do_elcon(pcans);
+							
+yprintf(&pbuf1,"%d %08X %d\n\r",swtim1_ctr-swtim1_ctr_prev,pcans->can.id,pcans->can.dlc);
+swtim1_ctr_prev = swtim1_ctr;
+							break;
 						}
 					}
 				} while (pcans != NULL);
 			}
+			if ((noteval & STRINGCHRGBIT01) != 0)
+			{ // Here, FreeRTOS timer (swtim1) callback 
+static uint32_t dbgt1;
+				dbgt1 += 1;
+				if (dbgt1 >= 100)
+				{
+					dbgt1 = 0;
+//yprintf(&pbuf1,"swtim1 tic\n\r");					
+				}
+
+			}
+
 			if (noteval == 0)
 			{ /* Blink green led */
 				if ((dbgalt++ & 1) == 0)
