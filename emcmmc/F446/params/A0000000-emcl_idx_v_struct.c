@@ -195,6 +195,10 @@ void emcl_idx_v_struct_hardcode_params(struct EMCLLC* p)
   /* ================ StringChgrfunction ============================ */
   p->lcstring.bmsnum_expected = 3; // Number of BMS nodes expected to be reporting
 
+  p->lcstring.chgr_maxvolts = (72.0*3); // Set charger voltage limit (volts)
+  p->lcstring.chgr_maxamps  = 1.0;      // Set charger current limit (amps)
+
+  p->lcstring.canelcon.can.id = CANID_ELCON_RX; //C0372FA4 'ELCON Charger receive: ');  
 
 /* ==================== ========================================= */
 // CAN ids EMCMMC sends, others receive
@@ -206,7 +210,8 @@ void emcl_idx_v_struct_hardcode_params(struct EMCLLC* p)
 
   p->cid_uni_bms_emc1_i = CANID_UNI_BMS_EMC1_I;   // B0000000 UNIversal From EMC1,  Incoming msg to BMS: X4=target CANID');   
   p->cid_uni_bms_emc2_i = CANID_UNI_BMS_EMC2_I;   // B0200000 UNIversal From EMC2,  Incoming msg to BMS: X4=target CANID');   
-  p->cid_uni_bms_pc_i   = CANID_UNI_BMS_PC_I;     // AEC00000 UNIversal From PC,    Incoming msg to BMS: X4=target CANID');     
+  p->cid_uni_bms_pc_i   = CANID_UNI_BMS_PC_I;     // AEC00000 UNIversal From PC,    Incoming msg to BMS: X4=target CANID');   
+
 
 
 	return;

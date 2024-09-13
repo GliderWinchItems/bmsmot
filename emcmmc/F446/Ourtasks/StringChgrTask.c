@@ -21,6 +21,7 @@
 #include "stringchgr_items.h"
 
 extern UART_HandleTypeDef huart3;
+extern struct CAN_CTLBLOCK* pctl0; // Pointer to CAN1 control block
 
 TaskHandle_t StringChgrTaskHandle = NULL;
 TimerHandle_t StringChgrTimerHandle;
@@ -29,7 +30,11 @@ uint32_t dbgS1;
 uint8_t dbgalt;
 
 uint32_t swtim1_ctr; // Running count of swtim1 callbacks
-static uint32_t swtim1_ctr_prev;
+
+#define SWTIME1PERIOD 50 // 50 ms ticks
+#define TIMCTR_ELCON_POLL (900/SWTIME1PERIOD) // Time between ELCON polls (900 ms)
+static uint32_t timctr_elcon_poll; // ELCON poll msg time ctr
+
 /* *************************************************************************
  * void swtim1_callback(TimerHandle_t tm);
  * @brief	: Software timer 1 timeout callback
@@ -42,23 +47,30 @@ static void swtim1_callback(TimerHandle_t tm)
 }
 /* *************************************************************************
  * void StartStringChgrTask(void const * argument);
- *	@brief	: Task startup
+ * @brief	: Task startup
  * *************************************************************************/
 void StartStringChgrTask(void* argument)
 {
 	uint32_t noteval;
 //	struct CANRCVBUF* pcan;
 	struct CANRCVBUFS* pcans;
+	struct EMCLLC* p = &emclfunction.lc;
+
+uint16_t tmpv;
+uint16_t tmpa;
 
 /* Setup serial output buffers for uarts. */
 	struct SERIALSENDTASKBCB* pbuf1 = getserialbuf(&HUARTMON,  96); // PC monitor uart	
+//	struct SERIALSENDTASKBCB* pbuf2 = getserialbuf(&HUARTMON,  96); // PC monitor uart	
 /*
+
+uint16_t tmpv
 #define LED5_GRN_Pin GPIO_PIN_12
 #define LED5_GRN_GPIO_Port GPIOB
 #define LED6_RED_Pin GPIO_PIN_13
 #define LED6_RED_GPIO_Port GPIOB
 */
-#define SWTIME1PERIOD 10 // 10 ms ticks
+
 #if 1
 /* Create timer swtimer1 Auto-reload/periodic (128 per sec) */
 	StringChgrTimerHandle = xTimerCreate("swtim1",SWTIME1PERIOD,pdTRUE,\
@@ -73,10 +85,18 @@ void StartStringChgrTask(void* argument)
 	/* Init some things. */
 	stringchgr_items_init();
 
+	/* Pre-load fixed data id CAN msg to be sent. */
+	p->lcstring.canelcon.pctl       = pctl0; // Control block for CAN module (CAN 1)
+	p->lcstring.canelcon.maxretryct = 4;
+	p->lcstring.canelcon.bits       = 0;
+	p->lcstring.canelcon.can.cd.ull = 0; // Clear playload [5-7] reserved
+	p->lcstring.canelcon.can.dlc    = 8; // ELCON always 8
+
 	for (;;)
 	{
 		xTaskNotifyWait(0,0xffffffff, &noteval, 500-15);
 		{
+			/* ============== CAN msg on circular buffer ================== */			
 			if ((noteval & STRINGCHRGBIT00) != 0)
 			{ // Here, gateway placed a CAN msg on circular buffer for us
 dbgS1 += 1;				
@@ -95,21 +115,26 @@ dbgS1 += 1;
 						case C1SELCODE_ELCON: // ELCON msg
 							// do_elcon(pcans);
 							
-yprintf(&pbuf1,"%d %08X %d\n\r",swtim1_ctr-swtim1_ctr_prev,pcans->can.id,pcans->can.dlc);
-swtim1_ctr_prev = swtim1_ctr;
+//yprintf(&pbuf1,"%08X %d %02X %02X %02X ",pcans->can.id,pcans->can.dlc,pcans->can.cd.uc[0],pcans->can.cd.uc[1],pcans->can.cd.uc[2]);
+//yprintf(&pbuf2,"%02X %02X %02X %02X %02X\n\r",pcans->can.cd.uc[3],pcans->can.cd.uc[4],pcans->can.cd.uc[5],pcans->can.cd.uc[6],pcans->can.cd.uc[7]);
+
+tmpv = __REVSH(pcans->can.cd.us[0]);
+tmpa = __REVSH(pcans->can.cd.us[1]);
+yprintf(&pbuf1,"%08X %d V.1 %d A.1  0x%02X\n\t",pcans->can.id,tmpv,tmpa,pcans->can.cd.uc[4]);
+
 							break;
 						}
 					}
 				} while (pcans != NULL);
 			}
+			/* ================== RTOS timer tick ================== */			
 			if ((noteval & STRINGCHRGBIT01) != 0)
 			{ // Here, FreeRTOS timer (swtim1) callback 
-static uint32_t dbgt1;
-				dbgt1 += 1;
-				if (dbgt1 >= 100)
+				timctr_elcon_poll += 1;
+				if (timctr_elcon_poll >= TIMCTR_ELCON_POLL)
 				{
-					dbgt1 = 0;
-//yprintf(&pbuf1,"swtim1 tic\n\r");					
+					timctr_elcon_poll = 0;
+					do_elcon_poll();
 				}
 
 			}

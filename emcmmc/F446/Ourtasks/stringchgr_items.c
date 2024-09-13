@@ -7,9 +7,10 @@
 #include "stringchgr_items.h"
 #include "cancomm_items.h"
 #include "bubblesort_uint32_t.h"
+#include "EMCLTaskCmd.h"
 
-/* Status bits (see BQTask.h)
-Battery--
+/* Status bits (see BQTask.h) */
+//Battery--
 #define BSTATUS_NOREADING (1 << 0)	// Exactly zero = no reading
 #define BSTATUS_OPENWIRE  (1 << 1)  // Negative or over 5v indicative of open wire
 #define BSTATUS_CELLTOOHI (1 << 2)  // One or more cells above max limit
@@ -18,17 +19,17 @@ Battery--
 #define BSTATUS_CHARGING  (1 << 5)  // Charging in progress
 #define BSTATUS_DUMPTOV   (1 << 6)  // Dump to a voltage in progress
 
-FETS--
+//FETS--
 #define FET_DUMP     (1 << 0) // 1 = DUMP FET ON
 #define FET_HEATER   (1 << 1) // 1 = HEATER FET ON
 #define FET_DUMP2    (1 << 2) // 1 = DUMP2 FET ON (external charger)
 #define FET_CHGR     (1 << 3) // 1 = Charger FET enabled: Normal charge rate
 #define FET_CHGR_VLC (1 << 4) // 1 = Charger FET enabled: Very Low Charge rate
 
-Mode status bits 'mode_status' --
+//Mode status bits 'mode_status' --
 #define MODE_SELFDCHG  (1 << 0) // 1 = Self discharge; 0 = charging
 #define MODE_CELLTRIP  (1 << 1) // 1 = One or more cells tripped max
-
+/* Copy of some code from somewhere
 	struct BQFUNCTION* p = &bqfunction;
 	po->cd.uc[1] = MISCQ_STATUS; // 
 	po->cd.us[1] = 0; // uc[2]-[3] cleared
@@ -46,11 +47,16 @@ uint8_t bmsnum; // Number of reported BMS nodes
 /* Pointers for accessing table in sorted CAN id order. */
 struct BMSTABLE* pbmstbl[BMSTABLESIZE];
 
-/* Indices for accessing table element, given lookup mapped index. */
-// Entry every possible BMS CAN id. -1 = not in table, >= 0 index of table
+/* Indices for accessing table element, given a lookup mapped index. */
+// Entry every possible BMS CAN id. -1 is not in table; >= 0 is index of table
 static int8_t remap[BMSNODEIDSZ]; 
 
 static uint8_t status1;  // Bits on BMS number reporting
+static uint16_t ichgr_maxvolts; // Parameter float(volts) to uint32_t ui(0.1v)
+static uint16_t ichgr_maxamps;  // Parameter float(amps) to uint32_t ui(0.1a)
+static uint16_t ichgr_setvolts;
+static uint16_t ichgr_setamps;
+
 
 /* *************************************************************************
  * void stringchgr_items_init(void);
@@ -58,6 +64,7 @@ static uint8_t status1;  // Bits on BMS number reporting
  * *************************************************************************/
 void stringchgr_items_init(void)
 {
+	struct EMCLLC* p = &emclfunction.lc;
 	int i;
 	/* Remap CAN ID array. */
 	for (i = 0; i < BMSNODEIDSZ; i++)
@@ -65,6 +72,11 @@ void stringchgr_items_init(void)
 		remap[i] = -1; // Show BMS node CAN ID position not accessed
 	}
 	status1 = 0;
+
+	ichgr_maxvolts = p->lcstring.chgr_maxvolts*10; // Set charger voltage limit (0.1 volts)
+	ichgr_maxamps  = p->lcstring.chgr_maxamps*10;  // Set charger current limit (0.1 amps)
+
+
 
 	return;
 }
@@ -113,10 +125,8 @@ static void updatetable(struct BMSTABLE* ptbl, struct CANRCVBUFS* pcans)
 			ptbl->vsum      = ptbl->vsum_work;
 			ptbl->vsum_work = 0;
 		}
-
 		break;
 	}
-
 	return;	
 }
 
@@ -170,7 +180,32 @@ int8_t do_tableupdate(struct CANRCVBUFS* pcans)
 	updatetable(&bmstable[idx], pcans);
 	return 0;
 }
+/* *************************************************************************
+ * void do_elcon(struct CANRCVBUFS* pcans);
+ * @brief	: Handle ELCON CAN msg received. 
+ * @param	: pcans = pointer to CAN msg w selection code
+ * *************************************************************************/
+float fmsgvolts;
+float fmsgamps;
+void do_elcon(struct CANRCVBUFS* pcans)
+{
+	uint32_t itmpvolts = (pcans->can.cd.uc[0] << 8) | (pcans->can.cd.uc[1]);
+	uint32_t itmpamps  = (pcans->can.cd.uc[2] << 8) | (pcans->can.cd.uc[3]);
+	fmsgvolts = itmpvolts;
+	fmsgamps  = itmpamps;	
 
-
-
-							
+	return;
+}
+/* *************************************************************************
+ * void do_elcon_poll(void);
+ * @brief	: Send CAN msg to ELCON
+ * *************************************************************************/
+void do_elcon_poll(void)
+{
+	struct CANTXQMSG* p = &emclfunction.lc.lcstring.canelcon;
+	p->can.cd.us[0] = __REVSH(ichgr_setvolts); //(ichgr_setvolts >> 8) || (ichgr_setvolts << 8);
+	p->can.cd.us[1] = __REVSH(ichgr_setamps);  //(ichgr_setamps  >> 8) || (ichgr_setamps  << 8);
+	p->can.cd.uc[4] = 1;
+	xQueueSendToBack(CanTxQHandle,p,4);
+	return;
+}

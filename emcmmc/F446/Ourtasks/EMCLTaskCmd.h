@@ -8,6 +8,9 @@
 #define __EMCLTASKCMD
 
 // Numbering chosen to not conflict with loader commands
+#define EMCL_STRINGCHGR_GETVI   33 // GET: Status: ELCON reports V & I
+#define EMCL_STRINGCHGR_SETVI   34 // GET: Status: ELCON setting V & I
+#define EMCL_STRINGCHGR_STATUS1 35 // GET: Status: Nodes and ELCON
 #define EMCL_COOLING_STATUS1    36 // GET: Alert status & temperature report
 #define EMCL_MOTOR_RY_SET       37 // SET: Relays and PWM PCT for motors
 #define EMCL_MOTOR_RY_STATUS2   38 // GET: Relay status groups OA, OB, and PWM PCT for OC motors

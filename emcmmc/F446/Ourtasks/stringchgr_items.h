@@ -46,6 +46,9 @@ struct BMSTABLE
  void stringchgr_items_init(void);
 /* @brief	: Init stuff
  * *************************************************************************/
+ void do_elcon_poll(void);
+/* @brief	: Send CAN msg to ELCON
+ * *************************************************************************/
 
 extern struct BMSTABLE bmstable[BMSTABLESIZE];
 extern uint8_t bmsnum; // Number of reported BMS nodes
