@@ -31,9 +31,9 @@ uint8_t dbgalt;
 
 uint32_t swtim1_ctr; // Running count of swtim1 callbacks
 
-#define SWTIME1PERIOD 50 // 50 ms ticks
-#define TIMCTR_ELCON_POLL (900/SWTIME1PERIOD) // Time between ELCON polls (900 ms)
-static uint32_t timctr_elcon_poll; // ELCON poll msg time ctr
+/* Time tick counters. */
+static uint32_t timctr_elcon_poll;  // ELCON poll msg time ctr
+static uint32_t timctr_bms_timeout; // BMS table update timeout
 
 /* *************************************************************************
  * void swtim1_callback(TimerHandle_t tm);
@@ -71,8 +71,7 @@ uint16_t tmpv
 #define LED6_RED_GPIO_Port GPIOB
 */
 
-#if 1
-/* Create timer swtimer1 Auto-reload/periodic (128 per sec) */
+	/* Create timer swtimer1 Auto-reload/periodic (128 per sec) */
 	StringChgrTimerHandle = xTimerCreate("swtim1",SWTIME1PERIOD,pdTRUE,\
 		(void *) 0, swtim1_callback);
 	if (StringChgrTimerHandle == NULL) {morse_trap(404);}
@@ -80,7 +79,6 @@ uint16_t tmpv
 	/* Start command/keep-alive timer */
 	BaseType_t bret = xTimerReset(StringChgrTimerHandle, 10);
 	if (bret != pdPASS) {morse_trap(405);}
-#endif
 
 	/* Init some things. */
 	stringchgr_items_init();
@@ -94,9 +92,9 @@ uint16_t tmpv
 
 	for (;;)
 	{
-		xTaskNotifyWait(0,0xffffffff, &noteval, 500-15);
+		xTaskNotifyWait(0,0xffffffff, &noteval, 1000);
 		{
-			/* ============== CAN msg on circular buffer ================== */			
+			/* ============ incoming CAN msg on circular buffer ================== */			
 			if ((noteval & STRINGCHRGBIT00) != 0)
 			{ // Here, gateway placed a CAN msg on circular buffer for us
 dbgS1 += 1;				
@@ -115,9 +113,6 @@ dbgS1 += 1;
 						case C1SELCODE_ELCON: // ELCON msg
 							// do_elcon(pcans);
 							
-//yprintf(&pbuf1,"%08X %d %02X %02X %02X ",pcans->can.id,pcans->can.dlc,pcans->can.cd.uc[0],pcans->can.cd.uc[1],pcans->can.cd.uc[2]);
-//yprintf(&pbuf2,"%02X %02X %02X %02X %02X\n\r",pcans->can.cd.uc[3],pcans->can.cd.uc[4],pcans->can.cd.uc[5],pcans->can.cd.uc[6],pcans->can.cd.uc[7]);
-
 tmpv = __REVSH(pcans->can.cd.us[0]);
 tmpa = __REVSH(pcans->can.cd.us[1]);
 yprintf(&pbuf1,"%08X %d V.1 %d A.1  0x%02X\n\t",pcans->can.id,tmpv,tmpa,pcans->can.cd.uc[4]);
@@ -130,25 +125,24 @@ yprintf(&pbuf1,"%08X %d V.1 %d A.1  0x%02X\n\t",pcans->can.id,tmpv,tmpa,pcans->c
 			/* ================== RTOS timer tick ================== */			
 			if ((noteval & STRINGCHRGBIT01) != 0)
 			{ // Here, FreeRTOS timer (swtim1) callback 
+	HAL_GPIO_WritePin(LED5_GRN_GPIO_Port,LED5_GRN_Pin,GPIO_PIN_SET); // GRN LED	off				
 				timctr_elcon_poll += 1;
 				if (timctr_elcon_poll >= TIMCTR_ELCON_POLL)
 				{
 					timctr_elcon_poll = 0;
 					do_elcon_poll();
+	HAL_GPIO_WritePin(LED5_GRN_GPIO_Port,LED5_GRN_Pin,GPIO_PIN_RESET); // GRN LED on
 				}
-
+				timctr_bms_timeout += 1;
+				if (timctr_bms_timeout >= TIMCTR_BMSTIMEOUT)
+				{
+					timctr_bms_timeout = 0;
+					do_timeoutcheck();
+				}
 			}
 
 			if (noteval == 0)
-			{ /* Blink green led */
-				if ((dbgalt++ & 1) == 0)
-				{
-					HAL_GPIO_WritePin(LED5_GRN_GPIO_Port,LED5_GRN_Pin,GPIO_PIN_RESET); // GRN LED
-				}
-				else
-				{
-					HAL_GPIO_WritePin(LED5_GRN_GPIO_Port,LED5_GRN_Pin,GPIO_PIN_SET); // GRN LED					
-				}
+			{ 
 			}
 		}
 	}		
@@ -172,7 +166,7 @@ UBaseType_t uxPriority,
 TaskHandle_t *pxCreatedTask );
 */
 	BaseType_t ret = xTaskCreate(StartStringChgrTask, "StringChgrTask",\
-     (128), NULL, taskpriority,\
+     (192), NULL, taskpriority,\
      &StringChgrTaskHandle);
 	if (ret != pdPASS) return NULL;
 

@@ -9,36 +9,8 @@
 #include "bubblesort_uint32_t.h"
 #include "EMCLTaskCmd.h"
 
-/* Status bits (see BQTask.h) */
-//Battery--
-#define BSTATUS_NOREADING (1 << 0)	// Exactly zero = no reading
-#define BSTATUS_OPENWIRE  (1 << 1)  // Negative or over 5v indicative of open wire
-#define BSTATUS_CELLTOOHI (1 << 2)  // One or more cells above max limit
-#define BSTATUS_CELLTOOLO (1 << 3)  // One or more cells below min limit
-#define BSTATUS_CELLBAL   (1 << 4)  // Cell balancing in progress
-#define BSTATUS_CHARGING  (1 << 5)  // Charging in progress
-#define BSTATUS_DUMPTOV   (1 << 6)  // Dump to a voltage in progress
 
-//FETS--
-#define FET_DUMP     (1 << 0) // 1 = DUMP FET ON
-#define FET_HEATER   (1 << 1) // 1 = HEATER FET ON
-#define FET_DUMP2    (1 << 2) // 1 = DUMP2 FET ON (external charger)
-#define FET_CHGR     (1 << 3) // 1 = Charger FET enabled: Normal charge rate
-#define FET_CHGR_VLC (1 << 4) // 1 = Charger FET enabled: Very Low Charge rate
-
-//Mode status bits 'mode_status' --
-#define MODE_SELFDCHG  (1 << 0) // 1 = Self discharge; 0 = charging
-#define MODE_CELLTRIP  (1 << 1) // 1 = One or more cells tripped max
-/* Copy of some code from somewhere
-	struct BQFUNCTION* p = &bqfunction;
-	po->cd.uc[1] = MISCQ_STATUS; // 
-	po->cd.us[1] = 0; // uc[2]-[3] cleared
-	// Data payload bytes [4]-[7]
-	po->cd.ui[1] = 0; // Clear
-	po->cd.uc[4] = p->battery_status;
-	po->cd.uc[5] = p->fet_status;
-	po->cd.uc[6] = p->mode_status;
-*/
+extern uint32_t swtim1_ctr; // Running count of swtim1 callbacks
 
 /* Table with data for each BMS node on the string. */
 struct BMSTABLE bmstable[BMSTABLESIZE];
@@ -76,33 +48,29 @@ void stringchgr_items_init(void)
 	ichgr_maxvolts = p->lcstring.chgr_maxvolts*10; // Set charger voltage limit (0.1 volts)
 	ichgr_maxamps  = p->lcstring.chgr_maxamps*10;  // Set charger current limit (0.1 amps)
 
-
-
 	return;
 }
 
 /* *************************************************************************
- * int8_t do_tableupdate(struct CANRCVBUFS* pcans);
- * @brief	: BMS msg received. 
+ * static void updatetable(struct BMSTABLE* ptbl, struct CANRCVBUFS* pcans);
+ * @brief	: Update table for BMS node
+ * @param   : ptbl = pointer to table entry for this BMS node
  * @param	: pcans = pointer to CAN msg w selection code
- * @return	: 0 = updated; 1 = added entry and updated
  * *************************************************************************/
 static void updatetable(struct BMSTABLE* ptbl, struct CANRCVBUFS* pcans)
 {
 	uint8_t idx;
-
-	ptbl->rpid_now = 1; // Reported ID now
-
 	switch (pcans->can.cd.uc[0])
 	{
 	case CMD_CMD_MISCHB: // 45 Heartbeat 
 		if (pcans->can.cd.uc[1] == MISCQ_STATUS)
 		{ // Here, BMS node w status payload
-			ptbl->rpsts_ever = 1;
-			ptbl->rpsts_now  = 1;
 			ptbl->batt = pcans->can.cd.uc[4];
 			ptbl->fet  = pcans->can.cd.uc[5];
 			ptbl->mode = pcans->can.cd.uc[6];
+			// Time of update for timeout checking status msgs
+			ptbl->toctr_status = swtim1_ctr; // Running count of swtim1 callbacks
+			ptbl->stale_status = 0;
 		}
 		break;
 
@@ -120,16 +88,65 @@ static void updatetable(struct BMSTABLE* ptbl, struct CANRCVBUFS* pcans)
 		                   pcans->can.cd.us[2] + 
 		                   pcans->can.cd.us[3];
 
+		/* Set bit to show each cell msg of group received. */
+		ptbl->idxbits |= (1<<idx);		                   
+
+		/* Save time for checking for failure to respond timeout. */
+		ptbl->toctr_cell = swtim1_ctr;
+
 		if (idx == 0xF)
 		{ // Here, last CAN msg of group
-			ptbl->vsum      = ptbl->vsum_work;
-			ptbl->vsum_work = 0;
+
+			/* Check if all 6 msgs were received. */
+/* The idx sequence in the cell reading msg is the beginning of the
+three cell readings in the payload, and therefore,
+0, 3, 6, 9, 12, 15
+So, rather than suffer dividing by 3, and fitting it in a single byte,
+a 16b half-word is used. Hence, 0x9249 for having received all 6 msgs.
+*/ 
+			if (ptbl->idxbits == 0x9249)
+			{
+				// Time of update for timeout checking cell msgs
+				ptbl->toctr_cell = swtim1_ctr; // Running count of swtim1 callbacks	
+				ptbl->vsum       = ptbl->vsum_work;
+				ptbl->stale_cell = 0; 
+			}
+			ptbl->vsum_work = 0;	
+			ptbl->idxbits   = 0;			
 		}
 		break;
 	}
 	return;	
 }
-
+/* *************************************************************************
+ * void do_timeoutcheck(void);
+ * @brief	: Scan BMS table and mark those that have timed out
+ * @return	: stale_status and stale_cell set if timed out
+ * *************************************************************************/
+void do_timeoutcheck(void)
+{
+	int i;
+	struct BMSTABLE* ptbl = &bmstable[0];
+	for (i = 0; i < bmsnum; i++)
+	{
+		if ((int32_t)(swtim1_ctr - ptbl->toctr_cell) > BMSTIMEOUT)
+		{ // The data in this BMS table entry are stale.
+			ptbl->stale_cell = 1;
+		}
+		if ((int32_t)(swtim1_ctr - ptbl->toctr_status) > BMSTIMEOUT)
+		{ // The data in this BMS table entry are stale.
+			ptbl->stale_status = 1;
+		}
+		ptbl += 1;
+	}
+	return;
+}
+/* *************************************************************************
+ * int8_t do_tableupdate(struct CANRCVBUFS* pcans);
+ * @brief	: BMS msg received. 
+ * @param	: pcans = pointer to CAN msg w selection code
+ * @return	: 0 = updated; 1 = added entry and updated
+ * *************************************************************************/
 int8_t do_tableupdate(struct CANRCVBUFS* pcans)
 {
 	int8_t rmaptmp = pcans->pcl->rmap;

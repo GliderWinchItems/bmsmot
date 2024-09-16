@@ -1429,10 +1429,21 @@ HAL_GPIO_WritePin(GPIOB, GPIO_PIN_13, GPIO_PIN_SET); // RED OFF
       }
       fmsum = msum;
       // Cell summation for node
-      yprintf(&pbuf1," %6.3f",fmsum*0.0001f);
-      for (int k = 0; k < 18; k++)
-      { // Print individual cell readings (100uV)
-        yprintf(&pbuf2," %4d",pbmstbl[j]->cell[k]);
+      if (pbmstbl[j]->stale_cell == 0)
+      {
+        yprintf(&pbuf1," %6.3f",fmsum*0.0001f);
+        for (int k = 0; k < 18; k++)
+        { // Print individual cell readings (100uV)
+          yprintf(&pbuf2," %4d",pbmstbl[j]->cell[k]);
+        }
+      }
+      else
+      {
+        yprintf(&pbuf1," %6.3f",fmsum*0.0001f);
+        for (int k = 0; k < 18; k++)
+        { // Print individual cell readings (100uV)
+          yprintf(&pbuf2,"_stale");
+        }  
       }
       // Check gateway_items summation
       yprintf(&pbuf2,"\n\r      vsum %7.3f\n\r",pbmstbl[j]->vsum*0.0001f);

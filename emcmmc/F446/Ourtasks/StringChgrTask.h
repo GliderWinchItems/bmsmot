@@ -14,6 +14,12 @@
 #include "can_iface.h"
 //#include "stm32f4xx_hal.h"
 
+/* emcmmc general status. */
+#define MMCSTATUS_BMSSTAT (1 << 0) // 1 = ALL BMS nodes reporting status
+#define MMCSTATUS_BMSCELL (1 << 1) // 1 = ALL BMS nodes reporting cell readings
+#define MMCSTATUS_CHRGR   (1 << 2) // 1 = Charger reporting OK
+
+
 /* Status: BMS node reporting status. */
 #define SCTSTATUS_EXP (1<<0) // Expected number is reporting
 #define SCTSTATUS_OVF (1<<1) // Received more than table size
@@ -25,7 +31,7 @@
 #define ELCONSTATUS_HWFAIL (1<<0) //  1 Hardware failure
 #define ELCONSTATUS_OVTEMP (1<<1) //  2 Over temperature
 #define ELCONSTATUS_INVOLT (1<<2) //  4 Input voltage wrong
-#define ELCONSTATUS_RVRSE  (1<<3) //  8 Reversed polarity
+#define ELCONSTATUS_DISCNT (1<<3) //  8 Battery disconnected
 #define ELCONSTATUS_COMMTO (1<<4) // 16 Communications timeout
 #define ELCONSTATUS_REPORT (1<<5) // 32 ELCON is reporting
 
@@ -45,8 +51,16 @@ pay[4]-[7] (float) String voltage (Volts)
 #define STRINGCHRGBIT00 (1<<0) // GatewayTask
 #define STRINGCHRGBIT01 (1<<1) // RTOS timer swtim1
 
+#define SWTIME1PERIOD 50 // 50 ms ticks
+#define TIMCTR_ELCON_POLL (900/SWTIME1PERIOD) // Time between ELCON polls (900 ms)
+#define TIMCTR_BMSTIMEOUT (1000/SWTIME1PERIOD) // Timecheck BMS responding. (1000 ms)
+
+#define BMSTIMEOUT (3000/SWTIME1PERIOD) // Timeout: BMS msgs missing. (3000 ms)
+
 /* Table with element for each BMS node on string. */
 #define BMSTABLESIZE 7 // Max size of table
+
+
 
 /* Working struct for EMC local function. */
 struct STRINGCHGRFUNCTION
