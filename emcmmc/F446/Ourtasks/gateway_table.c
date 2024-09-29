@@ -13,6 +13,8 @@ const struct CANIDCLASS canidclass[] =
 {
 	{CANID_MSG_CNTCTR1V,   C1SELCODE_CONTACTOR0, 0 }, /* '50400000' Contactor1: poll response: HV1:Current sensor1 */
 	{CANID_MSG_CNTCTR1A,   C1SELCODE_CONTACTOR0, 1},  /* '50600000' Contactor1: poll response: HV2 battery gnd to: DMOC+, HV3 DMOC- */
+	{CANID_CMD_PC_EMC,       C1SELCODE_EMC_CMDS, 0},  /* '98000000',PC sends commands to EMC */
+	{CANID_CMD_EMC_EMC,      C1SELCODE_EMC_CMDS, 1},  /* '98200000',EMC sends commands to EMC1 or 2) */
 	{CANID_UNI_BMS_PC_I,   C1SELCODE_POLLS, 0 },      /* 'AEC00000' */
 	{CANID_UNI_BMS_EMC2_I, C1SELCODE_POLLS, 1 },      /* 'AEE00000' */
 	{CANID_UNI_BMS_PC_I,   C1SELCODE_POLLS, 2 },      /* 'B0000000' */
@@ -35,7 +37,7 @@ const struct CANIDCLASS canidclass[] =
 	{CANID_UNIT_BMS16,      C1SELCODE_BMS, 15 },      /* 'B2600000','UNIT_BMS16' */
 	{CANID_UNIT_BMS17,      C1SELCODE_BMS, 16 },      /* 'B2800000','UNIT_BMS17' */
 	{CANID_UNIT_BMS18,      C1SELCODE_BMS, 17 },      /* 'B2A00000','UNIT_BMS18' */		
-	{CANID_ELCON_TX,       C1SELCODE_ELCON, 0 },      /* 'C7FA872C' ELCON charger TX */
+	{CANID_ELCON_TX,      C1SELCODE_ELCON,  0 },      /* 'C7FA872C' ELCON charger TX */
 	{CANID_CMD_CNTCTR1R,   C1SELCODE_CONTACTOR0, 2 }, /* 'E3600000' Contactor1: R Command response */
 	{CANID_CMD_CNTCTR1I,   C1SELCODE_CONTACTOR0, 3 }, /* 'E360000C' Contactor1: I Command incoming */
 	{CANID_CMD_CNTCTRKAR,  C1SELCODE_CONTACTOR0, 4 }, /* 'E3C00000' Contactor1: R KeepAlive response */

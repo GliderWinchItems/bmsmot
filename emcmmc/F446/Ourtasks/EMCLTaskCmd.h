@@ -7,7 +7,7 @@
 #ifndef __EMCLTASKCMD
 #define __EMCLTASKCMD
 
-// Numbering chosen to not conflict with loader commands
+// Numbering chosen to not conflict with loader commands (see GliderWinchCommons/embed/*common/db/CMD_CODES_INSERT.sql)
 #define EMCL_STRINGCHGR_GETVI   33 // GET: Status: ELCON reports V & I
 #define EMCL_STRINGCHGR_SETVI   34 // GET: Status: ELCON setting V & I
 #define EMCL_STRINGCHGR_STATUS1 35 // GET: Status: Nodes and ELCON
@@ -15,7 +15,6 @@
 #define EMCL_MOTOR_RY_SET       37 // SET: Relays and PWM PCT for motors
 #define EMCL_MOTOR_RY_STATUS2   38 // GET: Relay status groups OA, OB, and PWM PCT for OC motors
 #define EMCL_RY_HOLD_PWM_SET    39 // SET: Special relay hold pwm (after pullin testing)
-
 
 
 /* Payload layout

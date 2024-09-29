@@ -53,7 +53,6 @@ lookup.
 //#include "gateway_PCtoCAN.h"
 //#include "gateway_CANtoPC.h"
 #include "main.h"
-#include "StringChgrTask.h"
 #include "gateway_table.h"
 
 uint32_t dbuggateway1;
@@ -320,7 +319,7 @@ static struct CANIDCLASS* selectCAN1(struct CANRCVBUF* pcan)
 /* BSEARCH */
 static struct CANIDCLASS* selectCAN1(struct CANRCVBUF* pcan)
 {
-	struct CANIDCLASS* pcl = &canidclass[0];
+	struct CANIDCLASS* pcl = (struct CANIDCLASS*)&canidclass[0];
 	uint32_t id = pcan->id;
 	int16_t i,j,k;
 	  i = 0; j = (cidclsz - 1);

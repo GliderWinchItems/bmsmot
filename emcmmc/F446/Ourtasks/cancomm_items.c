@@ -17,13 +17,15 @@
 
 void cancomm_items_sendcell(struct CANRCVBUF* pcan, float *pf);
 
+#if 0
 static void loadfloat(uint8_t* puc, float* f);
 static void status_group(struct CANRCVBUF* po);
 static void send_bms_array(struct CANRCVBUF* po, float* pout, uint8_t n);
 static void send_allfets(struct CANRCVBUF* po);
 static void not_implemented(struct CANRCVBUF* po);
+#endif
 
-static uint8_t skip;
+//static uint8_t skip;
 /* *************************************************************************
  * void cancomm_items_init(void);
  * @brief	: Initialization
@@ -51,6 +53,7 @@ static void returncmd(struct CANTXQMSG* pmsg, struct CANRCVBUF* pcan)
  *  @param  : puc = pointer to CAN msg payload
  *  @param  : n = unit32_t to be loaded
  * *************************************************************************/
+#if 0
 static void loaduint32(uint8_t* puc, uint32_t n)
 {
 	*(puc+0) = n >>  0;
@@ -59,12 +62,14 @@ static void loaduint32(uint8_t* puc, uint32_t n)
 	*(puc+3) = n >> 24;
 	return;
 }
+#endif
 /* *************************************************************************
  * static void loadfloat(uint8_t* puc, float* pf);
  *	@brief	: Prepare and send a response to a received command
  *  @param  : puc = pointer to CAN msg payload
  *  @param  : pf = pointer to float to be loaded
  * *************************************************************************/
+#if 0
 static void loadfloat(uint8_t* puc, float* pf)
 {
 	union UF
@@ -80,6 +85,7 @@ static void loadfloat(uint8_t* puc, float* pf)
 	*(puc+3) = uf.uc[3];
 	return;
 }
+#endif
 
 /* *************************************************************************
  * void cancomm_items_sendcell(struct CANRCVBUF* pcan, float *pf);
@@ -296,6 +302,7 @@ void cancomm_items_sendcmdr(struct CANRCVBUF* pi)
  *  @param  : pout = pointer to output array of floats for first reading
  *  @param  : n = number of readings (CAN msgs) to send
  * *************************************************************************/
+#if 0
 static void send_bms_array(struct CANRCVBUF* po, float* pout, uint8_t n)
 {
 //	struct BQFUNCTION* p = &bqfunction;
@@ -315,6 +322,7 @@ static void send_bms_array(struct CANRCVBUF* po, float* pout, uint8_t n)
 	skip = 1;
 	return;
 }
+#endif
 /* *************************************************************************
  * static void send_allfets(struct CANRCVBUF* po);
  *	@brief	: Prepare and send CAN msgs for FET status
@@ -339,9 +347,9 @@ payload [3] Defines payload data in payload [4-7]:
   2 = installed cells (1 = installed)
       [4-7] cells #1 - #18: bits 0-17
 */
+#if 0	
 static void send_allfets(struct CANRCVBUF* po)
 {
-#if 0	
 	struct BQFUNCTION* p = &bqfunction;
 
 	/* FET status: (see cellball.c) */
@@ -362,17 +370,19 @@ static void send_allfets(struct CANRCVBUF* po)
 	xQueueSendToBack(CanTxQHandle,&p->canmsg,4);	
 
 	skip = 1;
-#endif	
 	return;
 }
+#endif	
+
 /* *************************************************************************
  * static void status_group(struct CANRCVBUF* po);
  *	@brief	: Load data for status
  *  @param  : po = pointer to outgoing CAN msg 
  * *************************************************************************/
+#if 0
 static void status_group(struct CANRCVBUF* po)
 {
-#if 0	
+	
 /* Status bits (see BQTask.h)
 Battery--
 #define BSTATUS_NOREADING (1 << 0)	// Exactly zero = no reading
@@ -396,17 +406,19 @@ FETS--
 	po->cd.uc[4] = p->battery_status;
 	po->cd.uc[5] = p->fet_status;
 	skip = 0;
-#endif	
 	return;
 }
+#endif	
+
 /* *************************************************************************
  * static void not_implemented(struct CANRCVBUF* po);
  *	@brief	: Send response to not implemented command code
  *  @param  : po = pointer to outgoing CAN msg
  * *************************************************************************/
-
+#if 0
 static void not_implemented(struct CANRCVBUF* po)
 {
 	po->cd.uc[1] = MISCQ_UNIMPLIMENT;
 	return;
 }
+#endif

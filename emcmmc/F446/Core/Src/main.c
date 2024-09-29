@@ -51,6 +51,8 @@
 #include "StringChgrTask.h"
 #include "stringchgr_items.h"
 #include "GatewayTask.h"
+#include "DMOCTask.h"
+#include "ContactorTask.h"
 
 #include "FreeRTOS.h"
 #include "semphr.h"
@@ -252,7 +254,7 @@ int main(void)
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
 
-  /* Relay/output handler. */
+/* Relay/output handler. */
   //ry_init(); // Task does this
   TaskHandle_t rett = xRyTaskCreate(osPriorityNormal);
   if (rett == NULL) morse_trap(109);
@@ -260,7 +262,7 @@ int main(void)
   Thrdret = xADCTaskCreate(osPriorityNormal+2); // (arg) = priority
   if (Thrdret == NULL) morse_trap(117);
 
-  /* Create serial task (priority) */
+/* Create serial task (priority) */
   Thrdret = xSerialTaskSendCreate(osPriorityNormal); // Create task and set Task priority
   if (Thrdret == NULL) morse_trap(112);
 
@@ -291,8 +293,9 @@ int main(void)
   if (Cret == HAL_ERROR) morse_trap(217);
 #endif  
 
-   /* definition and creation of CanTxTask - CAN driver TX interface. */
-  QueueHandle_t QHret = xCanTxTaskCreate(osPriorityNormal+1, 48); // CanTask priority, Number of msgs in queue
+/* Create CanTxTask - CAN driver TX interface. */
+  // CanTask priority, Number of msgs in queue
+  QueueHandle_t QHret = xCanTxTaskCreate(osPriorityNormal+1, 48); 
   if (QHret == NULL) morse_trap(120); // Panic LED flashing
 
   /* definition and creation of CanRxTask - CAN driver RX interface. */
@@ -300,10 +303,10 @@ int main(void)
 //  Qidret = xCanRxTaskCreate(1, 32); // CanTask priority, Number of msgs in queue
 //  if (Qidret < 0) morse_trap(6); // Panic LED flashing
 
-  /* Create MailboxTask */
+/* Create MailboxTask */
   xMailboxTaskCreate(osPriorityNormal+1); // (arg) = priority
 
-  /* Create Mailbox control block w 'take' pointer for each CAN module. */
+/* Create Mailbox control block w 'take' pointer for each CAN module. */
   struct MAILBOXCANNUM* pmbxret;
   // (CAN1 control block pointer, size of circular buffer)
   pmbxret = MailboxTask_add_CANlist(pctl0, 32);
@@ -317,11 +320,11 @@ int main(void)
 /* Create GatewayTask */
   xGatewayTaskCreate(osPriorityNormal); // (arg) = priority  
 
-  /* Create serial receiving task. */
+/* Create serial receiving task. */
   ret = xSerialTaskReceiveCreate(osPriorityNormal);
   if (ret != pdPASS) morse_trap(113);
 
-  /* Create EMCLTask */
+/* Create EMCLTask */
   Thrdret = xEMCLTaskCreate(osPriorityNormal);
   if (Thrdret == NULL) morse_trap(108);
 
@@ -334,20 +337,28 @@ int main(void)
 
 /* Create String Charging Task. */  
   Thrdret = xStringChgrTaskCreate(osPriorityNormal);
-  if (Thrdret == NULL) morse_trap(110);
+  if (Thrdret == NULL) morse_trap(114);
 
-/* CAN communication */
-  TaskHandle_t retT = xCanCommCreate(osPriorityNormal+2);
-  if (retT == NULL) morse_trap(121);
+/* Create DMOC task. */
+  Thrdret = xDMOCTaskCreate(osPriorityNormal);
+  if (Thrdret == NULL) morse_trap(116);
 
-    /* Select interrupts for CAN1 */
+/* Create Contactor Task. */
+  Thrdret = xContactorTaskCreate(osPriorityNormal);
+  if (Thrdret == NULL) morse_trap(122);
+
+/* Create CAN communication task handler. */
+  rett = xCanCommCreate(osPriorityNormal+2);
+  if (rett == NULL) morse_trap(121);
+
+  /* Select interrupts for CAN1 */
   HAL_CAN_ActivateNotification(&hcan1, \
     CAN_IT_TX_MAILBOX_EMPTY     |  \
     CAN_IT_RX_FIFO0_MSG_PENDING |  \
     CAN_IT_RX_FIFO1_MSG_PENDING    );
 
 #ifdef CONFIGCAN2
-    /* Select interrupts for CAN2 */
+/* Select interrupts for CAN2 */
   HAL_CAN_ActivateNotification(&hcan2, \
     CAN_IT_TX_MAILBOX_EMPTY     |  \
     CAN_IT_RX_FIFO0_MSG_PENDING |  \
@@ -1410,31 +1421,31 @@ HAL_GPIO_WritePin(GPIOB, GPIO_PIN_13, GPIO_PIN_SET); // RED OFF
   static uint8_t bmsnum_prev;
   float fmsum;
   float totalv;
-  yprintf(&pbuf1,"bmsnum %d\n\r",bmsnum);
+  yprintf(&pbuf1,"bmsnum %d\n\r",emclfunction.lc.lcstring.bmsnum);
   /* Output table when there is a change in size,
      OR, every 10 cycles. */
-  if ((bmsnum_prev != bmsnum) || 
+  if ((bmsnum_prev != emclfunction.lc.lcstring.bmsnum) || 
       ((yyctr % 10) == 0)      )
   { 
-    bmsnum_prev = bmsnum;
+    bmsnum_prev = emclfunction.lc.lcstring.bmsnum;
     totalv = 0;
-    for (int j = 0; j < bmsnum; j++)
+    for (int j = 0; j < emclfunction.lc.lcstring.bmsnum; j++)
     {
-      yprintf(&pbuf2,"%2d %08X",j,pbmstbl[j]->id);
+      yprintf(&pbuf2,"%2d %08X",j,emclfunction.lc.lcstring.pbmstbl[j]->id);
       // Sum cell readings for module
       uint32_t msum = 0;
       for (int k = 0; k < 18; k++)
       {
-        msum += pbmstbl[j]->cell[k];
+        msum += emclfunction.lc.lcstring.pbmstbl[j]->cell[k];
       }
       fmsum = msum;
       // Cell summation for node
-      if (pbmstbl[j]->stale_cell == 0)
+      if (emclfunction.lc.lcstring.pbmstbl[j]->toctr_status == 0)
       {
         yprintf(&pbuf1," %6.3f",fmsum*0.0001f);
         for (int k = 0; k < 18; k++)
         { // Print individual cell readings (100uV)
-          yprintf(&pbuf2," %4d",pbmstbl[j]->cell[k]);
+          yprintf(&pbuf2," %4d",emclfunction.lc.lcstring.pbmstbl[j]->cell[k]);
         }
       }
       else
@@ -1446,7 +1457,7 @@ HAL_GPIO_WritePin(GPIOB, GPIO_PIN_13, GPIO_PIN_SET); // RED OFF
         }  
       }
       // Check gateway_items summation
-      yprintf(&pbuf2,"\n\r      vsum %7.3f\n\r",pbmstbl[j]->vsum*0.0001f);
+      yprintf(&pbuf2,"\n\r      vsum %7.3f\n\r",emclfunction.lc.lcstring.pbmstbl[j]->vsum*0.0001f);
       totalv += fmsum; // Sum total battery string volts
     }
     yprintf(&pbuf1,"     total %7.3f\n\r",totalv*0.0001f);

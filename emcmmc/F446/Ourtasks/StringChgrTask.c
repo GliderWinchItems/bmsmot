@@ -31,10 +31,6 @@ uint8_t dbgalt;
 
 uint32_t swtim1_ctr; // Running count of swtim1 callbacks
 
-/* Time tick counters. */
-static uint32_t timctr_elcon_poll;  // ELCON poll msg time ctr
-static uint32_t timctr_bms_timeout; // BMS table update timeout
-
 /* *************************************************************************
  * void swtim1_callback(TimerHandle_t tm);
  * @brief	: Software timer 1 timeout callback
@@ -52,14 +48,13 @@ static void swtim1_callback(TimerHandle_t tm)
 void StartStringChgrTask(void* argument)
 {
 	uint32_t noteval;
-//	struct CANRCVBUF* pcan;
 	struct CANRCVBUFS* pcans;
-	struct EMCLLC* p = &emclfunction.lc;
+	struct STRINGCHGRFUNCTION* p = &emclfunction.lc.lcstring;
 
 uint16_t tmpv;
 uint16_t tmpa;
 
-/* Setup serial output buffers for uarts. */
+/* Setup serial output buffers for debugging uart */
 	struct SERIALSENDTASKBCB* pbuf1 = getserialbuf(&HUARTMON,  96); // PC monitor uart	
 //	struct SERIALSENDTASKBCB* pbuf2 = getserialbuf(&HUARTMON,  96); // PC monitor uart	
 /*
@@ -71,12 +66,13 @@ uint16_t tmpv
 #define LED6_RED_GPIO_Port GPIOB
 */
 
-	/* Create timer swtimer1 Auto-reload/periodic (128 per sec) */
-	StringChgrTimerHandle = xTimerCreate("swtim1",SWTIME1PERIOD,pdTRUE,\
-		(void *) 0, swtim1_callback);
+	/* Create timer swtimer1 Auto-reload/periodic */
+	StringChgrTimerHandle = xTimerCreate("swtim1",
+		SWTIME1PERIOD,
+		pdTRUE,(void *) 0, swtim1_callback);
 	if (StringChgrTimerHandle == NULL) {morse_trap(404);}
 
-	/* Start command/keep-alive timer */
+	/* Start timer */
 	BaseType_t bret = xTimerReset(StringChgrTimerHandle, 10);
 	if (bret != pdPASS) {morse_trap(405);}
 
@@ -84,19 +80,23 @@ uint16_t tmpv
 	stringchgr_items_init();
 
 	/* Pre-load fixed data id CAN msg to be sent. */
-	p->lcstring.canelcon.pctl       = pctl0; // Control block for CAN module (CAN 1)
-	p->lcstring.canelcon.maxretryct = 4;
-	p->lcstring.canelcon.bits       = 0;
-	p->lcstring.canelcon.can.cd.ull = 0; // Clear playload [5-7] reserved
-	p->lcstring.canelcon.can.dlc    = 8; // ELCON always 8
+	p->canelcon.pctl       = pctl0; // Control block for CAN module (CAN 1)
+	p->canelcon.maxretryct = 4;
+	p->canelcon.bits       = 0;
+	p->canelcon.can.cd.ull = 0; // Clear playload [5-7] reserved
+	p->canelcon.can.dlc    = 8; // ELCON always 8
+
+	p->chgr_rate[0]  = 0; // Must be zero
+	p->chgr_rate_idx = 0;
+	p->bmsnum        = 0; // Discovered BMS nodes
 
 	for (;;)
 	{
-		xTaskNotifyWait(0,0xffffffff, &noteval, 1000);
+		xTaskNotifyWait(0,0xffffffff, &noteval, portMAX_DELAY);
 		{
 			/* ============ incoming CAN msg on circular buffer ================== */			
 			if ((noteval & STRINGCHRGBIT00) != 0)
-			{ // Here, gateway placed a CAN msg on circular buffer for us
+			{ // Here, gateway placed a CAN msg for us on circular buffer
 dbgS1 += 1;				
 				do // Loop until buffer emptied
 				{ /* Gateway passes only CAN msgs needed for StringChgrTask. */
@@ -108,16 +108,25 @@ dbgS1 += 1;
 						{ 
 						case C1SELCODE_BMS: // BMS node CAN msg group
 							do_tableupdate(pcans); // Build or update table of BMS nodes
+							do_bms_status_check(pcans);
 							break;
 					
 						case C1SELCODE_ELCON: // ELCON msg
-							// do_elcon(pcans);
+							do_elcon(pcans);
 							
 tmpv = __REVSH(pcans->can.cd.us[0]);
 tmpa = __REVSH(pcans->can.cd.us[1]);
 yprintf(&pbuf1,"%08X %d V.1 %d A.1  0x%02X\n\t",pcans->can.id,tmpv,tmpa,pcans->can.cd.uc[4]);
 
 							break;
+
+						case C1SELCODE_EMC_CMDS: // '98000000'PC or '98200000'EMC 
+							do_emc_cmds(pcans);
+							break;
+
+						case C1SELCODE_POLLS: // PC, EMC1, EMC2 polling
+							// todo();
+							break;				
 						}
 					}
 				} while (pcans != NULL);
@@ -125,20 +134,8 @@ yprintf(&pbuf1,"%08X %d V.1 %d A.1  0x%02X\n\t",pcans->can.id,tmpv,tmpa,pcans->c
 			/* ================== RTOS timer tick ================== */			
 			if ((noteval & STRINGCHRGBIT01) != 0)
 			{ // Here, FreeRTOS timer (swtim1) callback 
-	HAL_GPIO_WritePin(LED5_GRN_GPIO_Port,LED5_GRN_Pin,GPIO_PIN_SET); // GRN LED	off				
-				timctr_elcon_poll += 1;
-				if (timctr_elcon_poll >= TIMCTR_ELCON_POLL)
-				{
-					timctr_elcon_poll = 0;
-					do_elcon_poll();
-	HAL_GPIO_WritePin(LED5_GRN_GPIO_Port,LED5_GRN_Pin,GPIO_PIN_RESET); // GRN LED on
-				}
-				timctr_bms_timeout += 1;
-				if (timctr_bms_timeout >= TIMCTR_BMSTIMEOUT)
-				{
-					timctr_bms_timeout = 0;
-					do_timeoutcheck();
-				}
+				/* Timeout checks: countdown counters. */
+				do_timeoutcheck();
 			}
 
 			if (noteval == 0)

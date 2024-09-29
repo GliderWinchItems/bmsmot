@@ -109,6 +109,11 @@ C_SOURCES += Ourtasks/StringChgrTask.c
 C_SOURCES += Ourtasks/stringchgr_items.c
 C_SOURCES += Ourtasks/bubblesort_uint32_t.c
 C_SOURCES += Ourtasks/gateway_table.c
+C_SOURCES += Ourtasks/DMOCchecksum.c
+C_SOURCES += Ourtasks/ContactorTask.c
+C_SOURCES += Ourtasks/DMOCTask.c
+#C_SOURCES += Ourtasks/dmoc_control.c
+
 
 
 # /* USER CODE END */ 

@@ -43,19 +43,6 @@ struct RELAY
 /* Parameters levelwind instance (LC = Local Copy) */
 struct EMCLLC
  {
-/* NOTE: all suffix _t parameters are times in milliseconds */
-	uint32_t size;
-	uint32_t crc;   // TBD
-   uint32_t version;   //
-
-   /* Identification of this module node. */
-   uint8_t  winchnum;  // Winch number (1-4)
-   uint8_t  stringnum; // Battery string number (1 - 4)
-
-	/* Timings in milliseconds. Converted later to 'swtim1' ticks. */
-	uint32_t hbct_t;     // Heartbeat ct: ms between sending 
-   uint32_t hbct;      // Number of ticks between hb msgs
-
 /* RelayTask: Relay/Controls */
    struct RELAY relay[NRELAY]; // Relay status & control
 
@@ -65,9 +52,22 @@ struct EMCLLC
 /* StringChgrTask: */
   struct STRINGCHGRFUNCTION lcstring;
 
+/* NOTE: all suffix _t parameters are times in milliseconds */
+	uint32_t size;
+	uint32_t crc;   // TBD
+   uint32_t version;   //
+
+/* Identification of this module node. */
+   uint8_t  winchnum;  // Winch number (1-4)
+   uint8_t  stringnum; // Battery string number (1 - 4)
+
+	/* Timings in milliseconds. Converted later to 'swtim1' ticks. */
+	uint32_t hbct_t;     // Heartbeat ct: ms between sending 
+   uint32_t hbct;      // Number of ticks between hb msgs
+
  // CAN ids ...........................................................................
    //                                  CANID_NAME            CANID       PAYLOAD FORMAT
-    // EMCMMC1,2 sends; EMC, PC or other receives
+   // EMCMMC1,2 sends; EMC, PC or other receives
   uint32_t cid_unit_emcmmcx; // e.g.'CANID_UNIT_EMCMMC1','A0000000'
 
  // List of CAN ID's for setting up hw filter for incoming msgs
@@ -87,6 +87,5 @@ struct EMCLLC
  * @return  : 0
  * *************************************************************************/
 
- 
 #endif
 

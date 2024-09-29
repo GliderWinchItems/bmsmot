@@ -17,6 +17,7 @@
 #include "common_can.h"
 #include "../../../../GliderWinchCommons/embed/svn_common/trunk/db/gen_db.h"
 #include "gateway_table.h"
+#include "StringChgrTask.h"
 
 /* CAN msg ID codes for CANRCVBUFS passed to StringChgrTask. */
 #define C1SELCODE_NOT_FOUND  0  // Not in table
