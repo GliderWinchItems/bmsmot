@@ -38,7 +38,7 @@
  * @return	: stale_status and stale_cell set if timed out
  * *************************************************************************/
   void do_emc_cmds(struct CANRCVBUFS* pcans);
-/* @brief	: Commands from either PC, or EMC 
+/* @brief	: Commands from either PC, EMC, or deus ex machina
  * @param	: pcans = pointer to CAN msg w selection code
  * *************************************************************************/
   int8_t do_bms_status_check(struct CANRCVBUFS* pcans);

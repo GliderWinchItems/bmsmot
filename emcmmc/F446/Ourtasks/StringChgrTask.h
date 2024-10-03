@@ -32,8 +32,10 @@
 #define ELCONSTATUS_OVTEMP (1<<1) //  2 Over temperature
 #define ELCONSTATUS_INVOLT (1<<2) //  4 Input voltage wrong
 #define ELCONSTATUS_DISCNT (1<<3) //  8 Battery disconnected
-#define ELCONSTATUS_COMMTO (1<<4) // 16 Communications timeout
-#define ELCONSTATUS_REPORT (1<<5) // 32 ELCON is reporting
+#define ELCONSTATUS_COMMTO (1<<4) // 10 Communications timeout
+/* Additional bits for ELCON. */
+#define ELCONSTATUS_REPORT (1<<5) // 20 ELCON is reporting
+#define ELCONSTATUS_TIMOUT (1<<6) // 40 Time out bits [0:4] not ready
 
 /* Charging status. */
 #define CHGSTATUS_MODE  (1<<0) // 0 = relaxation; 1 = charging
@@ -57,11 +59,14 @@ pay[4]-[7] (float) String voltage (Volts)
 #define SWTIME1PERIOD 50 // 50 ms ticks
 #define TIMCTR_ELCON_POLL  ( 900/SWTIME1PERIOD) // Time between ELCON polls (900 ms)
 #define TIMCTR_TIMEOUT_BMS (1000/SWTIME1PERIOD) // Timecheck BMS responding. (1000 ms)
-
+#define TIMCTR_ELCON_TIMOUT (15000/SWTIME1PERIOD) // ELCON fails ready status (15sec)
+#define TIMCTR_RELAX (3000/SWTIME1PERIOD) // Chargingg turned off wait for cell volts to settle
 
 /* Modes */
-#define STRMODE_SELF 0 // Self discharging
-#define STRMODE_CHGR 1 // Charging in-progress
+#define EMCCMD_ELIDLE 0 // ELCON: Self discharging/stop 
+#define EMCCMD_ELCHG  1 // ELCON: Start charging
+#define EMCCMD_LCCHG  2 // Node Low Current: set charging mode
+#define EMCCMD_LCIDLE 3 // Node Low Current: self discharging/stop 
 
 /* Table with element for each BMS node on string. */
 #define BMSTABLESIZE 7 // Max size of table
@@ -89,8 +94,12 @@ pay[4]-[7] (float) String voltage (Volts)
 #define MODE_CELLTRIP  (1 << 2) // 1 = One or more cells tripped max
 
 /* state switch on BMS status msg. */
-#define STSSTATE_IDLE  0  // Don't do anything with status msgs
-#define STSSTATE_CHRG  1  //
+#define STSSTATE_IDLE   0  // Just poll ELCON to keep its COMM status alive
+#define STSSTATE_CHRG   1  // Charging in progress
+#define STSSTATE_RELAX  2  // Waiting for cells to relax after charge stopped.
+
+/* status2 */
+#define STS2_NODES_RPT  (1 << 0) // 1 = All discovered nodes reported status
 
 /* BMS TABLE (not Bowel Movements STable) */
 struct BMSTABLE
@@ -118,13 +127,14 @@ struct ELCONSTUFF
 {
 	float fmsgvolts;         // ELCON reported: volts
 	float fmsgamps;          // ELCON reported: amps
-	int32_t toct_poll_dur;   // Timer tick ct for polling duration
+	int32_t toct_poll_dur;   // Timer tick ct for polling duration (might be variable)
 
 	/* toctrs are time tick countdown and zero means timed out. */
 	int32_t toctr_elcon_rcv; // Timeout counter: ELCON rcv msgs
 	int32_t toctr_wait1;     // Timeout counter: delay 1
 	int32_t toctr_wait2;     // Timeout counter: delay 2
 	int32_t toctr_elcon_poll;// Timeout counter: ELCON poll
+	int32_t toctr_elcon_ready; // Receving ELCON mgs, but status shows not ready
 
 	/* Note: ichgr 16b are big endian in ELCON CAN payloads. */
 	uint16_t ichgr_maxvolts; // Parameter float(volts) to uint32_t ui(0.1v)
@@ -138,22 +148,30 @@ struct ELCONSTUFF
 /* Working struct. */
 struct STRINGCHGRFUNCTION
 {
-	struct ELCONSTUFF elconstuff;
-	struct BMSTABLE bmstable[BMSTABLESIZE];
-	struct BMSTABLE* pbmstbl[BMSTABLESIZE];
+	struct ELCONSTUFF elconstuff; // Group ELCON vars together
+	struct BMSTABLE bmstable[BMSTABLESIZE]; // Entry for each BMS node
+	struct BMSTABLE* pbmstbl[BMSTABLESIZE]; // Ptrs for sorted sequence
+
+	/* CAN msgs */
+	struct CANTXQMSG canelcon; // CAN msg for sending to ELCON
+	struct CANTXQMSG canbms;   // CAN msg for sending to BMS nodes
 
 	uint32_t hbct_t;   // Duration between STRINGCHGR function heartbeats(ms)
 	uint32_t hbct_tic; // Loop tick count between heartbeats
 	int32_t  hbct_ctr; // Heartbeat time count-down
 
-	uint8_t bmsnum_expected; // Number of BMS nodes expected to be reporting
-	uint8_t bmsnum;    // Discovered number of BMS nodes.
+	int32_t toctr_relax; // Wait after turning off ELCON 
+
+
 
 	float chgr_maxvolts; // Set charger voltage limit (volts)
 	float chgr_maxamps;  // Set charger current limit (amps)
 
 	/* Charging current steps. */
 	float chgr_rate[CHGRATENUM]; // Amps
+
+	uint8_t bmsnum_expected; // Number of BMS nodes expected to be reporting
+	uint8_t bmsnum;    // Discovered number of BMS nodes.
 
 	// chgr_rate_idx = (CHGRATENUM-1) is MAX rate
 	uint8_t chgr_rate_idx; // Index of rate in effect. 
@@ -164,14 +182,16 @@ struct STRINGCHGRFUNCTION
 // Entry every possible BMS CAN id. -1 is not in table; >= 0 is index of table
 	int8_t remap[BMSNODEIDSZ]; 
 
-	uint8_t status1;  // Bits on BMS number reporting
-	uint8_t mode;
-	uint8_t state; // Switch on status msg
-	uint8_t cellrcv; // All cells received status 
-	uint8_t statusrcv; 
+	uint8_t status1;   // Bits on BMS number reporting
+	uint8_t mode;      // Charging or off
+	uint8_t state;     // Switch on status msg
+	uint8_t cellrcv;   // Node bits: all cell readings received 
+	uint8_t statusrcv; // Node bits: status msg received
+	uint8_t statusmax; // Node bits: Cell above max in status report
+	uint8_t status2;   // ?
+	uint8_t stsstate;  // Charging management
 		
-	/* CAN msgs */
-	struct CANTXQMSG canelcon; // CAN msg for sending to ELCON
+
 };
 
 /* *************************************************************************/

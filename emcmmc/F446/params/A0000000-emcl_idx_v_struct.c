@@ -206,7 +206,8 @@ void emcl_idx_v_struct_hardcode_params(struct EMCLLC* p)
   p->lcstring.chgr_rate[4] = 0.8f;
   p->lcstring.chgr_rate[5] = 1.0f;
 
-  p->lcstring.canelcon.can.id = CANID_ELCON_RX; //C0372FA4 'ELCON Charger receive: ');  
+  p->lcstring.canelcon.can.id = CANID_ELCON_RX;      //C0372FA4 ELCON Charger receive
+  p->lcstring.canbms.can.id   = CANID_UNI_BMS_EMC1_I;//B0000000 EMC1 to BMS'
 
 /* ==================== ========================================= */
 // CAN ids EMCMMC sends, others receive

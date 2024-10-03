@@ -1440,7 +1440,7 @@ HAL_GPIO_WritePin(GPIOB, GPIO_PIN_13, GPIO_PIN_SET); // RED OFF
       }
       fmsum = msum;
       // Cell summation for node
-      if (emclfunction.lc.lcstring.pbmstbl[j]->toctr_status == 0)
+      if (emclfunction.lc.lcstring.pbmstbl[j]->toctr_cell > 0)
       {
         yprintf(&pbuf1," %6.3f",fmsum*0.0001f);
         for (int k = 0; k < 18; k++)

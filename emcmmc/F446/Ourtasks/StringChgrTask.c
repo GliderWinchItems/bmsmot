@@ -86,9 +86,15 @@ uint16_t tmpv
 	p->canelcon.can.cd.ull = 0; // Clear playload [5-7] reserved
 	p->canelcon.can.dlc    = 8; // ELCON always 8
 
-	p->chgr_rate[0]  = 0; // Must be zero
-	p->chgr_rate_idx = 0;
-	p->bmsnum        = 0; // Discovered BMS nodes
+	p->canbms.pctl       = pctl0; // Control block for CAN module (CAN 1)
+	p->canbms.maxretryct = 4;
+	p->canbms.bits       = 0;
+	p->canbms.can.cd.ull = 0; // Clear playload [5-7] reserved
+	p->canbms.can.dlc    = 8; // default size
+
+	p->chgr_rate[0]  = 0; // JIC: Must be zero
+	p->chgr_rate_idx = 0; // Charge current step: current = 0;
+	p->bmsnum        = 0; // Discovered number of BMS nodes
 
 	for (;;)
 	{
@@ -136,10 +142,6 @@ yprintf(&pbuf1,"%08X %d V.1 %d A.1  0x%02X\n\t",pcans->can.id,tmpv,tmpa,pcans->c
 			{ // Here, FreeRTOS timer (swtim1) callback 
 				/* Timeout checks: countdown counters. */
 				do_timeoutcheck();
-			}
-
-			if (noteval == 0)
-			{ 
 			}
 		}
 	}		
