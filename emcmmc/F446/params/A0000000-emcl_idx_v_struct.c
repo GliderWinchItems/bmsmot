@@ -199,12 +199,13 @@ void emcl_idx_v_struct_hardcode_params(struct EMCLLC* p)
   p->lcstring.chgr_maxvolts = (72.0f*3); // Set charger voltage limit (volts)
   p->lcstring.chgr_maxamps  = 1.0f;      // Set charger current limit (amps)
 
+  /* CHGRATENUM 6 // Number of charger current steps */
   p->lcstring.chgr_rate[0] = 0; // Always zero
   p->lcstring.chgr_rate[1] = 0.1f;
   p->lcstring.chgr_rate[2] = 0.2f;
   p->lcstring.chgr_rate[3] = 0.5f;
   p->lcstring.chgr_rate[4] = 0.8f;
-  p->lcstring.chgr_rate[5] = 1.0f;
+  p->lcstring.chgr_rate[5] = 1.0f; // Max
 
   p->lcstring.canelcon.can.id = CANID_ELCON_RX;      //C0372FA4 ELCON Charger receive
   p->lcstring.canbms.can.id   = CANID_UNI_BMS_EMC1_I;//B0000000 EMC1 to BMS'

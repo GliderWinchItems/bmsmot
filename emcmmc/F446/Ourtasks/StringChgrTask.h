@@ -60,13 +60,15 @@ pay[4]-[7] (float) String voltage (Volts)
 #define TIMCTR_ELCON_POLL  ( 900/SWTIME1PERIOD) // Time between ELCON polls (900 ms)
 #define TIMCTR_TIMEOUT_BMS (1000/SWTIME1PERIOD) // Timecheck BMS responding. (1000 ms)
 #define TIMCTR_ELCON_TIMOUT (15000/SWTIME1PERIOD) // ELCON fails ready status (15sec)
-#define TIMCTR_RELAX (3000/SWTIME1PERIOD) // Chargingg turned off wait for cell volts to settle
+#define TIMCTR_RELAX (3000/SWTIME1PERIOD) // Charging turned off wait for cell volts to settle
 
 /* Modes */
-#define EMCCMD_ELIDLE 0 // ELCON: Self discharging/stop 
-#define EMCCMD_ELCHG  1 // ELCON: Start charging
-#define EMCCMD_LCCHG  2 // Node Low Current: set charging mode
-#define EMCCMD_LCIDLE 3 // Node Low Current: self discharging/stop 
+#define EMCCMD_ELIDLE   0 // ELCON: Self discharging/stop 
+#define EMCCMD_ELCHG    1 // ELCON: Start charging
+#define EMCCMD_LCCHG    2 // Node Low Current: set charging mode
+#define EMCCMD_LCIDLE   3 // Node Low Current: self discharging/stop 
+#define EMCCMD_DBGSET   4 // Debug: ELCON: Force volts & amps setting
+#define EMCCMD_POLLRATE 5 // Set BMS poll rate
 
 /* Table with element for each BMS node on string. */
 #define BMSTABLESIZE 7 // Max size of table
@@ -97,6 +99,7 @@ pay[4]-[7] (float) String voltage (Volts)
 #define STSSTATE_IDLE   0  // Just poll ELCON to keep its COMM status alive
 #define STSSTATE_CHRG   1  // Charging in progress
 #define STSSTATE_RELAX  2  // Waiting for cells to relax after charge stopped.
+#define STSSTATE_DBG    3  // PC or EMC direct setting of volts, amps, rate idx
 
 /* status2 */
 #define STS2_NODES_RPT  (1 << 0) // 1 = All discovered nodes reported status

@@ -1432,16 +1432,18 @@ HAL_GPIO_WritePin(GPIOB, GPIO_PIN_13, GPIO_PIN_SET); // RED OFF
     for (int j = 0; j < emclfunction.lc.lcstring.bmsnum; j++)
     {
       yprintf(&pbuf2,"%2d %08X",j,emclfunction.lc.lcstring.pbmstbl[j]->id);
-      // Sum cell readings for module
+
+      // Sum cell readings for =>module<=
       uint32_t msum = 0;
       for (int k = 0; k < 18; k++)
       {
         msum += emclfunction.lc.lcstring.pbmstbl[j]->cell[k];
       }
       fmsum = msum;
-      // Cell summation for node
+
+      // Display
       if (emclfunction.lc.lcstring.pbmstbl[j]->toctr_cell > 0)
-      {
+      { // Timeout counter for cell readings has not expired
         yprintf(&pbuf1," %6.3f",fmsum*0.0001f);
         for (int k = 0; k < 18; k++)
         { // Print individual cell readings (100uV)
@@ -1449,7 +1451,7 @@ HAL_GPIO_WritePin(GPIOB, GPIO_PIN_13, GPIO_PIN_SET); // RED OFF
         }
       }
       else
-      {
+      { // Timeout expired, so readings are "stale"
         yprintf(&pbuf1," %6.3f",fmsum*0.0001f);
         for (int k = 0; k < 18; k++)
         { // Print individual cell readings (100uV)

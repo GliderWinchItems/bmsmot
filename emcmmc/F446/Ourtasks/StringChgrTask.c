@@ -65,6 +65,29 @@ uint16_t tmpv
 #define LED6_RED_Pin GPIO_PIN_13
 #define LED6_RED_GPIO_Port GPIOB
 */
+	/* Init some things. */
+	stringchgr_items_init();
+
+	/* Pre-load fixed data id CAN msg to be sent. */
+	// CAN msg for sending ELCON commands
+	p->canelcon.pctl       = pctl0; // Control block for CAN module (CAN 1)
+	p->canelcon.maxretryct = 4;
+	p->canelcon.bits       = 0;
+	p->canelcon.can.cd.ull = 0; // Clear playload [5-7] reserved
+	p->canelcon.can.dlc    = 8; // ELCON always 8
+
+	// CAN control block & msg for polling BMS
+	p->canbms.pctl         = pctl0; // Control block for CAN module (CAN 1)
+	p->canbms.maxretryct   = 4;
+	p->canbms.bits         = 0;
+	p->canbms.can.cd.ull   = 0; // Clear playload [5-7] reserved
+	p->canbms.can.dlc      = 8; // default size
+	p->canbms.can.cd.uc[0] = CMD_CMD_TYPE2;	
+	p->canbms.can.cd.uc[1] = (0x3 << 6); // All nodes respond
+
+	p->chgr_rate[0]  = 0; // JIC: Must be zero
+	p->chgr_rate_idx = 0; // Charge current step: current = 0;
+	p->bmsnum        = 0; // Discovered number of BMS nodes
 
 	/* Create timer swtimer1 Auto-reload/periodic */
 	StringChgrTimerHandle = xTimerCreate("swtim1",
@@ -74,27 +97,7 @@ uint16_t tmpv
 
 	/* Start timer */
 	BaseType_t bret = xTimerReset(StringChgrTimerHandle, 10);
-	if (bret != pdPASS) {morse_trap(405);}
-
-	/* Init some things. */
-	stringchgr_items_init();
-
-	/* Pre-load fixed data id CAN msg to be sent. */
-	p->canelcon.pctl       = pctl0; // Control block for CAN module (CAN 1)
-	p->canelcon.maxretryct = 4;
-	p->canelcon.bits       = 0;
-	p->canelcon.can.cd.ull = 0; // Clear playload [5-7] reserved
-	p->canelcon.can.dlc    = 8; // ELCON always 8
-
-	p->canbms.pctl       = pctl0; // Control block for CAN module (CAN 1)
-	p->canbms.maxretryct = 4;
-	p->canbms.bits       = 0;
-	p->canbms.can.cd.ull = 0; // Clear playload [5-7] reserved
-	p->canbms.can.dlc    = 8; // default size
-
-	p->chgr_rate[0]  = 0; // JIC: Must be zero
-	p->chgr_rate_idx = 0; // Charge current step: current = 0;
-	p->bmsnum        = 0; // Discovered number of BMS nodes
+	if (bret != pdPASS) {morse_trap(405);}	
 
 	for (;;)
 	{
@@ -114,7 +117,7 @@ dbgS1 += 1;
 						{ 
 						case C1SELCODE_BMS: // BMS node CAN msg group
 							do_tableupdate(pcans); // Build or update table of BMS nodes
-							do_bms_status_check(pcans);
+							do_bms_status_check();
 							break;
 					
 						case C1SELCODE_ELCON: // ELCON msg

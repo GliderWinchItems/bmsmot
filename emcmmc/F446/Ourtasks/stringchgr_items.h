@@ -41,9 +41,8 @@
 /* @brief	: Commands from either PC, EMC, or deus ex machina
  * @param	: pcans = pointer to CAN msg w selection code
  * *************************************************************************/
-  int8_t do_bms_status_check(struct CANRCVBUFS* pcans);
+  int8_t do_bms_status_check(void);
 /* @brief	: Check statusrcv to see if all nodes sent a status msg
- * @param	: pcans = pointer to CAN msg w selection code 
  * @return  : 0 = yes; -1 = no
  * *************************************************************************/
 
