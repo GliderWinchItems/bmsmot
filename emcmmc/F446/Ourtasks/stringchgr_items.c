@@ -21,6 +21,7 @@ void do_relax(struct ELCONSTUFF* pe);
 void do_dbg(struct ELCONSTUFF* pe);
 int8_t do_bms_status_check(void);
 void do_bms_send(struct STRINGCHGRFUNCTION* ps, uint8_t code, uint8_t uc3);
+void do_bms_status_poll(void);
 
 /* *************************************************************************
  * void stringchgr_items_init(void);
@@ -39,8 +40,9 @@ void stringchgr_items_init(void)
 	{
 		ps->remap[i] = -1;
 	}
-	ps->status1 = 0;
-	ps->mode    = 0;
+	ps->status1  = 0;
+	ps->mode     = 0;
+	pe->pollflag = 0;
 
 	/* Rescale parameter and convert to unit16_t. */
 	pe->ichgr_maxvolts = ps->chgr_maxvolts*10.0f; // Set charger voltage limit (0.1 volts)
@@ -50,7 +52,7 @@ void stringchgr_items_init(void)
 	pe->toct_poll_dur     = TIMCTR_ELCON_POLL; // Poll duration
 	pe->toctr_elcon_poll  = pe->toct_poll_dur; // Set first delay
 	pe->toctr_elcon_ready = TIMCTR_ELCON_TIMOUT; // Receving ELCON mgs, but status shows not ready
-
+	pe->toctr_elcon_pollflag = TIMCTR_ELCON_POLLFLAG; //
 
 	return;
 }
@@ -201,39 +203,51 @@ void do_timeoutcheck(void)
 		}
 	}
 
-	/* Transmit ELCON w charinging logic/states. */
-	if (pe->toctr_elcon_poll > 0)
-	{ 
-		pe->toctr_elcon_poll -= 1;
-		if (pe->toctr_elcon_poll <= 0)
-		{
-			if (do_bms_status_check() == 0)
-			{ // Poll cycle ends:start next cycle
-				switch (ps->mode)			
-				{
-				case STSSTATE_IDLE: // 0 Just poll ELCON to keep its COMM status alive
-					break;
-				case STSSTATE_CHRG: // 1 Charging in progress
-					do_chrg(pe); 
-					break;
-				case STSSTATE_RELAX:// 2 Waiting for cells to relax after charge stopped.
-					do_relax(pe);
-					break;
-				case STSSTATE_DBG:  // 3 PC or EMC direct setting of volts, amps, rate idx			
-					do_dbg(pe);
-					break;
+	/* Transmit ELCON w charging logic/states. */
+	if (pe->pollflag == 0)
+	{
+		if (pe->toctr_elcon_poll > 0)
+		{ 
+			pe->toctr_elcon_poll -= 1;
+			if (pe->toctr_elcon_poll <= 0)
+			{
+				if (do_bms_status_check() == 0)
+				{ // Poll cycle ends:start next cycle
+					switch (ps->mode)			
+					{
+					case STSSTATE_IDLE: // 0 Just poll ELCON to keep its COMM status alive
+						break;
+					case STSSTATE_CHRG: // 1 Charging in progress
+						do_chrg(pe); 
+						break;
+					case STSSTATE_RELAX:// 2 Waiting for cells to relax after charge stopped.
+						do_relax(pe);
+						break;
+					case STSSTATE_DBG:  // 3 PC or EMC direct setting of volts, amps, rate idx			
+						do_dbg(pe);
+						break;
+					}
+					do_bms_status_poll(); // Start next BMS poll
 				}
-				do_bms_status_poll(); // Start next BMS poll
-			}
-			else
-			{ // Error: All nodes in table did not return a status in this interval
+				else
+				{ // Error: All nodes in table did not return a status in this interval
 
-			}			
-			// Set duration for next ELCON poll msg
-			pe->toctr_elcon_poll = pe->toct_poll_dur; 
-			do_elcon_poll();
-		}
-	}	
+				}			
+				// Set duration for next ELCON poll msg
+				pe->toctr_elcon_poll = pe->toct_poll_dur; 
+				do_elcon_poll();
+			}
+		}	
+	}
+	else
+	{ // Here, someone else sent an ELCON poll msg 
+		pe->toctr_elcon_pollflag -= 1;
+		if (pe->toctr_elcon_pollflag <= 0)
+		{ // Here, it looks like that "someone" is no longer sending ELCON poll msgs
+			pe->pollflag = 0; // Reset the wait flag
+			pe->toctr_elcon_poll = 1; // Regular poll next time thru routine
+		}		
+	}
 
 	if (pe->toctr_elcon_ready > 0)
 	{
@@ -393,16 +407,24 @@ void do_elcon_poll(void)
 
 	if ((pe->status_elcon != 0) || (pe->toctr_elcon_rcv <= 0))
 	{ // ELCON not ready or ELCON not responding
-		px->can.cd.ui[0] = 0; // Zero volts and amps
+		px->can.cd.ui[0] = 0; // Zero volts AND amps
+		px->can.cd.uc[4] = 1; // Charging stop
 	}
 	else
 	{
 	// Make 16b payload big-endian with __REVSH
 		px->can.cd.us[0] = __REVSH(pe->ichgr_setvolts); //(ichgr_setvolts >> 8) || (ichgr_setvolts << 8);
 		px->can.cd.us[1] = __REVSH(pe->ichgr_setamps);  //(ichgr_setamps  >> 8) || (ichgr_setamps  << 8);	
+		px->can.cd.uc[4] = 0; // Charging start
 	}
-	px->can.cd.uc[4] = 1;
+	
+
+//px->can.cd.us[0] = __REVSH((uint16_t)2160); //(ichgr_setvolts >> 8) || (ichgr_setvolts << 8);
+//px->can.cd.us[1] = __REVSH((uint16_t)6);  //(ichgr_setamps  >> 8) || (ichgr_setamps  << 8);		
+//px->can.cd.uc[4] = 0;
+
 	xQueueSendToBack(CanTxQHandle,px,4);
+
 	return;
 }
 /* *************************************************************************
@@ -559,7 +581,7 @@ void do_idle(struct ELCONSTUFF* pe)
 /* *************************************************************************
  * void do_dbg(struct ELCONSTUFF* pe);
  * @brief	: Poll dur end:start--STSSTATE_DBG    3  // PC or EMC direct setting of volts, amps, rate idx
- * @param	: pe = pointer struct with all this mess
+ * @param	: pe = pointer struct with alldo_bms_status_poll this mess
  * *************************************************************************/
 void do_dbg(struct ELCONSTUFF* pe)
 {

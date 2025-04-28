@@ -61,6 +61,7 @@ pay[4]-[7] (float) String voltage (Volts)
 #define TIMCTR_TIMEOUT_BMS (1000/SWTIME1PERIOD) // Timecheck BMS responding. (1000 ms)
 #define TIMCTR_ELCON_TIMOUT (15000/SWTIME1PERIOD) // ELCON fails ready status (15sec)
 #define TIMCTR_RELAX (3000/SWTIME1PERIOD) // Charging turned off wait for cell volts to settle
+#define TIMCTR_ELCON_POLLFLAG (6000/SWTIME1PERIOD) // Wait to reset ELCON poll flag
 
 /* Modes */
 #define EMCCMD_ELIDLE   0 // ELCON: Self discharging/stop 
@@ -138,6 +139,7 @@ struct ELCONSTUFF
 	int32_t toctr_wait2;     // Timeout counter: delay 2
 	int32_t toctr_elcon_poll;// Timeout counter: ELCON poll
 	int32_t toctr_elcon_ready; // Receving ELCON mgs, but status shows not ready
+	int32_t toctr_elcon_pollflag; // Timeout counter: others sent a ELCON poll
 
 	/* Note: ichgr 16b are big endian in ELCON CAN payloads. */
 	uint16_t ichgr_maxvolts; // Parameter float(volts) to uint32_t ui(0.1v)
@@ -146,6 +148,7 @@ struct ELCONSTUFF
 	uint16_t ichgr_setamps;  // Set ELCON: (0.1a)
 	/* ELCON status bits 0:4 HW FAIL:OVR TEMP:INPUT RVRSE:BATT DISC:COMM TO: */
 	uint8_t status_elcon;    // uc[4] status byte rcvd from ELCON
+	uint8_t pollflag;        // 0 = OK; 1 = someone else sent a poll CAN msg
 };
 
 /* Working struct. */

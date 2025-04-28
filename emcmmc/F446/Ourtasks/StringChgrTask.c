@@ -50,6 +50,7 @@ void StartStringChgrTask(void* argument)
 	uint32_t noteval;
 	struct CANRCVBUFS* pcans;
 	struct STRINGCHGRFUNCTION* p = &emclfunction.lc.lcstring;
+	struct ELCONSTUFF* pe = &emclfunction.lc.lcstring.elconstuff;
 
 uint16_t tmpv;
 uint16_t tmpa;
@@ -121,7 +122,19 @@ dbgS1 += 1;
 							break;
 					
 						case C1SELCODE_ELCON: // ELCON msg
-							do_elcon(pcans);
+							switch (pcans->pcl->rmap)
+							{
+							case 0: // Send to ELCON
+								if (pe ->pollflag == 0)
+									{ // Don't poll ELCON if someone else is polling
+									do_elcon(pcans);
+								}
+								break;
+							case 1: // Someone else is sending to ELCON
+								pe->pollflag = 1;
+								pe->toctr_elcon_pollflag = TIMCTR_ELCON_POLLFLAG;
+								break;
+							}
 							
 tmpv = __REVSH(pcans->can.cd.us[0]);
 tmpa = __REVSH(pcans->can.cd.us[1]);

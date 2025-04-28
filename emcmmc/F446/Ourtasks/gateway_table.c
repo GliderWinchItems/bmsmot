@@ -37,6 +37,7 @@ const struct CANIDCLASS canidclass[] =
 	{CANID_UNIT_BMS16,      C1SELCODE_BMS, 15 },      /* 'B2600000','UNIT_BMS16' */
 	{CANID_UNIT_BMS17,      C1SELCODE_BMS, 16 },      /* 'B2800000','UNIT_BMS17' */
 	{CANID_UNIT_BMS18,      C1SELCODE_BMS, 17 },      /* 'B2A00000','UNIT_BMS18' */		
+	{CANID_ELCON_RX,      C1SELCODE_ELCON,  1 },      /* 'C0372FA4' Someone else is polling ELCON */
 	{CANID_ELCON_TX,      C1SELCODE_ELCON,  0 },      /* 'C7FA872C' ELCON charger TX */
 	{CANID_CMD_CNTCTR1R,   C1SELCODE_CONTACTOR0, 2 }, /* 'E3600000' Contactor1: R Command response */
 	{CANID_CMD_CNTCTR1I,   C1SELCODE_CONTACTOR0, 3 }, /* 'E360000C' Contactor1: I Command incoming */

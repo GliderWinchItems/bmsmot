@@ -6,6 +6,12 @@
 
 ./mm $1
 
+cd ../../../../GliderWinchCommons/embed/svn_discoveryf4/PC/sensor/CANldr1/trunk
+./CANldr $2 $3 $1 ../../../../../../../GliderWinchItems/bmsmot/emcmmc/F446/build/F446.xbin
+echo $?
+cd -
+exit
+
 cd ~/GliderWinchCommons/embed/svn_discoveryf4/PC/sensor/CANldr1/trunk
 ./CANldr $2 $3 $1 ~/GliderWinchItems/bmsmot/emcmmc/F446/build/F446.xbin
 echo $?
