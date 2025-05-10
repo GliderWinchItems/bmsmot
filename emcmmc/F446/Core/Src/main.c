@@ -1385,13 +1385,13 @@ void StartDefaultTask(void const * argument)
   if (pbuf1 == NULL) morse_trap(115);
   struct SERIALSENDTASKBCB* pbuf2 = getserialbuf(&HUARTMON,128);
   if (pbuf2 == NULL) morse_trap(125);
-//struct SERIALSENDTASKBCB* pbuf3 = getserialbuf(&HUARTMON,128);
-//if (pbuf3 == NULL) morse_trap(125);
-//struct SERIALSENDTASKBCB* pbuf4 = getserialbuf(&HUARTMON,128);
+struct SERIALSENDTASKBCB* pbuf3 = getserialbuf(&HUARTMON,64);
+  if (pbuf3 == NULL) morse_trap(125);
+//struct SERIALSENDTASKBCB* pbuf4 = getserialbuf(&HUARTMON,64);
 //if (pbuf4 == NULL) morse_trap(125);
 HAL_GPIO_WritePin(GPIOB, GPIO_PIN_13, GPIO_PIN_RESET); // RED ON
 osDelay(20);
-  yprintf(&pbuf1,"\n\n\rPROGRAM STARTS");
+  yprintf(&pbuf1,"\n\n\rPROGRAM STARTS\n\r");
 HAL_GPIO_WritePin(GPIOB, GPIO_PIN_13, GPIO_PIN_SET); // RED OFF
   
 //    qret=xQueueSendToBack(RyTaskReadReqQHandle, &rytest[j].preq, portMAX_DELAY);
@@ -1406,7 +1406,7 @@ HAL_GPIO_WritePin(GPIOB, GPIO_PIN_13, GPIO_PIN_SET); // RED OFF
     yprintf(&pbuf1,"%5d\n\r", dbgcool1);
 #endif
 
-#if 0 // Green LED winking
+#if 1 // Green LED winking
     HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, GPIO_PIN_RESET); // GRN ON
         osDelay(3);
     HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, GPIO_PIN_SET); // GRN OFF
@@ -1418,6 +1418,47 @@ HAL_GPIO_WritePin(GPIOB, GPIO_PIN_13, GPIO_PIN_SET); // RED OFF
 #endif
 
 #if 1
+  static uint32_t sctr;
+  extern uint8_t do_bms_status_flag;
+  struct STRINGCHGRFUNCTION* ps= &emclfunction.lc.lcstring;
+  extern uint16_t pccmd;
+  if (do_bms_status_flag != 0)
+  {
+    yprintf(&pbuf1,"%5d, statusmax %02x pccmd %04X ",sctr++,ps->statusmax,pccmd);
+    yprintf(&pbuf2,"ststate %d\n\r",ps->stsstate);
+    do_bms_status_flag = 0;
+  }
+
+extern uint8_t dbg_do_elcon_poll_flag;
+extern uint8_t dbg_do_elcon_poll_status_elcon;
+extern int32_t dbg_do_elcon_poll_toctr_elcon_rcv;
+  if (dbg_do_elcon_poll_flag > 0)
+  {
+    yprintf(&pbuf1,"elcon_poll_flag %d  status_elcon %02X toctr_elcon_rcv %d\n\r",
+      dbg_do_elcon_poll_flag,dbg_do_elcon_poll_status_elcon,dbg_do_elcon_poll_toctr_elcon_rcv);
+    dbg_do_elcon_poll_flag = 0;
+  }    
+
+#endif   
+#if 1 // BMS Discovery table data
+    struct STRINGCHGRFUNCTION* ps2= &emclfunction.lc.lcstring;
+extern uint8_t discovery_end_flag; // Signal main for printf'ing
+  if (discovery_end_flag != 0)
+  {
+    discovery_end_flag = 0;
+    yprintf(&pbuf1,"\n\rDiscovery END: Sorted Table----------------\n\r");
+    yprintf(&pbuf2,"           v_max i_max i_bal\n\r");
+    for (int n = 0; n < ps2->bmsnum; n++)
+    {
+      yprintf(&pbuf3,"%d %08X %5d %5d %5d\n\r", (n+1),ps->pbmstbl[n]->id,ps->pbmstbl[n]->v_max,ps->pbmstbl[n]->i_max, ps->pbmstbl[n]->i_bal );
+    }
+  yprintf(&pbuf1,"MAX: %12.1f %4.1f %5.1f\n\r\n\r",ps->chgr_maxvolts,ps->chgr_maxamps,ps->chgr_balamps);
+  }
+
+#endif  
+
+#if 0
+static uint32_t yyctr;
   static uint8_t bmsnum_prev;
   float fmsum;
   float totalv;
@@ -1465,9 +1506,10 @@ HAL_GPIO_WritePin(GPIOB, GPIO_PIN_13, GPIO_PIN_SET); // RED OFF
     yprintf(&pbuf1,"     total %7.3f\n\r",totalv*0.0001f);
 
   }
-  
-
 #endif  
+
+
+
 
 #if 0    
   static uint32_t yctr;      

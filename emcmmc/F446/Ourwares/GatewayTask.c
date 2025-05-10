@@ -240,14 +240,17 @@ extern CAN_HandleTypeDef hcan1;
 					/* Get pointer into CAN msg circular buffer */
 					pncan = can_iface_get_CANmsg(ptake[i]);
 					if (pncan != NULL)
-					{			
+					{		
 					/* Convert binary to the ascii/hex format for PC. */
 						canqtx2.can = pncan->can; // Save a local copy
 
 						struct CANIDCLASS* pcl = selectCAN1(&pncan->can); // Selection for StringChgrTask
 						if (pcl != NULL)
 						{ // Here, CAN msg is in table for StringChgrTask
-							if ((pcl->code == C1SELCODE_BMS) || (pcl->code == C1SELCODE_ELCON))
+							if ((pcl->code == C1SELCODE_BMS)      || 
+								  (pcl->code == C1SELCODE_ELCON)    ||
+								  (pcl->code == C1SELCODE_EMC_CMDS) ||
+								  (pcl->code == C1SELCODE_POLLS)    )
 							{	/* Place CAN msg on circular buffer w selection code */
 								if (addcan(&circan1, &pncan->can, pcl) == 0)
 								{ // Here, success (no overflow)

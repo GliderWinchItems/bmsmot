@@ -124,26 +124,29 @@ dbgS1 += 1;
 						case C1SELCODE_ELCON: // ELCON msg
 							switch (pcans->pcl->rmap)
 							{
-							case 0: // Send to ELCON
+							case 0: // Rcvd ELCON, Send to ELCON
 								if (pe ->pollflag == 0)
-									{ // Don't poll ELCON if someone else is polling
+								{ // Don't poll ELCON if someone else is polling
 									do_elcon(pcans);
 								}
 								break;
-							case 1: // Someone else is sending to ELCON
-								pe->pollflag = 1;
+							case 1: // Someone else is sending to ELCON, set a timeout
+								pe->pollflag = 1; // Don't poll until timeout
 								pe->toctr_elcon_pollflag = TIMCTR_ELCON_POLLFLAG;
 								break;
 							}
 							
-tmpv = __REVSH(pcans->can.cd.us[0]);
-tmpa = __REVSH(pcans->can.cd.us[1]);
-yprintf(&pbuf1,"%08X %d V.1 %d A.1  0x%02X\n\t",pcans->can.id,tmpv,tmpa,pcans->can.cd.uc[4]);
+//tmpv = __REVSH(pcans->can.cd.us[0]);
+//tmpa = __REVSH(pcans->can.cd.us[1]);
+//yprintf(&pbuf1,"%08X %d V.1 %d A.1  0x%02X\n\t",pcans->can.id,tmpv,tmpa,pcans->can.cd.uc[4]);
 
 							break;
 
 						case C1SELCODE_EMC_CMDS: // '98000000'PC or '98200000'EMC 
-							do_emc_cmds(pcans);
+							if (pcans->can.dlc >= 2)
+							{ // uc[0]. ic[1] hold command codes
+								do_emc_cmds(pcans);
+							}
 							break;
 
 						case C1SELCODE_POLLS: // PC, EMC1, EMC2 polling

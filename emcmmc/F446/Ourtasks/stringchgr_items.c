@@ -9,6 +9,10 @@
 #include "bubblesort_uint32_t.h"
 #include "EMCLTaskCmd.h"
 //#include "../../../../BMS/bmsadbms1818/Ourtasks/cancomm_items.h"
+#include "morse.h"
+
+// Debug w main yprintf
+uint8_t do_bms_status_flag;
 
 extern uint32_t swtim1_ctr; // Running count of swtim1 callbacks
 
@@ -20,8 +24,9 @@ void do_chrg(struct ELCONSTUFF* pe);
 void do_relax(struct ELCONSTUFF* pe);
 void do_dbg(struct ELCONSTUFF* pe);
 int8_t do_bms_status_check(void);
-void do_bms_send(struct STRINGCHGRFUNCTION* ps, uint8_t code, uint8_t uc3);
+void sendcan_type2(struct STRINGCHGRFUNCTION* ps, uint8_t code, uint8_t uc3);
 void do_bms_status_poll(void);
+void do_bms_chg_limits_poll(void);
 
 /* *************************************************************************
  * void stringchgr_items_init(void);
@@ -40,25 +45,27 @@ void stringchgr_items_init(void)
 	{
 		ps->remap[i] = -1;
 	}
-	ps->status1  = 0;
-	ps->mode     = 0;
-	pe->pollflag = 0;
+	ps->status1       = 0;
+	ps->mode          = 0;
+	ps->vi_max_rpt    = 0; // Bits show module reported V & I max limits
+	pe->pollflag      = 0;
+	pe->discovery_ctr = 0; // Count ELCON timed BMS polls for discovery
 
 	/* Rescale parameter and convert to unit16_t. */
 	pe->ichgr_maxvolts = ps->chgr_maxvolts*10.0f; // Set charger voltage limit (0.1 volts)
 	pe->ichgr_setvolts = pe->ichgr_maxvolts;
 	pe->ichgr_maxamps  = ps->chgr_maxamps*10.0f;  // Set charger current limit (0.1 amps)
 
-	pe->toct_poll_dur     = TIMCTR_ELCON_POLL; // Poll duration
-	pe->toctr_elcon_poll  = pe->toct_poll_dur; // Set first delay
-	pe->toctr_elcon_ready = TIMCTR_ELCON_TIMOUT; // Receving ELCON mgs, but status shows not ready
+	pe->toct_poll_dur        = TIMCTR_ELCON_POLL; // Poll duration
+	pe->toctr_elcon_poll     = pe->toct_poll_dur; // Set first delay
+	pe->toctr_elcon_ready    = TIMCTR_ELCON_TIMOUT; // Receving ELCON mgs, but status shows not ready
 	pe->toctr_elcon_pollflag = TIMCTR_ELCON_POLLFLAG; //
 
 	return;
 }
 /* *************************************************************************
  * static void bms_response_init(void);
- * @brief	: Clear response flags for next poll
+ * @brief	: Clear response flags for next poll (status)
  * *************************************************************************/
 static void bms_response_init(void)
 {
@@ -81,7 +88,23 @@ static void bms_response_init(void)
 	return;
 }
 /* *************************************************************************
- * tatic uint16_t updatetable(struct CANRCVBUFS* pcans, uint8_t idx);
+ * static void bms_response_init37(void);
+ * @brief	: Clear response flags for next poll (MISCQ_CHG_LIMITS)
+ * *************************************************************************/
+static void bms_response_init37(void)
+{
+	int i;
+	struct BMSTABLE* ptbl = &emclfunction.lc.lcstring.bmstable[0];
+	ptbl->idxbits = 0; // 18 cell index
+
+// Are these needed?		
+//		ptbl->toctr_status = TIMCTR_TIMEOUT_BMS;
+//		ptbl->toctr_cell   = TIMCTR_TIMEOUT_BMS;
+
+	return;
+}
+/* *************************************************************************
+ * static uint16_t updatetable(struct CANRCVBUFS* pcans, uint8_t idx);
  * @brief	: Update table for BMS node, from status or BMS cell CAN msgs
  * @param	: pcans = pointer to CAN msg w selection code
  * @param   : idx = index in bmstbl array for this node (0 - BMSTABLESIZE)
@@ -93,9 +116,12 @@ static uint16_t updatetable(struct CANRCVBUFS* pcans, uint8_t idx)
 
 	switch (pcans->can.cd.uc[0])
 	{
-	case CMD_CMD_MISCHB: // 45 Heartbeat 
-		if (pcans->can.cd.uc[1] == MISCQ_STATUS)
-		{ // Here, BMS node w status payload
+	case CMD_CMD_MISCHB:   // 0x2D 45d Heartbeat 
+	case CMD_CMD_TYPE2:    // 0x2B 43d format 2: request for misc
+	case CMD_CMD_MISCEMC1: // 0x30 43d misc data: response to emc1 sent TYPE2		
+		switch (pcans->can.cd.uc[1])
+		{
+		case MISCQ_STATUS: // Here, BMS node w status payload
 			ptbl->batt = pcans->can.cd.uc[4]; // Save status bytes
 			ptbl->fet  = pcans->can.cd.uc[5];
 			ptbl->mode = pcans->can.cd.uc[6];
@@ -109,8 +135,15 @@ static uint16_t updatetable(struct CANRCVBUFS* pcans, uint8_t idx)
 			{ // One or more cells above max for this node
 				ps->statusmax |= (1<<idx);  // Bit shows this node reported status				
 			}
+			break;
+
+		case MISCQ_CHG_LIMITS: // Here, BMS node w Voltage & Charge current max limits
+			ptbl->v_max = pcans->can.cd.us[3]; // Module voltage max
+			ptbl->i_max = pcans->can.cd.uc[4]; // Module charge current max
+			ptbl->i_bal = pcans->can.cd.uc[5]; // Module balancing current max
+			ps->vi_max_rpt |= (1<<idx);  // Bit shows this node reported v & i max
+			break;
 		}
-		break;
 
 	/* Various sources can send a command. */
 	case CMD_CMD_CELLHB:   // 44 Heartbeat
@@ -156,6 +189,45 @@ a 16b half-word is used. Hence, 0x9249 for having received all 6 msgs.
 	}
 	return ptbl->idxbits;	
 }
+/* *************************************************************************
+ * void discovery_end(void);
+ * @brief	: Summarize discovered BMS data
+ * *************************************************************************/
+uint8_t discovery_end_flag; // Signal main for printf'ing
+void discovery_end(void)
+{
+	discovery_end_flag = 1;
+
+	int i;
+	// Convenience pointers
+	struct STRINGCHGRFUNCTION* ps = &emclfunction.lc.lcstring;
+//	struct ELCONSTUFF* pe = &ps->elconstuff;
+//	struct ELCONSTUFF* pe = &emclfunction.lc.lcstring.elconstuff;
+//	struct BMSTABLE* ptbl = &emclfunction.lc.lcstring.bmstable[0];
+
+	/* Find string voltage and minimum currents, i.e. the max for ELCON settings */
+	uint8_t imax  = 255; // (25.5a) Max charging current
+	uint8_t ibal  = 255; // (25.5a) Max balancing current
+	uint32_t vtot = 0;   // Sum module max voltages
+	for (i = 0; i < ps->bmsnum; i++)
+	{
+		if (ps->bmstable[i].i_max < imax) imax = ps->bmstable[i].i_max;
+		if (ps->bmstable[i].i_bal < ibal) ibal = ps->bmstable[i].i_bal;
+		vtot += ps->bmstable[i].v_max; 
+	}
+	// JIC the BMS module has these as zero.
+	if (imax == 0) imax = DEFAULT_IMAX;
+	if (ibal == 0) ibal = DEFULAT_IBAL;
+
+	// ELCON setting limits
+	ps->chgr_maxvolts = (float)vtot * 0.1f; // Set charger voltage limit (volts)
+	ps->chgr_maxamps  = (float)imax * 0.1f; // Set charger current limit (amps)
+	ps->chgr_balamps  = (float)ibal * 0.1f; // Balancing current limit (amps)
+
+	return;
+}
+
+
 /* *************************************************************************
  * void do_timeoutcheck(void);
  * @brief	: Timer tick: Check time out counters and take action if necessary
@@ -236,6 +308,22 @@ void do_timeoutcheck(void)
 				// Set duration for next ELCON poll msg
 				pe->toctr_elcon_poll = pe->toct_poll_dur; 
 				do_elcon_poll();
+
+				// Discovery poll
+				if (pe->discovery_ctr > 0)
+				{ // Here, poll for voltage and current limits
+					pe->discovery_ctr -= 1;
+					if (pe->discovery_ctr <= 0)
+					{ // End BMS discovery polling
+						// Summarize, analyze, present the prizes garnered
+						discovery_end();
+					}
+					else
+					{ // Request BMS v & i limits (MISCQ_CHG_LIMITS)
+						do_bms_chg_limits_poll();
+					}
+				}
+
 			}
 		}	
 	}
@@ -293,7 +381,7 @@ void do_tableupdate(struct CANRCVBUFS* pcans)
 			// Array of pointers for sorting.
 			ps->pbmstbl[ps->bmsnum] = &ps->bmstable[ps->bmsnum];
 
-			// Update table items depending CAN msg payloard
+			// Update table items depending CAN msg payload
 			updatetable(pcans, ps->bmsnum);
 
 			// Advance size of BMS nodes discovered
@@ -344,6 +432,7 @@ void do_elcon(struct CANRCVBUFS* pcans)
 
 	/* Set next timeout period. */
 	pe->toctr_elcon_ready = TIMCTR_ELCON_TIMOUT;
+	pe->toctr_elcon_rcv   = TIMCTR_ELCON_RCV;
 
 	/* If first 4 bits of elcon status are not zero, it is not ready to charge. */
 	if ((pe->status_elcon & ((1<<5)-1)) != 0)
@@ -366,59 +455,80 @@ void do_elcon(struct CANRCVBUFS* pcans)
 	return;
 }
 /* *************************************************************************
- * void do_bms_send(void);
- * @brief	: Poll BMS for status
+ * void sendcan_type2(void);
+ * @brief	: Send a TYPE2 CAN msg request to all BMS
+ * @param   : ps   = pointer to struct with "everything"
+ * @param   : code = command code
+ * @param   : uc3  = sub-code (e.g. 0|1 for on|off command)
  * *************************************************************************/
-void do_bms_send(struct STRINGCHGRFUNCTION* ps, uint8_t code, uint8_t uc3)
+void sendcan_type2(struct STRINGCHGRFUNCTION* ps, uint8_t code, uint8_t uc3)
 {
 	ps->canbms.can.cd.uc[0] = CMD_CMD_TYPE2;
 	ps->canbms.can.cd.uc[1] = (0x3 << 6); // All nodes respond
 	ps->canbms.can.cd.uc[2] = code; // Request code
 	ps->canbms.can.cd.uc[3] = uc3;  // Sub-code
 	ps->canbms.can.cd.ui[1] = 0; // Reminder; no specific CAN ID
-
-	/* Reset bits that show a response to this poll was received. */
-	bms_response_init();	
-
 	xQueueSendToBack(CanTxQHandle,&ps->canbms,4);
 	return;
 }
 /* *************************************************************************
  * void do_bms_status_poll(void);
- * @brief	: Poll BMS for status
+ * @brief	: Poll all BMS for status
  * *************************************************************************/
 void do_bms_status_poll(void)
 {
 	struct STRINGCHGRFUNCTION* ps = &emclfunction.lc.lcstring;
-	do_bms_send(ps, MISCQ_STATUS,0); // 1 status
+	sendcan_type2(ps, MISCQ_STATUS,0); // 1 status
 
 	/* Reset bits that show a response to this poll was received. */
 	bms_response_init();	
+	return;
+}
+/* *************************************************************************
+ * void do_bms_chg_limits_poll(void);
+ * @brief	: Poll all BMS for voltage and current limits
+ * *************************************************************************/
+void do_bms_chg_limits_poll(void)
+{
+	struct STRINGCHGRFUNCTION* ps = &emclfunction.lc.lcstring;
+	sendcan_type2(ps, MISCQ_CHG_LIMITS,0); // 37d: Req volt & current limits
 	return;
 }
 /* *************************************************************************
  * void do_elcon_poll(void);
  * @brief	: Send CAN msg to ELCON
  * *************************************************************************/
+uint8_t dbg_do_elcon_poll_flag;
+uint8_t dbg_do_elcon_poll_status_elcon;
+int32_t dbg_do_elcon_poll_toctr_elcon_rcv;
+
 void do_elcon_poll(void)
 {
+//do_bms_status_flag = 1; // Signal main to print status
+
 	struct ELCONSTUFF* pe = &emclfunction.lc.lcstring.elconstuff;
 	struct CANTXQMSG*  px = &emclfunction.lc.lcstring.canelcon;
+
+dbg_do_elcon_poll_status_elcon = pe->status_elcon;
+dbg_do_elcon_poll_toctr_elcon_rcv = pe->toctr_elcon_rcv;
 
 	if ((pe->status_elcon != 0) || (pe->toctr_elcon_rcv <= 0))
 	{ // ELCON not ready or ELCON not responding
 		px->can.cd.ui[0] = 0; // Zero volts AND amps
 		px->can.cd.uc[4] = 1; // Charging stop
+
+dbg_do_elcon_poll_flag = 1;		
 	}
 	else
 	{
+dbg_do_elcon_poll_flag = 2;
+
 	// Make 16b payload big-endian with __REVSH
 		px->can.cd.us[0] = __REVSH(pe->ichgr_setvolts); //(ichgr_setvolts >> 8) || (ichgr_setvolts << 8);
 		px->can.cd.us[1] = __REVSH(pe->ichgr_setamps);  //(ichgr_setamps  >> 8) || (ichgr_setamps  << 8);	
 		px->can.cd.uc[4] = 0; // Charging start
 	}
 	
-
 //px->can.cd.us[0] = __REVSH((uint16_t)2160); //(ichgr_setvolts >> 8) || (ichgr_setvolts << 8);
 //px->can.cd.us[1] = __REVSH((uint16_t)6);  //(ichgr_setamps  >> 8) || (ichgr_setamps  << 8);		
 //px->can.cd.uc[4] = 0;
@@ -432,10 +542,14 @@ void do_elcon_poll(void)
  * @brief	: Commands from either PC, EMC, or deus ex machina
  * @param	: pcans = pointer to CAN msg w selection code
  * *************************************************************************/
+uint16_t pccmd; // Debug
 void do_emc_cmds(struct CANRCVBUFS* pcans)
 {
 	struct STRINGCHGRFUNCTION* ps= &emclfunction.lc.lcstring;
 	struct ELCONSTUFF* pe = &emclfunction.lc.lcstring.elconstuff;
+
+// Save for main & debugging
+pccmd = pcans->can.cd.us[0];
 
 	if (pcans->can.cd.uc[0] == CMD_EMC_SETMODE)
 	{ // Set EMC mode
@@ -444,6 +558,7 @@ void do_emc_cmds(struct CANRCVBUFS* pcans)
 		case EMCCMD_ELIDLE: // 0 // ELCON: Self discharging/stop
 			// Stop charging now.
 			ps->mode = EMCCMD_ELIDLE;
+			ps->stsstate = STSSTATE_IDLE;
 			pe->ichgr_setamps  = 0;
 			ps->chgr_rate_idx  = 0; // Charge current rate index
 			break;
@@ -454,7 +569,9 @@ void do_emc_cmds(struct CANRCVBUFS* pcans)
 			{ // Presently not charging mode
 				ps->mode = EMCCMD_ELCHG; // Set charging mode
 				ps->chgr_rate_idx  = (CHGRATENUM-1); // Start at max rate
-				ps->stsstate = STSSTATE_CHRG;
+//				ps->stsstate = STSSTATE_CHRG;
+				ps->stsstate = STSSTATE_DISCOVERY;
+				pe->discovery_ctr = DISCOVERY_POLL_LIMIT; // Time Discovery phase
 				pe->ichgr_setamps = ps->chgr_rate[ps->chgr_rate_idx] * 10.0f; 
 				pe->toctr_elcon_poll = TIMCTR_ELCON_POLL;
 				do_elcon_poll();
@@ -462,11 +579,11 @@ void do_emc_cmds(struct CANRCVBUFS* pcans)
 			break;
 
 		case EMCCMD_LCCHG: //  2 // Node Low Current: set charging mode
-			do_bms_send(ps, MISCQ_SET_SELFDCHG, 0); // 31 Set ON|OFF self-discharge mode
+			sendcan_type2(ps, MISCQ_SET_SELFDCHG, 0); // 31 Set ON|OFF self-discharge mode
 			break;
 
 		case EMCCMD_LCIDLE: // 3 // Node Low Current: self discharging/stop charging		
-			do_bms_send(ps, MISCQ_SET_SELFDCHG, 1); // 31 Set ON|OFF self-discharge mode
+			sendcan_type2(ps, MISCQ_SET_SELFDCHG, 1); // 31 Set ON|OFF self-discharge mode
 			break;	
 		}
 	}
@@ -479,6 +596,8 @@ void do_emc_cmds(struct CANRCVBUFS* pcans)
  * *************************************************************************/
 int8_t do_bms_status_check(void)
 {
+do_bms_status_flag = 1; // Signal main to print status
+
 	struct STRINGCHGRFUNCTION* ps= &emclfunction.lc.lcstring;
 	
 	// Check if poll resulted with all nodes reported status 
@@ -513,7 +632,7 @@ void do_chrg(struct ELCONSTUFF* pe)
 			ps->mode = STSSTATE_IDLE; // DONE!
 			pe->ichgr_setamps  = 0;
 			ps->chgr_rate_idx  = 0; // Charge current rate index
-			do_bms_send(ps, MISCQ_SET_SELFDCHG, 0); // 31 Set node chargers ON
+			sendcan_type2(ps, MISCQ_SET_SELFDCHG, 0); // 31 Set node chargers ON
 		}
 		else
 		{ // Do relax duration before setting new, lower current.
@@ -554,7 +673,7 @@ void do_relax(struct ELCONSTUFF* pe)
 					{ // End of stepping down charge current rate
 						ps->mode = STSSTATE_IDLE; // ===> DONE! <===
 						ps->chgr_rate_idx  = 0; // Charge current rate index
-						do_bms_send(ps, MISCQ_SET_SELFDCHG, 0); // 31 Set node chargers ON
+						sendcan_type2(ps, MISCQ_SET_SELFDCHG, 0); // 31 Set node chargers ON
 						pe->ichgr_setamps  = 0;
 
 					}

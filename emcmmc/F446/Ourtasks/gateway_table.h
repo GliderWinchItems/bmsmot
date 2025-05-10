@@ -14,7 +14,7 @@
 #define C1SELCODE_ELCON      2 // ELCON (not translated) on string
 #define C1SELCODE_POLLS      3 // PC, EMC1, EMC2 polling
 #define C1SELCODE_CONTACTOR0 4 // CONTACTOR on string
-#define C1SELCODE_EMC_CMDS   5 // PC->EMC, EMC->EMC1,2
+#define C1SELCODE_EMC_CMDS   6 // PC->EMC, EMC->EMC1,2
 
 #define C1SELCODE_DMOC   5 // Temp code for now
 

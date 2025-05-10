@@ -16,9 +16,10 @@
 #include "GatewayTask.h"
 
 /* emcmmc general status. */
-#define MMCSTATUS_BMSSTAT (1 << 0) // 1 = ALL BMS nodes reporting status
-#define MMCSTATUS_BMSCELL (1 << 1) // 1 = ALL BMS nodes reporting cell readings
-#define MMCSTATUS_CHRGR   (1 << 2) // 1 = Charger reporting OK
+#define MMCSTATUS_BMSSTAT  (1 << 0) // 1 = ALL BMS nodes reporting status
+#define MMCSTATUS_BMSCELL  (1 << 1) // 1 = ALL BMS nodes reporting cell readings
+#define MMCSTATUS_CHRGR    (1 << 2) // 1 = Charger reporting OK
+#define MMCSTATUS_BMSLMITS (1 << 3) // 1 = All BMS nodes reported v & i limits
 
 /* Status: BMS node reporting status. */
 #define SCTSTATUS_EXP (1<<0) // Expected number is reporting
@@ -42,6 +43,11 @@
 
 #define CHGRATENUM 6 // Number of charger current steps
 
+/* If BMS does not report module volt and charge current maxs */
+#define DEFAULT_VMAX ((3650*18)*0.1f) // (Voltage max 0.1v)
+#define DEFAULT_IMAX (13) // Charging max (0.1a)
+#define DEFULAT_IBAL (1)  // Balancing max (0.1a)
+
 /*
 Status1 CAN msg
 pay[0] : Msg is status
@@ -62,6 +68,9 @@ pay[4]-[7] (float) String voltage (Volts)
 #define TIMCTR_ELCON_TIMOUT (15000/SWTIME1PERIOD) // ELCON fails ready status (15sec)
 #define TIMCTR_RELAX (3000/SWTIME1PERIOD) // Charging turned off wait for cell volts to settle
 #define TIMCTR_ELCON_POLLFLAG (6000/SWTIME1PERIOD) // Wait to reset ELCON poll flag
+#define TIMCTR_ELCON_RCV (2000/SWTIME1PERIOD) // Wait for ELCON response to poll
+
+#define DISCOVERY_POLL_LIMIT 5 // Allow 5 polls before ending discovery phase
 
 /* Modes */
 #define EMCCMD_ELIDLE   0 // ELCON: Self discharging/stop 
@@ -101,6 +110,7 @@ pay[4]-[7] (float) String voltage (Volts)
 #define STSSTATE_CHRG   1  // Charging in progress
 #define STSSTATE_RELAX  2  // Waiting for cells to relax after charge stopped.
 #define STSSTATE_DBG    3  // PC or EMC direct setting of volts, amps, rate idx
+#define STSSTATE_DISCOVERY 4 // 
 
 /* status2 */
 #define STS2_NODES_RPT  (1 << 0) // 1 = All discovered nodes reported status
@@ -116,15 +126,18 @@ struct BMSTABLE
 	int32_t toctr_cell;   // Timeout counter: cell readings (0 = timed out)
 	int32_t toctr_status; // Timeout counter: status (0 = timed out)
 
-	uint16_t cell[18];  // Cell readings (100uv)
-	uint16_t idxbits;   // Bit for 'idx' of six cell msgs (all on = 0x9249)
+	uint16_t cell[18]; // Cell readings (100uv)
+	uint16_t idxbits;  // Bit for 'idx' of six cell msgs (all on = 0x9249)
+	uint16_t v_max;    // Voltage max for this module
+	uint8_t i_max;     // Max charging current (255 = 25.5a or greater) 
+	uint8_t i_bal;     // Max balancing current (0.1 steps)
+
 	uint8_t batt;       // Battery status
 	uint8_t fet;        // FET status
 	uint8_t mode;       // Mode status
 	uint8_t temperature;// Temperature status (maybe not implemented)
 	uint8_t groupnum;   // Six cell readings group number
 };
-
 
 /* Group vars having to do with ELCON together. */
 struct ELCONSTUFF
@@ -146,9 +159,12 @@ struct ELCONSTUFF
 	uint16_t ichgr_maxamps;  // Parameter float(amps) to uint32_t ui(0.1a)
 	uint16_t ichgr_setvolts; // Set ELCON: (0.1v)
 	uint16_t ichgr_setamps;  // Set ELCON: (0.1a)
+
 	/* ELCON status bits 0:4 HW FAIL:OVR TEMP:INPUT RVRSE:BATT DISC:COMM TO: */
 	uint8_t status_elcon;    // uc[4] status byte rcvd from ELCON
 	uint8_t pollflag;        // 0 = OK; 1 = someone else sent a poll CAN msg
+
+	int8_t discovery_ctr; // Count ELCON timed BMS polls for discovery
 };
 
 /* Working struct. */
@@ -168,10 +184,11 @@ struct STRINGCHGRFUNCTION
 
 	int32_t toctr_relax; // Wait after turning off ELCON 
 
-
-
 	float chgr_maxvolts; // Set charger voltage limit (volts)
 	float chgr_maxamps;  // Set charger current limit (amps)
+	float chgr_balamps;  // Balancing current limit (amps)
+
+	uint16_t vi_max_rpt; // Bits that module reported V & I max limits
 
 	/* Charging current steps. */
 	float chgr_rate[CHGRATENUM]; // Amps
@@ -190,14 +207,12 @@ struct STRINGCHGRFUNCTION
 
 	uint8_t status1;   // Bits on BMS number reporting
 	uint8_t mode;      // Charging or off
-	uint8_t state;     // Switch on status msg
+//	uint8_t state;     // Switch on status msg
 	uint8_t cellrcv;   // Node bits: all cell readings received 
 	uint8_t statusrcv; // Node bits: status msg received
 	uint8_t statusmax; // Node bits: Cell above max in status report
 	uint8_t status2;   // ?
-	uint8_t stsstate;  // Charging management
-		
-
+	uint8_t stsstate;  // Charging management state
 };
 
 /* *************************************************************************/
