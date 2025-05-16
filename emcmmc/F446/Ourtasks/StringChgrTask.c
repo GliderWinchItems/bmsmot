@@ -52,11 +52,11 @@ void StartStringChgrTask(void* argument)
 	struct STRINGCHGRFUNCTION* p = &emclfunction.lc.lcstring;
 	struct ELCONSTUFF* pe = &emclfunction.lc.lcstring.elconstuff;
 
-uint16_t tmpv;
-uint16_t tmpa;
+//uint16_t tmpv;
+//uint16_t tmpa;
 
 /* Setup serial output buffers for debugging uart */
-	struct SERIALSENDTASKBCB* pbuf1 = getserialbuf(&HUARTMON,  96); // PC monitor uart	
+//	struct SERIALSENDTASKBCB* pbuf1 = getserialbuf(&HUARTMON,  96); // PC monitor uart	
 //	struct SERIALSENDTASKBCB* pbuf2 = getserialbuf(&HUARTMON,  96); // PC monitor uart	
 /*
 

@@ -66,11 +66,11 @@ pay[4]-[7] (float) String voltage (Volts)
 #define TIMCTR_ELCON_POLL  ( 900/SWTIME1PERIOD) // Time between ELCON polls (900 ms)
 #define TIMCTR_TIMEOUT_BMS (1000/SWTIME1PERIOD) // Timecheck BMS responding. (1000 ms)
 #define TIMCTR_ELCON_TIMOUT (15000/SWTIME1PERIOD) // ELCON fails ready status (15sec)
-#define TIMCTR_RELAX (3000/SWTIME1PERIOD) // Charging turned off wait for cell volts to settle
+#define TIMCTR_RELAX (6) // Charging turned off wait for cell volts to settle
 #define TIMCTR_ELCON_POLLFLAG (6000/SWTIME1PERIOD) // Wait to reset ELCON poll flag
 #define TIMCTR_ELCON_RCV (2000/SWTIME1PERIOD) // Wait for ELCON response to poll
 
-#define DISCOVERY_POLL_LIMIT 5 // Allow 5 polls before ending discovery phase
+#define DISCOVERY_POLL_CT 6 // Allow 6 polls before ending discovery phase
 
 /* Modes */
 #define EMCCMD_ELIDLE   0 // ELCON: Self discharging/stop 
@@ -197,7 +197,7 @@ struct STRINGCHGRFUNCTION
 	uint8_t bmsnum;    // Discovered number of BMS nodes.
 
 	// chgr_rate_idx = (CHGRATENUM-1) is MAX rate
-	uint8_t chgr_rate_idx; // Index of rate in effect. 
+	 int8_t chgr_rate_idx; // Index of rate in effect. 
 
 	uint8_t nodeok; // Bits for each node that all readings received from poll
 
@@ -213,6 +213,10 @@ struct STRINGCHGRFUNCTION
 	uint8_t statusmax; // Node bits: Cell above max in status report
 	uint8_t status2;   // ?
 	uint8_t stsstate;  // Charging management state
+	uint8_t cmdpendingidle;
+	uint8_t cmdpendingchg;
+	uint8_t cmdpendingchg_prev;
+
 };
 
 /* *************************************************************************/

@@ -1419,14 +1419,18 @@ HAL_GPIO_WritePin(GPIOB, GPIO_PIN_13, GPIO_PIN_SET); // RED OFF
 
 #if 1
   static uint32_t sctr;
-  extern uint8_t do_bms_status_flag;
+//  extern uint8_t do_bms_status_flag;
+  extern uint8_t polltim_flag;
   struct STRINGCHGRFUNCTION* ps= &emclfunction.lc.lcstring;
+  struct ELCONSTUFF* pe = &ps->elconstuff;    
   extern uint16_t pccmd;
-  if (do_bms_status_flag != 0)
+//  if (do_bms_status_flag != 0)
+  if (polltim_flag != 0)    
   {
     yprintf(&pbuf1,"%5d, statusmax %02x pccmd %04X ",sctr++,ps->statusmax,pccmd);
-    yprintf(&pbuf2,"ststate %d\n\r",ps->stsstate);
-    do_bms_status_flag = 0;
+    yprintf(&pbuf2,"ststate %d discovery_ctr %d\n\r",ps->stsstate);
+//    do_bms_status_flag = 0;
+    polltim_flag = 0;
   }
 
 extern uint8_t dbg_do_elcon_poll_flag;
@@ -1434,12 +1438,32 @@ extern uint8_t dbg_do_elcon_poll_status_elcon;
 extern int32_t dbg_do_elcon_poll_toctr_elcon_rcv;
   if (dbg_do_elcon_poll_flag > 0)
   {
-    yprintf(&pbuf1,"elcon_poll_flag %d  status_elcon %02X toctr_elcon_rcv %d\n\r",
+    yprintf(&pbuf1,"elcon_poll_flag %d  status_elcon %02X toctr_elcon_rcv %d",
       dbg_do_elcon_poll_flag,dbg_do_elcon_poll_status_elcon,dbg_do_elcon_poll_toctr_elcon_rcv);
     dbg_do_elcon_poll_flag = 0;
-  }    
+extern int32_t dbg_amps;
+    yprintf(&pbuf3," ichgr_setvolts %d ichgr_maxamps %d dbg_amps %d\n\r",pe->ichgr_setvolts,pe->ichgr_maxamps,dbg_amps);
+    yprintf(&pbuf2," chgr_rate_idx %d",ps->chgr_rate_idx);
+
+    /* BMS status: CELLTOOHI for discovered nodes */
+    char ln[12];
+    char* pln = &ln[0];
+    *pln++ = '|';
+    for (int n = 0; n < ps->bmsnum; n++)
+    { 
+      if ((ps->pbmstbl[n]->batt & BSTATUS_CELLTOOHI) != 0)
+        *pln = 'X';
+      else
+        *pln = '.';
+      pln +=1;
+    }
+    *pln++ = '|'; *pln = 0;
+extern int32_t toctr_relax;
+    yprintf(&pbuf1," TOOHI %s statusmax %02X toctr_relax %d bmsnum %d\n\r",ln,ps->statusmax,ps->toctr_relax,ps->bmsnum);
+  }
 
 #endif   
+
 #if 1 // BMS Discovery table data
     struct STRINGCHGRFUNCTION* ps2= &emclfunction.lc.lcstring;
 extern uint8_t discovery_end_flag; // Signal main for printf'ing

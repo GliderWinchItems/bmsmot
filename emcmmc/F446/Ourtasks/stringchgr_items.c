@@ -14,6 +14,9 @@
 // Debug w main yprintf
 uint8_t do_bms_status_flag;
 
+uint8_t discovery_end_flag; // Signal main for printf'ing
+uint8_t polltim_flag;
+
 extern uint32_t swtim1_ctr; // Running count of swtim1 callbacks
 
 // Make these static after debugging. 
@@ -27,6 +30,7 @@ int8_t do_bms_status_check(void);
 void sendcan_type2(struct STRINGCHGRFUNCTION* ps, uint8_t code, uint8_t uc3);
 void do_bms_status_poll(void);
 void do_bms_chg_limits_poll(void);
+void do_cmdpending(struct STRINGCHGRFUNCTION* ps);
 
 /* *************************************************************************
  * void stringchgr_items_init(void);
@@ -45,16 +49,16 @@ void stringchgr_items_init(void)
 	{
 		ps->remap[i] = -1;
 	}
-	ps->status1       = 0;
-	ps->mode          = 0;
-	ps->vi_max_rpt    = 0; // Bits show module reported V & I max limits
-	pe->pollflag      = 0;
-	pe->discovery_ctr = 0; // Count ELCON timed BMS polls for discovery
+	ps->bmsnum         = 0;
+	ps->status1        = 0;
+	ps->vi_max_rpt     = 0; // Bits show module reported V & I max limits
+	ps->cmdpendingidle = 0;
+	ps->cmdpendingchg  = 0;
+	ps->cmdpendingchg_prev = 0;
+	ps->stsstate       = STSSTATE_DISCOVERY; // Begin with BMS discovery
 
-	/* Rescale parameter and convert to unit16_t. */
-	pe->ichgr_maxvolts = ps->chgr_maxvolts*10.0f; // Set charger voltage limit (0.1 volts)
-	pe->ichgr_setvolts = pe->ichgr_maxvolts;
-	pe->ichgr_maxamps  = ps->chgr_maxamps*10.0f;  // Set charger current limit (0.1 amps)
+	pe->pollflag       = 0;
+	pe->discovery_ctr  = DISCOVERY_POLL_CT; // Count ELCON timed BMS polls for discovery
 
 	pe->toct_poll_dur        = TIMCTR_ELCON_POLL; // Poll duration
 	pe->toctr_elcon_poll     = pe->toct_poll_dur; // Set first delay
@@ -91,9 +95,10 @@ static void bms_response_init(void)
  * static void bms_response_init37(void);
  * @brief	: Clear response flags for next poll (MISCQ_CHG_LIMITS)
  * *************************************************************************/
+#if 0
 static void bms_response_init37(void)
 {
-	int i;
+//	int i;
 	struct BMSTABLE* ptbl = &emclfunction.lc.lcstring.bmstable[0];
 	ptbl->idxbits = 0; // 18 cell index
 
@@ -103,6 +108,7 @@ static void bms_response_init37(void)
 
 	return;
 }
+#endif
 /* *************************************************************************
  * static uint16_t updatetable(struct CANRCVBUFS* pcans, uint8_t idx);
  * @brief	: Update table for BMS node, from status or BMS cell CAN msgs
@@ -201,9 +207,7 @@ void discovery_end(void)
 	int i;
 	// Convenience pointers
 	struct STRINGCHGRFUNCTION* ps = &emclfunction.lc.lcstring;
-//	struct ELCONSTUFF* pe = &ps->elconstuff;
-//	struct ELCONSTUFF* pe = &emclfunction.lc.lcstring.elconstuff;
-//	struct BMSTABLE* ptbl = &emclfunction.lc.lcstring.bmstable[0];
+	struct ELCONSTUFF* pe = &emclfunction.lc.lcstring.elconstuff;
 
 	/* Find string voltage and minimum currents, i.e. the max for ELCON settings */
 	uint8_t imax  = 255; // (25.5a) Max charging current
@@ -219,15 +223,18 @@ void discovery_end(void)
 	if (imax == 0) imax = DEFAULT_IMAX;
 	if (ibal == 0) ibal = DEFULAT_IBAL;
 
-	// ELCON setting limits
+	/* ELCON setting limits */
 	ps->chgr_maxvolts = (float)vtot * 0.1f; // Set charger voltage limit (volts)
 	ps->chgr_maxamps  = (float)imax * 0.1f; // Set charger current limit (amps)
 	ps->chgr_balamps  = (float)ibal * 0.1f; // Balancing current limit (amps)
 
+	/* Rescale parameter and convert to unit16_t. */
+	pe->ichgr_maxvolts = ps->chgr_maxvolts*10.0f; // Set charger voltage limit (0.1 volts)
+	pe->ichgr_setvolts = pe->ichgr_maxvolts;
+	pe->ichgr_maxamps  = ps->chgr_maxamps*10.0f;  // Set charger current limit (0.1 amps)	
+
 	return;
 }
-
-
 /* *************************************************************************
  * void do_timeoutcheck(void);
  * @brief	: Timer tick: Check time out counters and take action if necessary
@@ -275,76 +282,67 @@ void do_timeoutcheck(void)
 		}
 	}
 
-	/* Transmit ELCON w charging logic/states. */
+	/* Polling cycle */
 	if (pe->pollflag == 0)
-	{
-		if (pe->toctr_elcon_poll > 0)
-		{ 
-			pe->toctr_elcon_poll -= 1;
-			if (pe->toctr_elcon_poll <= 0)
+	{ //Someone else is NOT polling ELCON
+		pe->toctr_elcon_poll -= 1;
+		if (pe->toctr_elcon_poll < 0)
+		{ // Poll timeout ended.
+polltim_flag = 1; // Trigger main for printf
+			// Set duration for next ELCON poll msg
+			pe->toctr_elcon_poll = pe->toct_poll_dur;
+			switch (ps->stsstate)			
 			{
-				if (do_bms_status_check() == 0)
-				{ // Poll cycle ends:start next cycle
-					switch (ps->mode)			
-					{
-					case STSSTATE_IDLE: // 0 Just poll ELCON to keep its COMM status alive
-						break;
-					case STSSTATE_CHRG: // 1 Charging in progress
-						do_chrg(pe); 
-						break;
-					case STSSTATE_RELAX:// 2 Waiting for cells to relax after charge stopped.
-						do_relax(pe);
-						break;
-					case STSSTATE_DBG:  // 3 PC or EMC direct setting of volts, amps, rate idx			
-						do_dbg(pe);
-						break;
-					}
-					do_bms_status_poll(); // Start next BMS poll
+			case STSSTATE_IDLE: // 0 Just poll ELCON to keep its COMM status alive
+				do_cmdpending(ps); // Check for commands from PC
+				break;
+			case STSSTATE_CHRG: // 1 Charging in progress
+				do_chrg(pe); 
+				do_cmdpending(ps); // Check for commands from PC
+				do_bms_status_poll(); // Poll all BMS for status
+				do_elcon_poll(); // Poll ELCON				
+				break;
+			case STSSTATE_RELAX:// 2 Waiting for cells to relax after charge paused.
+				do_relax(pe);
+				do_cmdpending(ps); // Check for commands from PC
+				do_bms_status_poll(); // Poll all BMS for status
+				do_elcon_poll(); // Poll ELCON
+				break;
+			case STSSTATE_DBG:  // 3 PC or EMC direct setting of volts, amps, rate idx			
+				do_dbg(pe);
+				break;
+			case STSSTATE_DISCOVERY: // 4 Discovery phase
+				// Here, poll for voltage and current limits
+				pe->discovery_ctr -= 1;
+				if (pe->discovery_ctr <= 0)
+				{ // End BMS discovery polling
+					// Summarize, analyze, present the prizes garnered
+					discovery_end();
+					ps->stsstate = STSSTATE_IDLE;
 				}
 				else
-				{ // Error: All nodes in table did not return a status in this interval
-
-				}			
-				// Set duration for next ELCON poll msg
-				pe->toctr_elcon_poll = pe->toct_poll_dur; 
-				do_elcon_poll();
-
-				// Discovery poll
-				if (pe->discovery_ctr > 0)
-				{ // Here, poll for voltage and current limits
-					pe->discovery_ctr -= 1;
-					if (pe->discovery_ctr <= 0)
-					{ // End BMS discovery polling
-						// Summarize, analyze, present the prizes garnered
-						discovery_end();
-					}
-					else
-					{ // Request BMS v & i limits (MISCQ_CHG_LIMITS)
-						do_bms_chg_limits_poll();
-					}
+				{ // Discovery phase still active
+					do_bms_chg_limits_poll(); // BMS poll for charger limits
 				}
-
+				do_bms_status_poll(); // Poll all BMS for status
+				do_elcon_poll(); // Poll ELCON
+				break;
+			default: // JIC the goober programmer screwed up.
+				morse_trap(474);
+				break;
 			}
-		}	
-	}
+		}
+	}		
 	else
-	{ // Here, someone else sent an ELCON poll msg 
+	{ // Here, someone else sent an ELCON poll msg. Timeout if no more received.
 		pe->toctr_elcon_pollflag -= 1;
 		if (pe->toctr_elcon_pollflag <= 0)
 		{ // Here, it looks like that "someone" is no longer sending ELCON poll msgs
 			pe->pollflag = 0; // Reset the wait flag
-			pe->toctr_elcon_poll = 1; // Regular poll next time thru routine
+			pe->toctr_elcon_poll = TIMCTR_ELCON_POLL; // Regular poll next time thru routine
+			stringchgr_items_init();  // Restart, as if a reboot
 		}		
-	}
-
-	if (pe->toctr_elcon_ready > 0)
-	{
-		pe->toctr_elcon_ready -= 1;
-		if (pe->toctr_elcon_ready <= 0)
-		{ // Not receiving ELCON status msgs
-			pe->status_elcon |= ELCONSTATUS_TIMOUT;
-		}
-	}
+	}	
 
 	/* Wink GREEN LED. */
 static int32_t toctr_led;
@@ -439,8 +437,8 @@ void do_elcon(struct CANRCVBUFS* pcans)
 	{ // ELCON status may have a reason to not charge
 		if (pe->toctr_elcon_ready <= 0)
 		{
-			pe->ichgr_setamps  = 0; // Don't try to charge (redundant)
-			ps->chgr_rate_idx  = 0; // Charge current rate index (zero current)
+//$			pe->ichgr_setamps  = 0; // Don't try to charge (redundant)
+//$			ps->chgr_rate_idx  = 0; // Charge current rate index (zero current)
 		}
 	}
 	else
@@ -501,11 +499,10 @@ void do_bms_chg_limits_poll(void)
 uint8_t dbg_do_elcon_poll_flag;
 uint8_t dbg_do_elcon_poll_status_elcon;
 int32_t dbg_do_elcon_poll_toctr_elcon_rcv;
+int32_t dbg_amps;
 
 void do_elcon_poll(void)
 {
-//do_bms_status_flag = 1; // Signal main to print status
-
 	struct ELCONSTUFF* pe = &emclfunction.lc.lcstring.elconstuff;
 	struct CANTXQMSG*  px = &emclfunction.lc.lcstring.canelcon;
 
@@ -532,7 +529,7 @@ dbg_do_elcon_poll_flag = 2;
 //px->can.cd.us[0] = __REVSH((uint16_t)2160); //(ichgr_setvolts >> 8) || (ichgr_setvolts << 8);
 //px->can.cd.us[1] = __REVSH((uint16_t)6);  //(ichgr_setamps  >> 8) || (ichgr_setamps  << 8);		
 //px->can.cd.uc[4] = 0;
-
+dbg_amps = pe->ichgr_setamps;
 	xQueueSendToBack(CanTxQHandle,px,4);
 
 	return;
@@ -556,26 +553,13 @@ pccmd = pcans->can.cd.us[0];
 		switch (pcans->can.cd.uc[1])
 		{
 		case EMCCMD_ELIDLE: // 0 // ELCON: Self discharging/stop
-			// Stop charging now.
-			ps->mode = EMCCMD_ELIDLE;
-			ps->stsstate = STSSTATE_IDLE;
+			ps->cmdpendingidle = 1; // Set a pending command
 			pe->ichgr_setamps  = 0;
 			ps->chgr_rate_idx  = 0; // Charge current rate index
 			break;
 
 		case EMCCMD_ELCHG:  // 1 // ELCON: Start charging
-			// Ignore multiple requests
-			if (ps->mode == EMCCMD_ELIDLE)
-			{ // Presently not charging mode
-				ps->mode = EMCCMD_ELCHG; // Set charging mode
-				ps->chgr_rate_idx  = (CHGRATENUM-1); // Start at max rate
-//				ps->stsstate = STSSTATE_CHRG;
-				ps->stsstate = STSSTATE_DISCOVERY;
-				pe->discovery_ctr = DISCOVERY_POLL_LIMIT; // Time Discovery phase
-				pe->ichgr_setamps = ps->chgr_rate[ps->chgr_rate_idx] * 10.0f; 
-				pe->toctr_elcon_poll = TIMCTR_ELCON_POLL;
-				do_elcon_poll();
-			}
+			ps->cmdpendingchg = 1; // Set a pending command
 			break;
 
 		case EMCCMD_LCCHG: //  2 // Node Low Current: set charging mode
@@ -611,7 +595,7 @@ do_bms_status_flag = 1; // Signal main to print status
 }
 /* *************************************************************************
  * void do_chrg(struct ELCONSTUFF* pe);
- * @brief	: Poll dur end:start--STSSTATE_CHRG   1  // Charging in progress
+ * @briefichgr_setvolts	: Poll dur end:start--STSSTATE_CHRG   1  // Charging in progress
  * @param	: pe = pointer struct with all this mess
  * *************************************************************************/
 void do_chrg(struct ELCONSTUFF* pe)
@@ -629,17 +613,16 @@ void do_chrg(struct ELCONSTUFF* pe)
 		ps->chgr_rate_idx -= 1;
 		if (ps->chgr_rate_idx == 0)
 		{ // End of stepping down charge current rate
-			ps->mode = STSSTATE_IDLE; // DONE!
-			pe->ichgr_setamps  = 0;
+			ps->stsstate = STSSTATE_IDLE; // DONE!
 			ps->chgr_rate_idx  = 0; // Charge current rate index
 			sendcan_type2(ps, MISCQ_SET_SELFDCHG, 0); // 31 Set node chargers ON
 		}
 		else
 		{ // Do relax duration before setting new, lower current.
-			ps->mode = STSSTATE_RELAX;
+			ps->stsstate = STSSTATE_RELAX;
 			ps->toctr_relax = TIMCTR_RELAX; // Relax duration timer ticks
-			pe->ichgr_setamps  = 0;
 		}
+		pe->ichgr_setamps  = 0;
 	}
 }
 /* *************************************************************************
@@ -654,34 +637,37 @@ void do_relax(struct ELCONSTUFF* pe)
 	{
 		ps->toctr_relax -= 1;
 		if (ps->toctr_relax > 0)
-		{ // Waiting for cell volts to settle 
-		}
-		else
-		{ // Relax time-out: check next step
-			/* Any cell in any node above max? */
-			if (ps->statusmax == 0)
-			{ // No. Set new (reduced) charge current
-				ps->mode = STSSTATE_CHRG; // Back to charging state
-				pe->ichgr_setamps = ps->chgr_rate[ps->chgr_rate_idx] * 10.0f;
+			return;
+
+	 /* Relax time-out */
+		/* Any cell in any node still above max? */
+		if (ps->statusmax == 0)
+		{ // No. Set new (reduced) charge current
+			ps->chgr_rate_idx -= 1;
+			if (ps->chgr_rate_idx <= 0)
+			{ // End of stepping down charge current rate
+				ps->stsstate = STSSTATE_IDLE; // ===> DONE! <===
+				pe->ichgr_setamps  = 0;
+				sendcan_type2(ps, MISCQ_SET_SELFDCHG, 0); // (31d) Set node chargers ON
 			}
 			else
-			{ // Yes. relax some more
-				if (ps->chgr_rate_idx > 0)
-				{
-					ps->chgr_rate_idx -= 1;
-					if (ps->chgr_rate_idx == 0)
-					{ // End of stepping down charge current rate
-						ps->mode = STSSTATE_IDLE; // ===> DONE! <===
-						ps->chgr_rate_idx  = 0; // Charge current rate index
-						sendcan_type2(ps, MISCQ_SET_SELFDCHG, 0); // 31 Set node chargers ON
-						pe->ichgr_setamps  = 0;
-
-					}
-				}
-				else
-				{ // Do another relax duration
-					ps->toctr_relax = TIMCTR_RELAX; // Relax duration timer ticks
-				}
+			{ // Resume charging at previously computed reduced rate
+				ps->stsstate = STSSTATE_CHRG; // Back to charging state
+			}
+		}
+		else
+		{ // Yes. Do another relax cycle and step the current down
+			ps->chgr_rate_idx -= 1;
+			if (ps->chgr_rate_idx <= 0)
+			{
+			 // End of stepping down charge current rate
+				ps->stsstate = STSSTATE_IDLE; // ===> DONE! <===
+				pe->ichgr_setamps  = 0;
+				sendcan_type2(ps, MISCQ_SET_SELFDCHG, 0); // (31d) Set node chargers ON
+			}
+			else
+			{ // Do another relax duration
+				ps->toctr_relax = TIMCTR_RELAX; // Relax duration timer ticks
 			}
 		}
 	}
@@ -700,9 +686,40 @@ void do_idle(struct ELCONSTUFF* pe)
 /* *************************************************************************
  * void do_dbg(struct ELCONSTUFF* pe);
  * @brief	: Poll dur end:start--STSSTATE_DBG    3  // PC or EMC direct setting of volts, amps, rate idx
- * @param	: pe = pointer struct with alldo_bms_status_poll this mess
+ * @param	: pe = pointer to struct with alldo_bms_status_poll this mess
  * *************************************************************************/
 void do_dbg(struct ELCONSTUFF* pe)
 {
 	// TODO
+}
+/* *************************************************************************
+ * void do_cmdpending(struct STRINGCHGRFUNCTION* ps);
+ * @brief	: Handle pending commands from PC
+ * @param	: ps = pointer struct with string function stuff
+ * *************************************************************************/
+void do_cmdpending(struct STRINGCHGRFUNCTION* ps)
+{
+	struct ELCONSTUFF* pe = &emclfunction.lc.lcstring.elconstuff;
+	/* Avoid problem of consecutive charge commands. */
+	if (ps->cmdpendingchg != 0)
+	{ // Command pending to set charge mode
+		if (ps->cmdpendingchg_prev == 0)
+		{
+			ps->cmdpendingchg_prev = 1;
+			ps->stsstate = STSSTATE_CHRG;
+			ps->chgr_rate_idx = CHGRATENUM;
+			pe->ichgr_setamps = pe->ichgr_maxamps;
+			pe->ichgr_setvolts = pe->ichgr_maxvolts;
+		}
+	}
+
+	/* PC wants return to IDLE */
+	if (ps->cmdpendingidle != 0)
+	{ // Command pending to set back to idle mode
+//		stringchgr_items_init();
+		// Override init
+		ps->stsstate = STSSTATE_IDLE;
+		ps->cmdpendingchg_prev = 0;
+	}
+	return;
 }
