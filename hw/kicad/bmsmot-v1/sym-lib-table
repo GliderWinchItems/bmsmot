@@ -1,0 +1,4 @@
+(sym_lib_table
+  (version 0)
+  (lib (name "bmsmot-eagle-import")(type "KiCad")(uri "${KIPRJMOD}/bmsmot-eagle-import.kicad_sym")(options "")(descr ""))
+)

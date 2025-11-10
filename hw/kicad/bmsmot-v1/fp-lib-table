@@ -1,0 +1,4 @@
+(fp_lib_table
+  (version 7)
+  (lib (name "bmsmot")(type "KiCad")(uri "$(KIPRJMOD)/bmsmot.pretty")(options "")(descr ""))
+)
